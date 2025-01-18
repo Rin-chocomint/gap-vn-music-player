@@ -6,6 +6,8 @@ Aplikasi berbasis Electron Chromium, dibuat dengan HTML, CSS, dan JS. Jadi maklu
 
 Kamu dapat memodifikasi teks-teks yang ada di aplikasi dengan mengedit file **"index.html"** menggunakan teks editor seperti Notepad.
 
+-> klick kanan aja **`index.html`** terus open with notepad, nah kamu skrol ke bawah terus sampai nemu teks yang mau kamu edit.
+
 ### PETUNJUK:
 Untuk buat playlist musik, kamu perlu membuat folder baru di dalam folder **"resources\app\aset\music"**.  
 Pokoknya, buka aja folder **"resources"**, terus buka lagi **"app"**, sampai ke folder **"music"**.  
