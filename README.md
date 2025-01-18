@@ -17,4 +17,3 @@ disitu kamu dapat mengedit berbagai macam teks yang ada di aplikasi seperti yang
 teks editor seperti notepad untuk membuka file "index.html" itu. jadi untuk mengedit buka dengan teks editor ya, jangan cuma diklick dua kali.
 
 untuk mengganti foto profil yang ada di main menu, kamu bisa ganti file "ikon.jpg" yang lokasinya ada di "resources\app\aset". pastikan ukuranya kotak atau 1:1 yak.
----------------------------------------------------------------------------------------------------------------------------------------------------------------------
