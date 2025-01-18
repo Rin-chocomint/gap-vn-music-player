@@ -2,6 +2,8 @@ Sebuah proyek untuk mempelajari pemerograman.
 
 Aplikasi berbasis Electron Chromium, dibuat dengan HTML, CSS, dan JS. Jadi maklumi segala kekurangan dan kelebihannya.
 
+Buat yang bingung download aplikasinya gimana, coba lihat bagian kanan tab layar github kamu saat ini. Disitu ada bagian yang tertulis "Releases", nah itu dibawahnya keliatan ada "Gap vn & music player". Klick aja nanti didalam klick "Gap.vn.music.player.v0.0.0.6.Alpha.rar" untuk download aplikasinya. Habis itu ekstrak aj
+
 ---
 
 Kamu dapat memodifikasi teks-teks yang ada di aplikasi dengan mengedit file **"index.html"** yang ada di folder **"resources"** didalam folder **"app"**. 
