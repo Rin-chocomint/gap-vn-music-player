@@ -4,7 +4,9 @@ Aplikasi berbasis Electron Chromium, dibuat dengan HTML, CSS, dan JS. Jadi maklu
 
 ---
 
-Kamu dapat memodifikasi teks-teks yang ada di aplikasi dengan mengedit file **"index.html"** menggunakan teks editor seperti Notepad.
+Kamu dapat memodifikasi teks-teks yang ada di aplikasi dengan mengedit file **"index.html"** yang ada di folder **"resources"** didalam folder **"app"**. 
+
+Edit **"index.html"** menggunakan teks editor seperti Notepad.
 
 -> klick kanan aja **`index.html`** terus open with notepad, nah kamu skrol ke bawah terus sampai nemu teks-teks yang ada di aplkasi, disitu kamu bisa edit sekuka hati.
 
