@@ -1,0 +1,205 @@
+<title>Selamat dateng di GAP Music & Vn Player!</title>
+<div class="custom-title-bar">
+    <span class="title-bar-text">Selamat dateng di Music & Vn Player!</span>
+</div>
+
+<div id="info-popup" class="popup">
+    <div class="popup-content">
+        <div class="popup-header">
+            <img src="./aset/ikon.jpg" alt="Icon" class="popup-icon">
+            <div class="header-text">
+                <h2 class="popup-title">Informasi Proyek</h2>
+                <p class="popup-description">
+                    Project ini dibuat hanya untuk mempelajari pemrograman dan menggambarkan gambaran jika anime kesukaan kalian menjadi sebuah game di-Lobby. Jika kamu ingin ikut berkontribusi ke Project ini hubungi discord rin_amelia
+                </p>
+                <p class="popup-description">
+                    Baca petunjuk untuk melakukan kostumisasi playlist, wallpaper, profil, atau skining aplikasi.
+                </p>
+            </div>
+        </div>
+
+        <div class="popup-main">
+            <div class="option-group">
+                <label for="skip-scene-checkbox">
+                    <input type="checkbox" id="skip-scene-checkbox">
+                    Skip Scene?
+                </label>
+            </div>
+        
+            <div class="option-group">
+                <label for="playlist-select">Select Playlist:</label>
+                <select id="playlist-select"></select>
+            </div>
+        
+            <div class="option-group">
+                <label for="wallpaper-select">Select Wallpaper:</label>
+                <select id="wallpaper-select"></select>
+            </div>
+        </div>
+        
+
+        <div class="popup-footer">
+            <p class="popup-warning">
+                <strong>Perhatian: </strong>Pastikan kamu memahami konteks nya sebelum melanjutkan.
+            </p>
+            <button id="popup-ok-button">OK</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.popup {
+    position: fixed;
+    top: 0;
+    left: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+}
+
+.popup-content {
+    background: white;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    padding: 10px;
+    font-family: 'Lexend', sans-serif;
+    color: black;
+}
+
+.popup-header {
+    display: flex;
+    align-items: center;
+}
+
+.popup-icon {
+    width: 50px;
+    height: 50px;
+    margin-right: 15px;
+}
+
+.header-text {
+    flex-grow: 1;
+}
+
+.popup-title {
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.popup-description {
+    font-size: 14px;
+    color: #666;
+}
+
+.popup-main {
+    margin: 7px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.option-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.option-group label {
+    font-size: 14px;
+}
+
+select {
+    padding: 5px;
+    font-size: 14px;
+    width: 100%;
+    max-width: 300px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+input[type="checkbox"] {
+    margin-right: 10px;
+}
+
+.popup-main label {
+    font-size: 14px;
+}
+
+.popup-footer {
+    border-top: 1px solid #ccc;
+    padding-top: 15px;
+    text-align: center;
+}
+
+.popup-warning {
+    color: red;
+    font-size: 14px;
+    margin-bottom: 10px;
+}
+
+#popup-ok-button {
+    padding: 10px 20px;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+#popup-ok-button:hover {
+    background: #0056b3;
+}
+
+img {
+    margin: 10px;
+}
+
+</style>
+
+<script>
+    const { ipcRenderer } = require('electron');
+    
+    // Kirim data pilihan pengguna ke main.js
+    document.getElementById('popup-ok-button').addEventListener('click', () => {
+    const skipScene = document.getElementById('skip-scene-checkbox').checked;
+    
+    // 1) Ambil nama subfolder playlist yang dipilih
+    const selectedPlaylist = document.getElementById('playlist-select').value;
+    
+    // 2) Ambil nama subfolder wallpaper yang dipilih
+    const selectedWallpaper = document.getElementById('wallpaper-select').value;
+    
+    // 3) Kirim ke main.js
+    // kirim "object", bukan hanya skipScene
+    ipcRenderer.send('open-main-window', {
+        skipScene,
+        selectedPlaylist,
+        selectedWallpaper
+    });
+});
+    
+    // Menerima data dari main.js untuk dropdown
+    ipcRenderer.on('populate-dropdowns', (event, data) => {
+        const { playlists, wallpapers } = data;
+    
+        const playlistSelect = document.getElementById('playlist-select');
+        const wallpaperSelect = document.getElementById('wallpaper-select');
+    
+        playlists.forEach(playlist => {
+            const option = document.createElement('option');
+            option.value = playlist;
+            option.textContent = playlist;
+            playlistSelect.appendChild(option);
+        });
+    
+        wallpapers.forEach(wallpaper => {
+            const option = document.createElement('option');
+            option.value = wallpaper;
+            option.textContent = wallpaper;
+            wallpaperSelect.appendChild(option);
+        });
+    });
+    </script>
+    

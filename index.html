@@ -1,0 +1,1401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;700&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Judul Aplikasi -->
+    <title> Gap vn & music Player | v0.0.0.6 Alpha </title>
+    <style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Lexend', sans-serif;
+}
+
+body {
+    overflow: hidden;
+    background-color: black;
+    color: white;
+    text-align: center;
+    transition: opacity 4.3s ease-in-out;
+}
+
+body.fade-out {
+    opacity: 0;
+}
+
+.screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    background-color: black;
+    transition: opacity 1s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+/* ============================ Warning Screen =======================================*/
+#warning-screen {
+    display: flex;
+    font-size: 1.5rem;
+    animation: fadeInOut 5s forwards;
+}
+
+@keyframes fadeInOut {
+    0% { opacity: 0; }
+    50% { opacity: 1; }
+    100% { opacity: 1; }
+}
+/* ============================ Warning Screen End =======================================*/
+
+/* ============================ Dev =======================================*/
+#developer-screen h2 {
+    font-size: 4rem;
+    font-weight: bold;
+    animation: fadeIn 2s ease forwards;
+}
+
+#developer-screen h4 {
+    font-size: 1.5rem;
+    margin-top: 10px;
+    animation: fadeIn 2s ease forwards;
+}
+/* ============================ Dev End =======================================*/
+
+/* ============================ Konsep Oleh =======================================*/
+
+/* ============================ Konsep Oleh End =======================================*/
+
+/* ========================== Judul Utama ==========================================*/
+
+@keyframes fadeInLetter {
+    from {
+        opacity: 0;
+        filter: blur(10px);
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        filter: blur(0);
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeInBlur {
+    from {
+        opacity: 0;
+        filter: blur(10px);
+    }
+    to {
+        opacity: 1;
+        filter: blur(0);
+    }
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    80% { opacity: 0.7; }
+}
+
+#title-screen h1 {
+    font-size: 3rem;
+    font-weight: bold;
+    color: #ffffff;
+    text-align: center;
+    text-shadow:
+        0 0 5px #8ec9ff,
+        0 0 10px #8ec9ff,
+        0 0 20px #8ec9ff,
+        0 0 30px rgba(142, 201, 255, 0.8),
+        0 0 40px rgba(142, 201, 255, 0.6);
+    animation: glowPulse 2s infinite alternate;
+}
+
+@keyframes glowPulse {
+    from {
+        text-shadow: 
+            0 0 5px #8ec9ff,
+            0 0 10px #8ec9ff,
+            0 0 20px #8ec9ff,
+            0 0 30px rgba(142, 201, 255, 0.8),
+            0 0 40px rgba(142, 201, 255, 0.6);
+    }
+    to {
+        text-shadow: 
+            0 0 10px #8ec9ff,
+            0 0 20px #8ec9ff,
+            0 0 30px rgba(142, 201, 255, 0.9),
+            0 0 40px rgba(142, 201, 255, 0.7),
+            0 0 50px rgba(142, 201, 255, 0.5);
+    }
+}
+
+#title-screen h1 span {
+    display: inline-block;
+    opacity: 0;
+    animation: fadeInLetter 0.5s ease forwards;
+}
+
+#title-screen h3 {
+    font-size: 2rem;
+    opacity: 0;
+    animation: fadeInBlur 1s ease-out forwards;
+    animation-delay: 2s;
+}
+
+#title-screen p {
+    font-size: 1.5rem;
+    opacity: 0;
+    animation: fadeIn 1s ease-out forwards, blink 0.5s infinite;
+    animation-delay: 0s;
+    position: relative;
+    top: 230px;
+}
+
+#title-screen p {
+    font-size: 1.5rem;
+    opacity: 0;
+    animation: fadeIn 1s ease-out forwards, blink 0.5s infinite;
+    animation-delay: 0s;
+    position: relative;
+    top: 230px;
+}
+
+#rotating-text {
+    font-size: 1.5rem;
+    opacity: 0;
+    margin: 60px;
+    animation: fadeIn 2s ease-out forwards;
+    animation-delay: 6s;
+}
+
+@keyframes slideIn {
+    from { transform: translateY(100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slideOut {
+    from { transform: translateY(0); opacity: 1; }
+    to { transform: translateY(-100%); opacity: 0; }
+}
+
+#background-video {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    object-fit: cover;
+    opacity: 0;
+    z-index: -1;
+    transition: opacity 2s ease-in-out;
+    filter: brightness(70%);
+}
+
+
+.star {
+    width: 3px;
+    height: 3px;
+    background: white;
+    border-radius: 50%;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+}
+
+.star-container {
+    position: absolute;
+    animation: fall linear infinite;
+}
+
+.star-container {
+    position: absolute;
+    animation: fall linear infinite;
+}
+
+.star-container::before {
+    content: '';
+    position: absolute;
+    width: 200px;
+    height: 2px;
+    filter: blur(4px);
+    top: 50%;
+    left: -200px;
+    transform: translateY(-50%) rotate(0deg);
+    opacity: 0.8;
+}
+
+@keyframes fall {
+    0% {
+        transform: translateX(var(--start-x)) translateY(var(--start-y)) scale(1);
+        opacity: 1;
+    }
+    100% {
+        transform: translateX(var(--end-x)) translateY(var(--end-y)) scale(0.7);
+        opacity: 0;
+    }
+}
+
+.star-container:nth-child(1) { top: 20%; }
+.star-container:nth-child(2) { top: 20%; }
+.star-container:nth-child(3) { top: 20%; }
+.star-container:nth-child(4) { top: 20%; }
+.star-container:nth-child(5) { top: 25%; }
+
+/* ========================== End Judul Utama ==========================================*/
+
+/* ============================ Main Menu =========================================*/
+
+ /*============== Profil =============== */
+ #profile-section {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    transform: scale(0.8);
+    padding: 10px;
+    background: linear-gradient(135deg, rgba(0, 204, 255, 0.2), rgba(0, 102, 204, 0.3));
+    border-radius: 15px;
+    box-shadow: 0 0 15px rgba(0, 204, 255, 0.3);
+    transition: box-shadow 0.3s ease-in-out, transform 0.3s ease-in-out;
+}
+
+#profile-section:hover {
+    box-shadow: 0 0 20px rgba(0, 204, 255, 0.6);
+}
+
+#profile-picture {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    border: 3px solid cyan;
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.8);
+    transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+}
+
+#profile-picture:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 20px rgba(0, 255, 255, 1);
+}
+
+#profile-info {
+    color: white;
+    text-align: left;
+    font-family: 'Poppins', sans-serif;
+}
+
+#profile-info h2 {
+    margin: 0;
+    font-size: 1.8rem;
+    text-shadow: 0 0 5px cyan, 0 0 10px rgba(0, 255, 255, 0.6);
+    transition: color 0.3s ease-in-out;
+}
+
+#profile-info h2:hover {
+    color: #00e5ff;
+}
+
+#profile-info p {
+    margin: 4px 0;
+    font-size: 1rem;
+    color: #bbb;
+    text-shadow: 0 0 3px rgba(0, 255, 255, 0.3);
+}
+
+#level-bar {
+    position: relative;
+    width: 200px;
+    height: 20px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid cyan;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-top: 5px;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+}
+
+#level-fill {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, #00bfff, #1e90ff, #8a2be2, #9400d3, #00e5ff);
+    background-size: 300% 100%;
+    animation: gradient-shift 2s infinite;
+    border-radius: 8px;
+}
+
+@keyframes gradient-shift {
+    0% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+#level-max-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 0.8rem;
+    font-weight: bold;
+    text-shadow: 0 0 5px cyan;
+    pointer-events: none;
+}
+
+@keyframes glow-pulse {
+    0%, 100% {
+        box-shadow: 0 0 5px rgba(0, 255, 255, 0.6);
+    }
+    50% {
+        box-shadow: 0 0 15px rgba(0, 255, 255, 1);
+    }
+}
+
+ /*============== End Profil =============== */
+
+ /*============== Karakter Menu =============== */
+
+ #character-menu {
+    opacity: 0;
+    display: none;
+}
+
+ .main-container {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.image-preview {
+    width: 20%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+    transition: width 0.5s ease, opacity 0.5s ease;
+}
+
+.image-preview:hover {
+    width: 42%;
+}
+
+.overlay {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    height: 50%;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.7) 30%, rgba(0, 0, 0, 0.5) 60%, transparent 100%);
+    opacity: 0;
+    transition: height 0.5s ease, opacity 0.5s ease;
+}
+
+.image-preview:hover .overlay {
+    opacity: 1;
+}
+
+.role-badge {
+    border-radius: 20px;
+    padding: 6px 12px;
+    font-weight: bold;
+    color: white;
+}
+
+#back-to-main-menu {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    padding: 10px 20px;
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.3s ease;
+}
+
+#back-to-main-menu:hover {
+    background-color: rgba(0, 0, 0, 0.9);
+}
+
+ /*============== End Karakter Menu =============== */
+
+
+/*=================== Menu ===============*/
+    #menu-options {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+    }
+
+    #menu-options h1 {
+        font-size: 3rem;
+        color: cyan;
+        margin-bottom: 20px;
+    }
+
+    #menu-options ul {
+        list-style: none;
+        font-size: 2rem;
+        padding: 0;
+    }
+
+    #menu-options li {
+        margin: 10px;
+        cursor: pointer;
+        transition: transform 0.2s, color 0.2s;
+    }
+
+    #menu-options li:hover {
+        transform: scale(1.1);
+        color: cyan;
+    }
+
+    #menu-popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.8);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            z-index: 100;
+        }
+
+        #menu-popup h2 {
+            color: cyan;
+            margin-bottom: 20px;
+        }
+
+        #menu-popup ul {
+            list-style: none;
+            padding: 0;
+            font-size: 1.5rem;
+        }
+
+        #menu-popup li {
+            margin: 10px;
+            cursor: pointer;
+            transition: transform 0.2s, color 0.2s;
+            color: white;
+        }
+
+        #menu-popup li:hover {
+            transform: scale(1.1);
+            color: cyan;
+        }
+
+        #close-popup {
+            margin-top: 20px;
+            background: none;
+            border: 2px solid cyan;
+            color: cyan;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        #close-popup:hover {
+            background-color: cyan;
+            color: black;
+        }    
+    
+/*=================== End Menu ===============*/
+
+
+ /*============== Background Lobby =============== */
+    #background-section {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: -1;
+    }
+
+    #character-background {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        filter: brightness(70%);
+    }
+ /*============== End Background Lobby =============== */
+
+
+ /*============== Wallpeper Next =============== */
+ #wallpaper-control {
+    position: absolute;
+    transition: bottom 0.3s ease;
+    bottom: 120px;
+    left: 20px;
+    width: 350px;
+    background-color: rgba(0, 0, 0, 0.8);
+    padding: 7px;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 10;
+    margin-bottom: 20px;
+}
+
+#wallpaper-control button {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: transform 0.2s, color 0.2s;
+}
+
+#wallpaper-control button:hover {
+    color: cyan;
+}
+
+#wallpaper-name {
+    font-size: 0.9rem;
+    color: cyan;
+    text-align: center;
+    flex: 1;
+}
+
+.fade-out {
+    animation: fadeOut 0.5s forwards;
+    opacity: 0;
+    display: flex !important;
+}
+
+.fade-in {
+    animation: fadeIn 0.5s forwards;
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+ /*============== End Wallpeper Next =============== */
+
+
+ /*============== Musik Plyaer =============== */
+ #music-control {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    width: 370px;
+    background-color: rgba(0, 0, 0, 0.8);
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+    color: white;
+    font-family: 'Lexend', sans-serif;
+    transition: height 0.3s ease, transform 0.3s ease;
+    overflow: hidden;
+}
+
+#music-control.collapsed {
+    height: 110px;
+}
+
+#music-control.expanded {
+    height: 300px;
+}
+
+#expand-collapse {
+    position: absolute;
+    bottom: 5px;
+    right: 10px;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+#expand-collapse:hover {
+    transform: scale(1.2);
+}
+
+#music-info {
+    margin-bottom: 10px;
+    padding-top: 7px;
+}
+
+#music-title {
+    font-size: 1rem;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+#progress-container {
+    position: relative;
+    width: 100%;
+    height: 10px;
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+#progress-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 100%;
+    background-color: cyan;
+    transition: width 0.1s linear;
+}
+
+#music-buttons button {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    margin: 0 5px;
+    transition: transform 0.2s;
+}
+
+#music-buttons button:hover {
+    color: cyan;
+}
+
+#volume-control {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#volume-slider {
+    width: 100px;
+}
+
+#playlist {
+    margin-top: 15px;
+    list-style: none;
+    padding: 0;
+    color: white;
+    font-size: 1rem;
+    max-height: 150px;
+    overflow-y: auto;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    padding-top: 10px;
+    scrollbar-width: thin;
+    scrollbar-color: cyan black;
+}
+
+#playlist::-webkit-scrollbar {
+    width: 8px;
+}
+
+#playlist::-webkit-scrollbar-track {
+    background: black;
+    border-radius: 5px;
+}
+
+#playlist::-webkit-scrollbar-thumb {
+    background: linear-gradient(to bottom, cyan, #1e90ff);
+    border-radius: 5px;
+    box-shadow: 0 0 5px rgba(0, 255, 255, 0.7);
+    transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+#playlist::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 255, 255, 0.7);
+    box-shadow: 0 0 10px rgba(0, 255, 255, 1);
+}
+
+
+#playlist li {
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: background 0.3s ease, transform 0.2s ease;
+}
+
+#playlist li:hover {
+    background: rgba(0, 255, 255, 0.1);
+    box-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+}
+
+#playlist .active {
+    background: linear-gradient(to right, #00bfff, #1e90ff);
+    font-weight: bold;
+    color: white;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
+}
+
+/*============== End Musik Player =============== */
+
+/* ============================ End Main Menu =========================================*/
+#version-info {
+    position: fixed;
+    bottom: 10px;
+    right: 10px;
+    font-size: 1rem;
+    color: rgba(255, 255, 255, 0.8);
+    padding: 5px 10px;
+    z-index: 1000;
+    pointer-events: none;
+}
+
+    </style>
+<!--====================================== END CSS =========================================-->
+
+
+<!--======================================= HTML ========================================-->
+</head>
+<body>
+    <div id="version-info">versi 0.0.0.6 | Jangan terlalu berharap, ini hanya coba-coba...</div>
+    <div class="screen" id="warning-screen">
+        <p>⚠️ Health and Safety Warning ⚠️</p>
+        <p>Take breaks regularly and play responsibly.</p>
+    </div>
+
+    <div class="screen" id="developer-screen">
+        <h2>Gamer & Anime Pub</h2>
+        <h4>The successor of Real World Nime</h4>
+    </div>
+
+    <div class="screen" id="concept-screen">
+        <h2 style="margin-bottom: 20px;">Disclaimer!!</h2>
+        <p>ID:</p>
+        <p>Project ini dibuat hanya untuk mempelajari pemerograman, Software ini dibuat</p>
+        <p>menggunakan Eclectron berbasis web seperti HTML, CSS, dan JavaScript.</p>
+        <p>jadi maklumi kelebihan dan kekurangannya</p>
+        <br>
+        <p>EN:</p>
+        <p>This project was created solely for the purpose of learning programming. This software was developed</p>
+        <p>using Electron, leveraging web-based such as HTML, CSS, and JavaScript</p>
+        <p>Please understand and bear with its strengths and limitations.</p>    
+    </div>
+
+    <div class="screen" id="title-screen">
+        <h1 id="title-screen">
+            <!-- Animasi judul pendek game di title screen -->
+            <span>調</span><span>和</span><span>凛</span>
+        </h1>
+            <!-- Animasi judul panjang game di title screen -->
+        <h3>Rin with the secret of her pure Javanese</h3>
+        <div id="rotating-text"></div>
+        <p>Press Start</p>  
+        <video id="background-video" autoplay muted loop>
+            <!-- buat video default ini tampil di title-screen, arahkan ke video yang kamu punya-->
+            <source src="./aset" type="video/mp4">
+        </video>     
+    </div>
+
+    <div class="screen" id="main-menu">
+        <div id="profile-section">
+            <!--Sesuaikan foto profil di profil main menu-->
+            <img src="./aset/ikon.jpg" alt="Profile Picture" id="profile-picture">
+            <div id="profile-info">
+                <h2 id="profile-name">凛・アメリア・ラディサ</h2>
+                <p id="profile-level">Level: 30</p>
+                <div id="level-bar">
+                    <div id="level-fill"></div>
+                    <span id="level-max-text">Max</span>
+                </div>                
+                <p id="profile-description">"a pure Javanese girl who is thought to be a mulatto"</p>
+            </div>
+        </div>
+    
+        <div id="menu-options">
+            <ul>
+                <li id="start-game">Start Game</li>
+                <li id="character-menu-button">Character</li>
+                <li id="options">Options</li>
+                <li id="quit">Quit</li>
+            </ul>
+        </div>
+
+        <div id="menu-popup">
+            <h2>Select Game Mode</h2>
+            <ul>
+                <li id="visual-novel">Visual Novel</li>
+                <li>Coming Soon</li>
+            </ul>
+            <button id="close-popup">Close</button>
+        </div>
+
+        <div id="background-section">
+            <video id="character-background" autoplay muted loop>
+                <!-- buat video default ini tampil di main menu !-->
+                <source src="./aset/wallpaper" type="video/mp4">
+            </video>
+
+            <div id="wallpaper-control">
+                <button id="next-wallpaper">Next Wallpaper</button>
+                <p id="wallpaper-name">Current: Wallpaper 1</p>
+            </div>
+
+            <div id="music-control" class="collapsed">
+                <div id="music-info">
+                    <p id="music-title">Now Playing: None</p>
+                    <div id="progress-container">
+                        <div id="progress-bar"></div>
+                    </div>
+                </div>
+                <div id="music-buttons">
+                    <button id="prev-music">⏮️</button>
+                    <button id="play-pause">▐▐</button>
+                    <button id="next-music">⏭️</button>
+                    <button id="shuffle-music">🔀</button>
+                </div>
+                <div id="music-time">
+                    <span id="current-time">0:00</span> / <span id="duration">0:00</span>
+                </div>    
+                <div id="volume-control">
+                    <label for="volume-slider">Volume:</label>
+                    <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="0.5">
+                </div>
+                <ul id="playlist"></ul>
+                <button id="expand-collapse">↑</button>
+            </div>
+            
+                   
+            </div>
+        </div>
+    </div>
+
+    <audio id="background-audio" preload="auto"></audio>
+<!--======================================= end HTML ========================================-->
+
+
+<!--===================================================================== Js Skrip ================================================================================-->
+    <script>
+const { ipcRenderer } = require('electron');
+
+screens = [
+    document.getElementById("warning-screen"),
+    document.getElementById("developer-screen"),
+    document.getElementById("concept-screen"),
+    document.getElementById("title-screen"),
+    document.getElementById("main-menu"),
+];
+
+let songs = [
+    { title: "", src: "" }
+];
+
+let wallpapers = [
+    { name: "", src: "" }
+];
+
+ipcRenderer.on('configure-scene', (event, config) => {
+    const {
+        skipScene,
+        songs: dynamicSongs,
+        wallpapers: dynamicWallpapers,
+        defaultSong,
+        defaultTitleVideo
+    } = config;
+
+    if (dynamicSongs) {
+        songs = dynamicSongs;
+        renderPlaylist();
+    }
+    if (dynamicWallpapers) {
+        wallpapers = dynamicWallpapers;
+        changeWallpaper();
+    }
+
+    console.log("Skip Scene:", skipScene);
+
+    const bgAudio = document.getElementById('background-audio');
+    if (defaultSong && defaultSong.src) {
+        bgAudio.src = defaultSong.src;
+    } else {
+        if (songs.length > 0) {
+            bgAudio.src = songs[0].src;
+        }
+    }
+
+    if (defaultTitleVideo && defaultTitleVideo.src) {
+        const bgVideo = document.getElementById('background-video');
+        const sourceEl = bgVideo.querySelector('source');
+        sourceEl.src = defaultTitleVideo.src;
+        bgVideo.load();
+    }
+
+    screens = [
+        document.getElementById('warning-screen'),
+        document.getElementById('developer-screen'),
+        document.getElementById('concept-screen'),
+        document.getElementById('title-screen'),
+        document.getElementById('main-menu'),
+    ];
+
+    if (skipScene) {
+        screens.forEach(screen => (screen.style.display = 'none'));
+        const mainMenu = document.getElementById('main-menu');
+        mainMenu.style.display = 'flex';
+        mainMenu.style.animation = "fadeIn 1s forwards";
+        mainMenu.style.opacity = '1';
+
+        if (bgAudio.paused) {
+            bgAudio.currentTime = 0;
+            bgAudio.play().catch(err => {
+                console.warn("Autoplay mungkin diblokir. Error:", err);
+            });
+        }
+    } else {
+        startTitleScreenAnimation();
+        setTimeout(() => {
+            bgAudio.play().catch(err => {
+                console.warn("Autoplay mungkin diblokir. Error:", err);
+            });
+        }, 16000);
+
+        setTimeout(showNextScreen, 2500);
+        setTimeout(showNextScreen, 8000);
+        setTimeout(showNextScreen, 18000);
+    }
+});
+
+ipcRenderer.on('fade-music-and-transition', () => {
+    const audioElement = document.getElementById('background-audio');
+    const fadeDuration = 4000;
+    const fadeStep = 0.001;
+
+    // Mulai fade layar
+    document.body.classList.add('fade-out');
+
+    // Mulai fade musik
+    let fadeInterval = setInterval(() => {
+        if (audioElement.volume > fadeStep) {
+            audioElement.volume = Math.max(audioElement.volume - fadeStep, 0);
+        } else {
+            clearInterval(fadeInterval);
+            audioElement.pause();
+
+            // Setelah fade selesai, kirim sinyal ke backend untuk pindah halaman
+            ipcRenderer.send('navigate-to-vn');
+        }
+    }, fadeDuration * fadeStep);
+});
+
+
+window.addEventListener('beforeunload', () => {
+    document.body.classList.add('fade-out');
+});
+
+
+const startGameButton = document.getElementById('start-game');
+        const menuPopup = document.getElementById('menu-popup');
+        const closePopupButton = document.getElementById('close-popup');
+
+        startGameButton.addEventListener('click', () => {
+            menuPopup.style.display = 'flex';
+        });
+
+        closePopupButton.addEventListener('click', () => {
+            menuPopup.style.display = 'none';
+        });
+
+    document.getElementById('visual-novel').addEventListener('click', () => {
+    const { ipcRenderer } = require('electron');
+    ipcRenderer.send('load-visual-novel');
+});
+
+
+
+let currentWallpaperIndex = 0;
+const wallpaperElement = document.getElementById('character-background');
+const wallpaperNameElement = document.getElementById('wallpaper-name');
+
+function changeWallpaper() {
+    wallpaperElement.classList.add('fade-out');
+    setTimeout(() => {
+        currentWallpaperIndex = (currentWallpaperIndex + 1) % wallpapers.length;
+        wallpaperElement.src = wallpapers[currentWallpaperIndex].src;
+        wallpaperNameElement.textContent = `Current: ${wallpapers[currentWallpaperIndex].name}`;
+        wallpaperElement.classList.remove('fade-out');
+        wallpaperElement.classList.add('fade-in');
+
+        setTimeout(() => {
+            wallpaperElement.classList.remove('fade-in');
+        }, 250);
+    }, 250);
+}
+
+document.getElementById('next-wallpaper').addEventListener('click', changeWallpaper);
+changeWallpaper();
+
+const imagePreviews = document.querySelectorAll('.image-preview');
+const videos = document.querySelectorAll('.image-preview .video');
+
+imagePreviews.forEach((preview, index) => {
+    preview.addEventListener('mouseenter', () => {
+        gsap.to(preview, { flex: 2, duration: 0.5 });
+        videos[index].play();
+        imagePreviews.forEach((otherPreview) => {
+            if (otherPreview !== preview) {
+                otherPreview.classList.add('dim');
+            }
+        });
+    });
+
+    preview.addEventListener('mouseleave', () => {
+        gsap.to(preview, { flex: 1, duration: 0.5 });
+        videos[index].pause();
+        imagePreviews.forEach((otherPreview) => {
+            otherPreview.classList.remove('dim');
+        });
+    });
+});
+
+let currentSongIndex = 0;
+let isShuffleOn = false;
+
+const volumeSlider = document.getElementById('volume-slider');
+volumeSlider.addEventListener('input', (e) => {
+    audioElement.volume = e.target.value;
+});
+
+const playlistElement = document.getElementById('playlist');
+
+function renderPlaylist() {
+    playlistElement.innerHTML = '';
+    songs.forEach((song, index) => {
+        const li = document.createElement('li');
+        li.textContent = song.title;
+        li.addEventListener('click', () => {
+            currentSongIndex = index;
+            loadSong(currentSongIndex);
+            audioElement.play();
+            updatePlaylistHighlight();
+        });
+        playlistElement.appendChild(li);
+    });
+    updatePlaylistHighlight();
+}
+
+function updatePlaylistHighlight() {
+    const items = playlistElement.querySelectorAll('li');
+    items.forEach((item, index) => {
+        item.classList.toggle('active', index === currentSongIndex);
+    });
+}
+
+renderPlaylist();
+
+const audioElement = document.getElementById('background-audio');
+const titleElement = document.getElementById('music-title');
+const progressBar = document.getElementById('progress-bar');
+const musicControl = document.getElementById('music-control');
+const expandCollapseButton = document.getElementById('expand-collapse');
+const wallpaperControl = document.getElementById('wallpaper-control');
+
+let isExpanded = false;
+
+expandCollapseButton.addEventListener('click', () => {
+    isExpanded = !isExpanded;
+
+    if (isExpanded) {
+        musicControl.classList.remove('collapsed');
+        musicControl.classList.add('expanded');
+        expandCollapseButton.textContent = '↓';
+    } else {
+        musicControl.classList.remove('expanded');
+        musicControl.classList.add('collapsed');
+        expandCollapseButton.textContent = '↑';
+    }
+
+    const musicControlHeight = isExpanded ? 300 : 100;
+    wallpaperControl.style.bottom = `${musicControlHeight + 20}px`;
+});
+
+function loadSong(index) {
+    audioElement.src = songs[index].src;
+    titleElement.textContent = `Now Playing: ${songs[index].title}`;
+    progressBar.style.width = '0%';
+}
+
+audioElement.addEventListener('ended', () => {
+    if (isShuffleOn) {
+        currentSongIndex = Math.floor(Math.random() * songs.length);
+    } else {
+        currentSongIndex = (currentSongIndex + 1) % songs.length;
+    }
+    loadSong(currentSongIndex);
+    audioElement.play();
+});
+
+document.getElementById('next-music').addEventListener('click', () => {
+    if (isShuffleOn) {
+        currentSongIndex = Math.floor(Math.random() * songs.length);
+    } else {
+        currentSongIndex = (currentSongIndex + 1) % songs.length;
+    }
+    loadSong(currentSongIndex);
+    audioElement.play();
+});
+
+document.getElementById('shuffle-music').addEventListener('click', () => {
+    isShuffleOn = !isShuffleOn;
+    const shuffleButton = document.getElementById('shuffle-music');
+    shuffleButton.style.color = isShuffleOn ? 'cyan' : 'white';
+    shuffleButton.textContent = isShuffleOn ? '🔀 ON' : '🔀 OFF';
+});
+
+document.getElementById('play-pause').addEventListener('click', () => {
+    if (audioElement.paused) {
+        audioElement.play();
+        document.getElementById('play-pause').textContent = '▐▐ ';
+    } else {
+        audioElement.pause();
+        document.getElementById('play-pause').textContent = '▶';
+    }
+});
+
+document.getElementById('next-music').addEventListener('click', () => {
+    currentSongIndex = (currentSongIndex + 1) % songs.length;
+    loadSong(currentSongIndex);
+    audioElement.play();
+});
+
+document.getElementById('prev-music').addEventListener('click', () => {
+    currentSongIndex = (currentSongIndex - 1 + songs.length) % songs.length;
+    loadSong(currentSongIndex);
+    audioElement.play();
+});
+
+audioElement.addEventListener('timeupdate', () => {
+    const currentMinutes = Math.floor(audioElement.currentTime / 60);
+    const currentSeconds = Math.floor(audioElement.currentTime % 60);
+    const durationMinutes = Math.floor(audioElement.duration / 60);
+    const durationSeconds = Math.floor(audioElement.duration % 60);
+
+    document.getElementById('current-time').textContent = `${currentMinutes}:${currentSeconds.toString().padStart(2, '0')}`;
+    document.getElementById('duration').textContent = `${durationMinutes}:${durationSeconds.toString().padStart(2, '0')}`;
+});
+
+document.getElementById('progress-container').addEventListener('click', (e) => {
+    if (!isNaN(audioElement.duration)) {
+        const containerWidth = e.currentTarget.offsetWidth;
+        const clickX = e.offsetX;
+        audioElement.currentTime = (clickX / containerWidth) * audioElement.duration;
+    }
+});
+
+function updateProgress() {
+    if (!isNaN(audioElement.duration)) {
+        const progressPercent = (audioElement.currentTime / audioElement.duration) * 100;
+        progressBar.style.width = `${progressPercent}%`;
+    }
+}
+
+audioElement.addEventListener('timeupdate', updateProgress);
+audioElement.addEventListener('loadedmetadata', updateProgress);
+
+document.getElementById('progress-container').addEventListener('click', (e) => {
+    if (!isNaN(audioElement.duration)) {
+        const containerWidth = e.currentTarget.offsetWidth;
+        const clickX = e.offsetX;
+        audioElement.currentTime = (clickX / containerWidth) * audioElement.duration;
+    }
+});
+
+loadSong(currentSongIndex);
+
+
+let isInTitleScreen = false;
+function startTitleScreenAnimation() {
+    isInTitleScreen = true;
+
+    const titleH1 = document.querySelectorAll("#title-screen h1 span");
+    titleH1.forEach((letter, index) => {
+        letter.style.animationDelay = `${index * 0.2}s`;
+    });
+
+    const titleH3 = document.querySelector("#title-screen h3");
+    setTimeout(() => {
+        titleH3.style.animationPlayState = "running";
+    }, titleH1.length * 200 + 2000);
+
+    startRotatingText();
+    setTimeout(showBackgroundVideo, 4000);
+}
+
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+        if (currentScreen === 3) {
+            isInTitleScreen = false;
+            showNextScreen();
+        } else {
+            e.preventDefault();
+        }
+    }
+});
+
+let currentScreen = 0;
+
+const audio = document.getElementById("background-audio");
+        setTimeout(() => {
+            audio.play();
+        }, 16000);
+
+        // Kalimat yang muncul di title screen
+        const rotatingTexts = [
+            "Through the cherry blossoms, her roots call out—will the truth bloom?",
+            "Rin’s smile hides more than words can tell, will her true heritage remain a secret?",
+            "Behind her foreign name and serene exterior lies a heritage she guards fiercely.",
+            "Beneath the falling petals of sakura, Rin hides her true feelings from her sibling.",
+            "a pure Javanese girl who is thought to be a mulatto"
+        ];
+
+        const rotatingTextElement = document.getElementById("rotating-text");
+        let currentTextIndex = 0;
+
+        function showNextScreen() {
+    if (currentScreen < screens.length) {
+        screens[currentScreen].style.animation = "fadeOut 1s forwards";
+        setTimeout(() => {
+            screens[currentScreen].style.display = "none";
+
+            if (currentScreen === 3) hideBackgroundVideo();
+
+            currentScreen++;
+            if (currentScreen < screens.length) {
+                screens[currentScreen].style.display = "flex";
+                screens[currentScreen].style.animation = "fadeIn 1s forwards";
+
+
+                if (currentScreen === 3) {
+                    startTitleScreenAnimation();
+                    setTimeout(showBackgroundVideo, 4000);
+                }
+            }
+        }, 1000);
+    }
+}
+
+function startRotatingText() {
+            rotatingTextElement.textContent = rotatingTexts[currentTextIndex];
+            setInterval(() => {
+                rotatingTextElement.style.animation = "slideOut 1s forwards";
+                setTimeout(() => {
+                    currentTextIndex = (currentTextIndex + 1) % rotatingTexts.length;
+                    rotatingTextElement.textContent = rotatingTexts[currentTextIndex];
+                    rotatingTextElement.style.animation = "slideIn 1s forwards";
+                }, 1500);
+            }, 4800);
+        }
+
+function startTitleScreenAnimation() {
+    const titleH1 = document.querySelectorAll("#title-screen h1 span");
+    titleH1.forEach((letter, index) => {
+        letter.style.animationDelay = `${index * 0.2}s`;
+    });
+
+    const titleH3 = document.querySelector("#title-screen h3");
+    setTimeout(() => {
+        titleH3.style.animationPlayState = "running";
+    }, titleH1.length * 200 + 2000);
+
+    startRotatingText();
+}
+
+function showBackgroundVideo() {
+    const video = document.getElementById("background-video");
+    video.style.opacity = "1";
+}
+
+function hideBackgroundVideo() {
+    const video = document.getElementById("background-video");
+    video.style.opacity = "0";
+}
+
+function createFallingStarsLeftToRight(numStars) {
+    const titleScreen = document.getElementById("title-screen");
+    for (let i = 0; i < numStars; i++) {
+        const starContainer = document.createElement("div");
+        starContainer.classList.add("star-container");
+        
+        const star = document.createElement("div");
+        star.classList.add("star");
+
+        const startX = Math.random() * -20 + "vw";
+        const startY = Math.random() * 100 + "vh";
+        const endX = Math.random() * 100 + 120 + "vw";
+        const endY = Math.random() * 100 - 50 + "vh";
+        const duration = Math.random() * 3 + 4 + "s";
+
+        starContainer.style.setProperty("--start-x", startX);
+        starContainer.style.setProperty("--start-y", startY);
+        starContainer.style.setProperty("--end-x", endX);
+        starContainer.style.setProperty("--end-y", endY);
+        starContainer.style.animationDuration = duration;
+
+        starContainer.appendChild(star);
+        titleScreen.appendChild(starContainer);
+    }
+}
+
+createFallingStarsLeftToRight(15);
+
+    const backgroundVideo = document.getElementById('character-background');
+    const characterMenu = document.getElementById('character-menu');
+    const titleScreen = document.getElementById('title-screen');
+    const mainMenu = document.getElementById('main-menu');
+
+
+function showMenu(menuToShow, menuToHide) {
+    menuToHide.style.animation = "fadeOut 0.5s forwards";
+    setTimeout(() => {
+        menuToHide.style.display = "none";
+        menuToHide.style.animation = ""; 
+
+        menuToShow.style.display = "flex";
+        menuToShow.style.animation = "fadeIn 0.5s forwards";
+    }, 500);
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        returnToTitleScreen();
+    }
+});
+
+quitButton.addEventListener('click', () => {
+    ipcRenderer.send('quit-application');
+});
+
+    </script>
+</body>
+</html>
