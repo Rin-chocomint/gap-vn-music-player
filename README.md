@@ -163,6 +163,7 @@ Video ini juga akan muncul di **title screen**.
 Contoh:  
 **`!wallpaper.mp4`**
 
+Jadi kalau mau bikin playlist musik atau wallpaper baru ya bikin folder baru lagi yak.
 
 Kamu dapat mengkostumisasi teks yang ada di aplikasi dengan mengedit isi file **"index.html"** yang lokasinya ada di **"resources\app"**.  
 Di situ, kamu dapat mengedit berbagai macam teks yang ada di aplikasi, seperti yang ada di **developer screen, title screen, dan main menu**.  
