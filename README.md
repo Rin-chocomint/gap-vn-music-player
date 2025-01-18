@@ -1,8 +1,9 @@
 Sebuah proyek untuk mempelajari pemerograman.
 
 Aplikasi berbais Electron chromium, dibuat dengan html, css, dan js. Jadi maklumi segala kekurangan dan kelebihannya.
-Kamu dapat memodifikasi teks-teks yang ada di Aplikasi dengan mengedit file "index.html" menggunakan teks editor seperti notepad.
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Kamu dapat memodifikasi teks-teks yang ada di Aplikasi dengan mengedit file "index.html" menggunakan teks editor seperti notepad.
+
 PETUNJUK :
 Untuk buat playlist musik, kamu perlu membuat folder baru didalam folder "resources\app\aset\music" pokoknya buka aja folder "resources" terus buka lagi "app"
 sampai ke folder "music". disitu kamu buat folder baru yang isinya audio musik-musik playlist mu, kalau mau buat playlist baru tinggal buat folder baru lagi aja.
