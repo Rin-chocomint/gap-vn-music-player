@@ -33,6 +33,7 @@ Versi siap pakai (Binary) untuk Windows dapat diunduh di menu **Releases**.
 * **Versi Repo:** Berisi kode sumber murni ("Clean") tanpa konten personal, siap untuk dikembangkan ulang oleh developer lain.
 
 **[Ke Halaman Download / Releases] (Link ke Tab Release)**
+Letak tombol **Releases** ada disebelah kanan halaman ini, jika tidak kelihatan scroll saja ke atas.
 
 ## For Developers / Untuk Pengembang
 Ingin membuat Visual Novel sendiri atau memodifikasi engine ini?
