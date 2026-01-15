@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GIF Overlay</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: transparent;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        /* Container utama */
+        #gif-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            cursor: move;
+            border: 2px solid transparent;
+            border-radius: 4px;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        /* Hover state */
+        #gif-container.hovered {
+            border-color: rgba(100, 200, 255, 0.5);
+            box-shadow: 0 0 15px rgba(100, 200, 255, 0.3);
+        }
+
+        /* Dragging state */
+        #gif-container.dragging {
+            border-color: rgba(100, 200, 255, 0.8);
+            box-shadow: 0 0 20px rgba(100, 200, 255, 0.5);
+        }
+
+        /* GIF image */
+        #gif-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            pointer-events: none;
+            transition: transform 0.2s ease, opacity 0.15s ease-out;
+        }
+
+        /* Resize handle */
+        #resize-handle {
+            position: absolute;
+            right: -1px;
+            bottom: -1px;
+            width: 22px;
+            height: 22px;
+            cursor: nwse-resize;
+            background: linear-gradient(135deg, transparent 40%, rgba(100, 200, 255, 0.7) 40%);
+            opacity: 0;
+            transition: opacity 0.15s ease;
+            z-index: 10;
+            border-radius: 0 0 4px 0;
+        }
+
+        #gif-container.hovered #resize-handle,
+        #gif-container.dragging #resize-handle {
+            opacity: 1;
+        }
+
+        /* Rotate Controls */
+        #rotate-controls {
+            position: absolute;
+            left: 0;
+            bottom: 0;
+            display: flex;
+            gap: 2px;
+            opacity: 0;
+            transition: opacity 0.15s ease;
+            z-index: 10;
+        }
+
+        #rotate-controls button {
+            width: 24px;
+            height: 24px;
+            border: none;
+            background: rgba(100, 200, 255, 0.8);
+            color: #000;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background 0.15s ease, transform 0.1s ease;
+            padding: 0;
+            line-height: 24px;
+        }
+
+        #rotate-controls button:hover {
+            background: rgba(150, 220, 255, 1);
+            transform: scale(1.1);
+        }
+
+        #rotate-controls button:active {
+            transform: scale(0.95);
+        }
+
+        #rotate-controls button:focus {
+            outline: none;
+        }
+
+        #gif-container.hovered #rotate-controls,
+        #gif-container.dragging #rotate-controls {
+            opacity: 1;
+        }
+
+        #gif-container.no-image #rotate-controls {
+            display: none;
+        }
+
+        /* Placeholder */
+        #placeholder {
+            display: none;
+            color: rgba(255, 255, 255, 0.8);
+            font-family: 'Segoe UI', sans-serif;
+            font-size: 13px;
+            text-align: center;
+            padding: 20px;
+            background: rgba(40, 40, 40, 0.9);
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        #gif-container.no-image #placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #gif-container.no-image #gif-image {
+            display: none;
+        }
+
+        .placeholder-icon {
+            font-size: 32px;
+            opacity: 0.8;
+        }
+
+        /* Locked Mode */
+        body.locked #gif-container {
+            cursor: default;
+            border-color: transparent !important;
+            box-shadow: none !important;
+        }
+
+        body.locked #resize-handle {
+            display: none !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="gif-container" class="no-image">
+        <img id="gif-image" src="" alt="GIF Overlay">
+        <div id="placeholder">
+            <span>Gif ilang coba klik ini</span>
+        </div>
+        <div id="resize-handle"></div>
+        <div id="rotate-controls">
+            <button id="rotate-left" title="Rotate -15°">↺</button>
+            <button id="rotate-right" title="Rotate +15°">↻</button>
+        </div>
+    </div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+
+        const gifContainer = document.getElementById('gif-container');
+        const gifImage = document.getElementById('gif-image');
+        const resizeHandle = document.getElementById('resize-handle');
+        const placeholder = document.getElementById('placeholder');
+        const rotateLeftBtn = document.getElementById('rotate-left');
+        const rotateRightBtn = document.getElementById('rotate-right');
+
+        let overlayId = null;
+        let currentGifPath = null;
+        let isDragging = false;
+        let isResizing = false;
+        let dragStartMouse = { x: 0, y: 0 };
+        let resizeStartMouse = { x: 0, y: 0 };
+        let isLocked = false;
+        let currentRotation = 0; // Rotasi saat ini dalam derajat
+        let currentFlip = 1; // 1 untuk normal, -1 untuk flip horizontal
+        let currentFlipY = 1; // 1 untuk normal, -1 untuk flip vertikal
+
+        // Helper untuk menerapkan semua transformasi
+        function updateTransform() {
+            gifImage.style.transform = `rotate(${currentRotation}deg) scaleX(${currentFlip}) scaleY(${currentFlipY})`;
+        }
+
+        // Inisialisasi dari Main Process
+        ipcRenderer.on('init-overlay', (event, { id, path, locked, bounds }) => {
+            overlayId = id;
+            console.log(`[GIF Overlay #${id}] Diinisialisasi, terkunci: ${locked}`);
+
+            if (path) {
+                loadGif(path);
+            }
+
+            setLockedState(locked === true);
+        });
+
+        ipcRenderer.on('set-rotation', (event, rotation) => {
+            currentRotation = rotation;
+            updateTransform();
+            console.log(`[GIF Overlay #${overlayId}] Rotasi: ${rotation}°`);
+        });
+
+        ipcRenderer.on('set-flip', (event, facingRight) => {
+            // Jika menghadap kanan = true (default), scaleX(1). Jika tidak, scaleX(-1)
+            currentFlip = facingRight ? 1 : -1;
+            updateTransform();
+        });
+
+        ipcRenderer.on('set-flip-vertical', (event, facingDown) => {
+            // Jika menghadap bawah = true (default), scaleY(1). Jika tidak, scaleY(-1)
+            currentFlipY = facingDown ? 1 : -1;
+            updateTransform();
+        });
+
+        // === ROTATE BUTTON HANDLERS ===
+        rotateLeftBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (isLocked) return;
+
+            currentRotation = (currentRotation - 15 + 360) % 360;
+            updateTransform();
+            ipcRenderer.send('gif-overlay-rotate', { id: overlayId, rotation: currentRotation });
+
+            // tetap aktif setelah klik
+            gifContainer.classList.add('hovered');
+            console.log(`[GIF Overlay #${overlayId}] Rotated left to ${currentRotation}°`);
+        });
+
+        rotateRightBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (isLocked) return;
+
+            currentRotation = (currentRotation + 15) % 360;
+            updateTransform();
+            ipcRenderer.send('gif-overlay-rotate', { id: overlayId, rotation: currentRotation });
+
+            gifContainer.classList.add('hovered');
+            console.log(`[GIF Overlay #${overlayId}] Rotated right to ${currentRotation}°`);
+        });
+        function setLockedState(locked) {
+            isLocked = locked;
+            if (locked) {
+                document.body.classList.add('locked');
+                gifContainer.classList.remove('hovered', 'dragging');
+            } else {
+                document.body.classList.remove('locked');
+            }
+            console.log(`[GIF Overlay #${overlayId}] Locked state: ${locked}`);
+        }
+
+        function loadGif(filePath) {
+            if (!filePath) return;
+
+            currentGifPath = filePath;
+            const imgUrl = `file:///${filePath.replace(/\\/g, '/')}`;
+
+            const tempImg = new Image();
+            tempImg.onload = () => {
+                const naturalWidth = tempImg.naturalWidth;
+                const naturalHeight = tempImg.naturalHeight;
+
+                ipcRenderer.send('gif-overlay-image-loaded', {
+                    id: overlayId,
+                    path: filePath,
+                    naturalWidth: naturalWidth,
+                    naturalHeight: naturalHeight
+                });
+
+                gifImage.src = imgUrl;
+                gifContainer.classList.remove('no-image');
+
+                console.log(`[GIF Overlay #${overlayId}] Gambar dimuat: ${filePath} (${naturalWidth}x${naturalHeight})`);
+            };
+            tempImg.onerror = () => {
+                console.error(`[GIF Overlay #${overlayId}] Gagal memuat gambar: ${filePath}`);
+                gifContainer.classList.add('no-image');
+            };
+            tempImg.src = imgUrl;
+        }
+
+        // === HOVER DETECTION ===
+        gifContainer.addEventListener('mouseenter', () => {
+            if (!isLocked && !isDragging && !isResizing) {
+                gifContainer.classList.add('hovered');
+            }
+        });
+
+        gifContainer.addEventListener('mouseleave', () => {
+            if (!isDragging && !isResizing) {
+                gifContainer.classList.remove('hovered');
+            }
+        });
+
+        // Klik placeholder untuk browse file
+        placeholder.addEventListener('click', (e) => {
+            e.stopPropagation();
+            ipcRenderer.send('gif-overlay-request-file', overlayId);
+        });
+
+        // === DRAG LOGIC (Manual via IPC) ===
+        gifContainer.addEventListener('mousedown', (e) => {
+            if (isLocked) return;
+            if (e.target === resizeHandle) return; // Jangan drag jika resize
+            if (gifContainer.classList.contains('no-image')) return;
+
+            isDragging = true;
+            dragStartMouse = { x: e.screenX, y: e.screenY };
+            gifContainer.classList.add('dragging');
+            gifContainer.classList.remove('hovered');
+
+            ipcRenderer.send('gif-overlay-drag-start', overlayId);
+        });
+
+        // === RESIZE LOGIC ===
+        resizeHandle.addEventListener('mousedown', (e) => {
+            if (isLocked) return;
+            e.preventDefault();
+            e.stopPropagation();
+
+            isResizing = true;
+            resizeStartMouse = { x: e.screenX, y: e.screenY };
+            gifContainer.classList.add('dragging');
+            document.body.style.cursor = 'nwse-resize';
+
+            ipcRenderer.send('gif-overlay-resize-start', overlayId);
+        });
+
+        // === GLOBAL MOUSE MOVE & UP ===
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                const deltaX = e.screenX - dragStartMouse.x;
+                const deltaY = e.screenY - dragStartMouse.y;
+
+                ipcRenderer.send('gif-overlay-drag-move', {
+                    id: overlayId,
+                    deltaX: deltaX,
+                    deltaY: deltaY
+                });
+
+                dragStartMouse = { x: e.screenX, y: e.screenY };
+            }
+
+            if (isResizing) {
+                const deltaX = e.screenX - resizeStartMouse.x;
+                const deltaY = e.screenY - resizeStartMouse.y;
+
+                ipcRenderer.send('gif-overlay-resize-move', {
+                    id: overlayId,
+                    deltaX: deltaX,
+                    deltaY: deltaY
+                });
+
+                resizeStartMouse = { x: e.screenX, y: e.screenY };
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                console.log('[GIF Overlay] Drag ended via mouseup');
+                isDragging = false;
+                gifContainer.classList.remove('dragging');
+                ipcRenderer.send('gif-overlay-drag-end', overlayId);
+            }
+
+            if (isResizing) {
+                // NOTE: Tidak mengirim resize-end ke main process di sini
+                // Karena mouseup sering terkirim saat mouse keluar window (shrinking)
+                // Main process akan handle via idle detection (cursor tidak bergerak 300ms)
+                console.log('[GIF Overlay] Resize mouseup detected (letting main process handle end)');
+                isResizing = false;
+                gifContainer.classList.remove('dragging');
+                document.body.style.cursor = '';
+                // TIDAK mengirim: ipcRenderer.send('gif-overlay-resize-end', overlayId);
+            }
+        });
+
+        // NOTE: Blur handler dihapus karena menyebabkan resize-end dikirim terlalu cepat
+        // saat window kehilangan fokus akibat mouse keluar saat shrinking
+
+        // === IPC HANDLERS ===
+
+        // Variabel untuk cursor proximity opacity (harus dideklarasikan sebelum handlers)
+        let currentProximityOpacity = 1.0;
+        let targetProximityOpacity = 1.0;
+        let opacityAnimationFrame = null;
+
+        function smoothOpacityTransition() {
+            const diff = targetProximityOpacity - currentProximityOpacity;
+            const step = diff * 0.25; // Smooth easing factor
+
+            if (Math.abs(diff) < 0.01) {
+                currentProximityOpacity = targetProximityOpacity;
+                gifImage.style.opacity = currentProximityOpacity;
+                opacityAnimationFrame = null;
+                return;
+            }
+
+            currentProximityOpacity += step;
+            gifImage.style.opacity = currentProximityOpacity;
+            opacityAnimationFrame = requestAnimationFrame(smoothOpacityTransition);
+        }
+
+        ipcRenderer.on('gif-overlay-set-image', (event, filePath) => {
+            loadGif(filePath);
+        });
+
+        ipcRenderer.on('set-locked', (event, locked) => {
+            setLockedState(locked);
+            // Reset opacity ke normal saat unlock
+            if (!locked) {
+                targetProximityOpacity = 1.0;
+                currentProximityOpacity = 1.0;
+                gifImage.style.opacity = 1.0;
+                if (opacityAnimationFrame) {
+                    cancelAnimationFrame(opacityAnimationFrame);
+                    opacityAnimationFrame = null;
+                }
+            }
+        });
+
+        ipcRenderer.on('set-opacity', (event, opacity) => {
+            gifContainer.style.opacity = opacity;
+            console.log(`[GIF Overlay #${overlayId}] Opacity: ${opacity}`);
+        });
+
+        // (Rotation & Flip handlers moved up)
+
+        ipcRenderer.on('gif-overlay-clear', () => {
+            currentGifPath = null;
+            gifImage.src = '';
+            gifContainer.classList.add('no-image');
+        });
+
+        gifImage.addEventListener('error', () => {
+            console.error(`[GIF Overlay #${overlayId}] Error loading image`);
+            gifContainer.classList.add('no-image');
+        });
+
+        // (Rotate buttons moved up)
+
+        // pastiin button tidak memiliki focus style yang mengganggu
+        rotateLeftBtn.addEventListener('mousedown', (e) => e.preventDefault());
+        rotateRightBtn.addEventListener('mousedown', (e) => e.preventDefault());
+
+        // === CURSOR PROXIMITY OPACITY HANDLER ===
+        ipcRenderer.on('cursor-proximity-opacity', (event, { opacity, isNear }) => {
+            targetProximityOpacity = opacity;
+
+            if (!opacityAnimationFrame) {
+                opacityAnimationFrame = requestAnimationFrame(smoothOpacityTransition);
+            }
+        });
+    </script>
+</body>
+
+</html>

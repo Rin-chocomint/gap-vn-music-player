@@ -1,0 +1,34 @@
+{
+  "name": "chocomint-software-0.0.0.8",
+  "version": "0.0.0.8",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron --unhandled-rejections=strict .",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "clean": "rimraf dist && rimraf %LocalAppData%\\Temp\\electron-packager",
+    "build": "electron-packager . Gap --platform=win32 --arch=x64 --out=dist --icon=aset/icon.ico",
+    "update-hashes": "node update-hashes.js"
+  },
+  "keywords": [],
+  "author": "Chocomint",
+  "contributors": [
+    "Rd chocomint",
+    "Rin chocomint"
+  ],
+  "license": "ISC",
+  "description": "Gap VN & Music Player (Codename: VN 0) - Aplikasi pemutar musik dan visual novel open source...",
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "electron": "^33.2.1",
+    "electron-packager": "^17.1.2",
+    "rimraf": "^6.0.1"
+  },
+  "dependencies": {
+    "axios": "^1.10.0",
+    "discord-rpc": "^4.0.1",
+    "express": "^5.1.0",
+    "klaw-sync": "^7.0.0",
+    "node-vibrant": "^3.1.6",
+    "serve-index": "^1.9.1"
+  }
+}

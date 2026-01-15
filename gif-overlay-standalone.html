@@ -1,0 +1,2486 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GAP GIF Overlay Manager</title>
+    <style>
+        /* lexend-300 - latin */
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 300;
+            src: url('./aset/fonts/lexend-v26-latin-300.woff2') format('woff2');
+        }
+
+        /* lexend-regular - latin */
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 400;
+            src: url('./aset/fonts/lexend-v26-latin-regular.woff2') format('woff2');
+        }
+
+        /* lexend-700 - latin */
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 700;
+            src: url('./aset/fonts/lexend-v26-latin-700.woff2') format('woff2');
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* === VARIABEL TEMA (Modern - Ultra Deep Black) === */
+        :root {
+            --bg-main: #050608;
+            --bg-secondary: #0d0e12;
+            --bg-tertiary: #16181d;
+            --bg-card: rgba(255, 255, 255, 0.015);
+            --text-primary: #f5f7fa;
+            --text-secondary: #a4abb6;
+            --text-muted: #5f6368;
+            --accent-color: #ff6b6b;
+            --accent-gradient: linear-gradient(45deg, #ff6b6b, #f06595);
+            --border-color: rgba(255, 255, 255, 0.05);
+            --button-hover: rgba(255, 255, 255, 0.07);
+            --font-family: 'Lexend', sans-serif;
+        }
+
+        body.theme-classic {
+            --bg-main: #373737;
+            --bg-secondary: #636060;
+            --bg-tertiary: #4a4a4a;
+            --bg-card: rgba(99, 96, 96, 0.3);
+            --text-primary: #ffffff;
+            --text-secondary: #cccccc;
+            --text-muted: #888;
+            --accent-color: #f3557a;
+            --accent-gradient: linear-gradient(90deg, #f3557a, #f37da2);
+            --border-color: #777;
+            --button-hover: rgba(255, 255, 255, 0.15);
+        }
+
+        body {
+            font-family: var(--font-family);
+            background: var(--bg-main);
+            min-height: 100vh;
+            color: var(--text-primary);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Title Bar */
+        #title-bar {
+            position: sticky;
+            top: 0;
+            z-index: 999;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-secondary);
+            padding: 8px 12px;
+            -webkit-app-region: drag;
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color);
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+        }
+
+        #title-bar .title {
+            font-size: 16px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+
+            /* Styling Warna Bercak Dasar Putih - Adjusted for Icon & Intensity */
+            background-image: linear-gradient(110deg,
+                    #ff2a6d 0%,
+                    #ff2a6d 18%,
+                    /* Diperlebar agar GAP kena pink */
+                    #ffffff 18%,
+                    #ffffff 30%,
+                    /* Jarak diperpendek */
+                    #05d9e8 30%,
+                    #05d9e8 48%,
+                    /* Cyan diperlebar */
+                    #ffffff 48%,
+                    #ffffff 60%,
+                    /* Jarak diperpendek */
+                    #ff9f1c 60%,
+                    #ff9f1c 78%,
+                    /* Orange diperlebar */
+                    #ffffff 78%,
+                    #ffffff 88%,
+                    /* Jarak akhir pendek */
+                    #ff2a6d 88%,
+                    #ff2a6d 100%);
+            background-size: 100%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            color: transparent;
+            /* Fallback */
+
+            /* Sedikit shadow agar tetap terbaca di background terang jika ada, 
+               tapi karena background title-bar gelap (#0d0e12), ini akan terlihat pop-up */
+            filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.1));
+        }
+
+        #title-bar .title .emoji {
+            font-size: 18px;
+        }
+
+        #title-bar .controls {
+            display: flex;
+            gap: 4px;
+            -webkit-app-region: no-drag;
+        }
+
+        .control-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            width: 32px;
+            height: 28px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 12px;
+            transition: background 0.2s;
+        }
+
+        .control-btn:hover {
+            background: var(--button-hover);
+        }
+
+        .control-btn.close:hover {
+            background: #e81123;
+        }
+
+        /* Main Content */
+        #main-content {
+            flex: 1;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            overflow-y: auto;
+        }
+
+        #left-column {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        #right-column {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        /* Section Card */
+        .section-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid var(--border-color);
+        }
+
+        .section-card h2 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-primary);
+        }
+
+        .section-card h2 .icon {
+            font-size: 16px;
+        }
+
+        /* GIF List Container - Grid Gallery Layout */
+        #gif-list-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 16px;
+            padding: 4px;
+            margin-bottom: 12px;
+        }
+
+        /* GIF Card - Gallery style dengan preview */
+        .gif-card {
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .gif-card:hover {
+            border-color: var(--accent-color);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+        }
+
+        /* GIF Preview Area */
+        .gif-preview-container {
+            position: relative;
+            width: 100%;
+            height: 200px;
+            background: var(--bg-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .gif-preview-container img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .gif-preview-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-muted);
+        }
+
+        .gif-preview-placeholder .icon {
+            font-size: 48px;
+            opacity: 0.5;
+        }
+
+        .gif-preview-placeholder .text {
+            font-size: 11px;
+            opacity: 0.7;
+        }
+
+        /* Badge nomor di preview */
+        .gif-number-badge {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: var(--accent-color);
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 700;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        /* GIF Card Content */
+        .gif-card-content {
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            flex: 1;
+        }
+
+        /* Filename dan status */
+        .gif-info-section {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .gif-filename {
+            font-size: 13px;
+            color: var(--text-primary);
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .gif-filename.empty {
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .gif-status {
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+
+        .gif-status.active {
+            color: #4caf50;
+        }
+
+        /* Action buttons di card */
+        .gif-actions-row {
+            display: flex;
+            gap: 6px;
+        }
+
+        .gif-card-btn {
+            flex: 1;
+            background: var(--button-hover);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 11px;
+            font-family: inherit;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+
+        .gif-card-btn:hover {
+            background: var(--bg-secondary);
+            border-color: var(--accent-color);
+        }
+
+        .gif-card-btn.browse {
+            color: var(--accent-color);
+            font-weight: 500;
+        }
+
+        .gif-card-btn.delete {
+            flex: 0 0 auto;
+            padding: 8px 12px;
+            color: #ff4d4d;
+        }
+
+        .gif-card-btn.delete:hover {
+            background: rgba(255, 77, 77, 0.2);
+            border-color: #ff4d4d;
+        }
+
+        /* Settings toggle button */
+        .gif-settings-toggle {
+            width: 100%;
+            background: transparent;
+            border: 1px dashed var(--border-color);
+            color: var(--text-secondary);
+            padding: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 11px;
+            font-family: inherit;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .gif-settings-toggle:hover {
+            background: var(--button-hover);
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+        }
+
+        .gif-settings-toggle.active {
+            background: var(--button-hover);
+            border-style: solid;
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+        }
+
+        /* Settings panel yang bisa di-collapse */
+        .gif-settings-panel {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .gif-settings-panel.expanded {
+            max-height: 500px;
+        }
+
+        .gif-settings-content {
+            padding: 12px;
+            padding-top: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .gif-setting-row {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .gif-setting-row label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .gif-setting-row input[type="range"] {
+            width: 100%;
+            accent-color: var(--accent-color);
+        }
+
+        .gif-setting-row .range-display {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+
+        .gif-setting-row .range-display .current {
+            color: var(--accent-color);
+            font-weight: 600;
+        }
+
+        /* Toggle setting dalam card */
+        .gif-toggle-setting {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .gif-toggle-setting .toggle-info {
+            flex: 1;
+        }
+
+        .gif-toggle-setting .toggle-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .gif-toggle-setting .toggle-desc {
+            font-size: 9px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* Add GIF Button */
+        .add-gif-btn {
+            width: 100%;
+            padding: 12px;
+            background: transparent;
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .add-gif-btn:hover {
+            background: var(--bg-tertiary);
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+        }
+
+        /* Save Settings Button */
+        .save-settings-btn {
+            width: 100%;
+            padding: 12px;
+            background: var(--accent-gradient);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+            box-shadow: 0 4px 12px rgba(255, 107, 107, 0.2);
+        }
+
+
+        .save-settings-btn.saved {
+            background: linear-gradient(45deg, #4caf50, #66bb6a);
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+        }
+
+        /* Toggle Switch */
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-top: 1px solid var(--border-color);
+            margin-top: 8px;
+        }
+
+        .toggle-row label {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--bg-tertiary);
+            transition: 0.4s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.4s;
+            border-radius: 50%;
+        }
+
+        input:checked+.slider {
+            background-color: var(--accent-color);
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(20px);
+        }
+
+        /* Tips Section */
+        .tips-section {
+            background: rgba(255, 200, 100, 0.1);
+            border: 1px solid rgba(255, 200, 100, 0.2);
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .tips-section h3 {
+            font-size: 12px;
+            color: #ffc864;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tips-section ol {
+            font-size: 11px;
+            color: #ccc;
+            padding-left: 18px;
+            line-height: 1.6;
+        }
+
+        .tips-section li {
+            margin-bottom: 4px;
+        }
+
+        /* Animation Dropdown Styling */
+        .animation-type-select {
+            cursor: pointer;
+        }
+
+        .animation-type-select option {
+            background: #2a2a2a;
+            color: #fff;
+            padding: 8px;
+        }
+
+        .animation-type-select option:hover {
+            background: #3a3a3a;
+        }
+
+        .animation-type-select option:checked {
+            background: linear-gradient(135deg, var(--accent-color), #667eea);
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .animation-type-select option:disabled {
+            color: #666;
+            font-style: italic;
+        }
+
+        /* Scrollbar Styling - sesuai tema */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 6px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg,
+                    #0a99b3,
+                    #e81183,
+                    #f38112,
+                    #0a99b3);
+            border-radius: 6px;
+            border: 2px solid rgba(255, 255, 255, 0.08);
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg,
+                    #0a99b3,
+                    #e81183,
+                    #f38112,
+                    #0a99b3);
+        }
+
+        /* Classic theme — tetap konsisten */
+        body.classic-theme ::-webkit-scrollbar-thumb,
+        body.classic-theme ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg,
+                    #e81183,
+                    #ee5d9e,
+                    #f38112,
+                    #0a99b3);
+        }
+
+        /* Status Bar */
+        #status-bar {
+            position: sticky;
+            bottom: 0;
+            z-index: 998;
+            background: var(--bg-secondary);
+            padding: 8px 16px;
+            font-size: 11px;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+            border-top: 1px solid var(--border-color);
+            box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.45);
+            backdrop-filter: blur(4px);
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4caf50;
+        }
+
+        .status-dot.inactive {
+            background: #666;
+        }
+
+        /* Theme Buttons */
+        .theme-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .theme-btn {
+            flex: 1;
+            padding: 10px;
+            font-family: var(--font-family);
+            font-size: 0.9rem;
+            border: 1px solid var(--bg-tertiary);
+            background-color: transparent;
+            color: var(--text-primary);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .theme-btn.active {
+            border-color: var(--accent-color);
+            background-color: rgba(243, 85, 122, 0.1);
+            color: var(--accent-color);
+        }
+
+        .theme-btn:hover:not(.active) {
+            background-color: var(--bg-tertiary);
+        }
+
+        /* === Preset Profile Section === */
+        .preset-section {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .preset-dropdown-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .preset-select {
+            flex: 1;
+            padding: 10px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: var(--font-family);
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .preset-select:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .preset-select option {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        .preset-btn {
+            padding: 10px 14px;
+            background: var(--button-hover);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: var(--font-family);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .preset-btn:hover {
+            background: var(--bg-tertiary);
+            border-color: var(--accent-color);
+        }
+
+        .preset-btn.apply {
+            background: var(--accent-gradient);
+            border: none;
+            color: white;
+            font-weight: 600;
+        }
+
+        .preset-btn.apply:hover {
+            opacity: 0.9;
+        }
+
+        .preset-btn.delete {
+            color: #ff4d4d;
+        }
+
+        .preset-btn.delete:hover {
+            background: rgba(255, 77, 77, 0.2);
+            border-color: #ff4d4d;
+        }
+
+        .preset-new-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .preset-name-input {
+            flex: 1;
+            padding: 10px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: var(--font-family);
+            font-size: 12px;
+        }
+
+        .preset-name-input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .preset-name-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .preset-info {
+            font-size: 10px;
+            color: var(--text-muted);
+            padding: 6px 0;
+        }
+
+        .preset-info.active {
+            color: #4caf50;
+        }
+
+        /* === File Warning Badge === */
+        .file-warning-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 77, 77, 0.9);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .file-warning-badge .icon {
+            font-size: 12px;
+        }
+
+        /* === Konfirmasi Dialog === */
+        .confirm-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .confirm-overlay.visible {
+            display: flex;
+        }
+
+        .confirm-box {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .confirm-box h3 {
+            font-size: 14px;
+            color: var(--text-primary);
+            margin-bottom: 10px;
+        }
+
+        .confirm-box p {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+        }
+
+        .confirm-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .confirm-btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-family: var(--font-family);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .confirm-btn.cancel {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+        }
+
+        .confirm-btn.cancel:hover {
+            background: var(--button-hover);
+        }
+
+        .confirm-btn.danger {
+            background: #ff4d4d;
+            border: none;
+            color: white;
+        }
+
+        .confirm-btn.danger:hover {
+            background: #ff3333;
+        }
+
+        /* Utility */
+        .hidden {
+            display: none !important;
+        }
+
+        /* No Profile Message */
+        #no-profile-message {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            min-height: 400px;
+            color: var(--text-muted);
+            text-align: center;
+            gap: 16px;
+            background: var(--bg-card);
+            border-radius: 12px;
+            border: 1px dashed var(--border-color);
+        }
+
+        #no-profile-message .icon {
+            font-size: 48px;
+            opacity: 0.5;
+            margin-bottom: 8px;
+        }
+
+        #no-profile-message h3 {
+            font-size: 18px;
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        #no-profile-message p {
+            font-size: 13px;
+            max-width: 300px;
+            line-height: 1.5;
+        }
+
+        /* === Preset Profile Section (Refactored) === */
+        .preset-section {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .preset-header {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .preset-select-wrapper {
+            flex: 1;
+            position: relative;
+        }
+
+        .preset-select {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: var(--font-family);
+            font-size: 13px;
+            cursor: pointer;
+            appearance: none;
+            /* Hide default arrow */
+        }
+
+        .preset-select-wrapper::after {
+            content: '▼';
+            font-size: 10px;
+            color: var(--text-muted);
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+        }
+
+        .preset-select:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .preset-actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        .preset-action-btn {
+            width: 36px;
+            height: 38px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+
+        .preset-action-btn:hover {
+            background: var(--button-hover);
+            color: var(--text-primary);
+            border-color: var(--accent-color);
+        }
+
+        .preset-action-btn.delete:hover {
+            color: #ff4d4d;
+            border-color: #ff4d4d;
+            background: rgba(255, 77, 77, 0.1);
+        }
+
+        .preset-action-btn.add {
+            width: auto;
+            padding: 0 12px;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--accent-color);
+            background: rgba(255, 107, 107, 0.1);
+            border-color: transparent;
+        }
+
+        .preset-action-btn.add:hover {
+            background: var(--accent-color);
+            color: white;
+        }
+
+        /* New Preset Form (Collapsible) */
+        .new-preset-form {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease, margin 0.3s ease;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            border: 1px solid transparent;
+        }
+
+        .new-preset-form.open {
+            max-height: 100px;
+            margin-top: 8px;
+            border-color: var(--border-color);
+            padding: 10px;
+        }
+
+        .new-preset-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .new-preset-input {
+            flex: 1;
+            background: var(--bg-main);
+            border: 1px solid var(--border-color);
+            padding: 8px;
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 12px;
+        }
+
+        .new-preset-input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .new-preset-save-btn {
+            padding: 8px 12px;
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .new-preset-save-btn:hover {
+            opacity: 0.9;
+        }
+    </style>
+</head>
+
+<body class="theme-modern">
+    <div id="title-bar">
+        <div class="title">
+            <img src="aset/ikon.jpg" alt="Icon"
+                style="height: 24px; width: 24px; border-radius: 6px; object-fit: cover;">
+            GAP GIF Overlay Manager
+        </div>
+        <div class="controls">
+            <button class="control-btn" id="btn-min" title="Minimize">─</button>
+            <button class="control-btn" id="btn-max" title="Maximize">□</button>
+            <button class="control-btn close" id="btn-close" title="Close">✕</button>
+        </div>
+    </div>
+
+    <div id="main-content">
+        <!-- Left Column: Tips & Theme -->
+        <div id="left-column">
+            <!-- Tips Section -->
+            <div class="section-card tips-section">
+                <h3>💡 Tips</h3>
+                <ol>
+                    <li>Cari gambar GIF apapun kesukaan kamu, misal gambar karakter, elemen unik, dll.</li>
+                    <li>Agar hasilnya keren, hilangkan background-nya dengan mencari website "GIF Background Remover".
+                    </li>
+                    <li>Setelah GIF bersih dari background, tambahkan file GIF tersebut di sini.</li>
+                    <li>Kamu bisa drag dan resize setiap GIF overlay sesuai keinginan.</li>
+                    <li>Preview GIF akan muncul di card setelah kamu memilih file.</li>
+                </ol>
+            </div>
+
+            <!-- Theme Settings Section -->
+            <div class="section-card">
+                <h2>Pengaturan Tema</h2>
+
+                <div class="theme-buttons">
+                    <button id="theme-btn-modern" class="theme-btn" data-theme="theme-modern">Modern</button>
+                    <button id="theme-btn-classic" class="theme-btn" data-theme="theme-classic">Classic Chocomint
+                        cafe</button>
+                </div>
+            </div>
+
+            <!-- Preset Profile Section -->
+            <div class="section-card">
+                <h2>Preset Profile</h2>
+
+                <div class="preset-section">
+                    <div class="preset-header">
+                        <div class="preset-select-wrapper">
+                            <select class="preset-select" id="preset-select" autocomplete="off">
+                                <option value="">-- Pilih Preset --</option>
+                            </select>
+                        </div>
+                        <div class="preset-actions">
+                            <button class="preset-action-btn" id="preset-apply-btn" title="Muat preset ini">
+                                ↺
+                            </button>
+                            <button class="preset-action-btn delete" id="preset-delete-btn" title="Hapus preset ini">
+                                🗑️
+                            </button>
+                        </div>
+                    </div>
+
+                    <button class="preset-action-btn add" id="preset-toggle-add-btn"
+                        style="width: 100%; justify-content: center;">
+                        + Buat Profile Baru
+                    </button>
+
+                    <!-- Hidden Create Form -->
+                    <div class="new-preset-form" id="new-preset-form">
+                        <div class="new-preset-row">
+                            <input type="text" class="new-preset-input" id="preset-name-input"
+                                placeholder="Nama profile...">
+                            <button class="new-preset-save-btn" id="preset-save-btn">Simpan</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: GIF Gallery -->
+        <div id="right-column">
+            <!-- GIF Overlay List Section -->
+            <!-- No Profile Message -->
+            <div id="no-profile-message" class="hidden">
+                <h3>Belum Ada Profile</h3>
+                <p>Silahkan buat atau pilih <b>Preset Profile</b> di panel sebelah kiri untuk mulai menambahkan koleksi
+                    GIF Overlay kamu.</p>
+            </div>
+
+            <!-- GIF Overlay List Section -->
+            <div class="section-card" id="gif-gallery-section">
+                <h2>Galeri GIF Overlay</h2>
+
+                <div id="gif-list-container">
+                    <!-- GIF cards akan ditambahkan secara dinamis -->
+                </div>
+
+                <button class="add-gif-btn" id="add-gif-btn" title="Tambah GIF Baru">+ Tambah GIF</button>
+
+                <div class="toggle-row">
+                    <label for="gif-interaction-lock">Kunci posisi (abaikan interaksi mouse)</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="gif-interaction-lock">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <button class="save-settings-btn" id="save-settings-btn" title="Simpan Konfigurasi">
+                    Simpan Setting
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="status-bar">
+        <div class="status-item">
+            <span class="status-dot" id="status-dot"></span>
+            <span id="status-text">Overlay aktif</span>
+        </div>
+        <div class="status-item">
+            <span id="gif-count">0 GIF</span>
+        </div>
+    </div>
+
+    <!-- Konfirmasi Dialog untuk Hapus Preset -->
+    <div class="confirm-overlay" id="confirm-delete-overlay">
+        <div class="confirm-box">
+            <h3>⚠️ Konfirmasi Hapus</h3>
+            <p id="confirm-delete-message">Apakah kamu yakin ingin menghapus preset ini?</p>
+            <div class="confirm-buttons">
+                <button class="confirm-btn cancel" id="confirm-delete-cancel">Batal</button>
+                <button class="confirm-btn danger" id="confirm-delete-confirm">Hapus</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        console.log('[GIF Standalone] ========================================');
+        console.log('[GIF Standalone] Script loaded! Initializing...');
+        console.log('[GIF Standalone] ========================================');
+
+        const { ipcRenderer } = require('electron');
+        const fs = require('fs');
+
+        // === Elemen DOM ===
+        const gifListContainer = document.getElementById('gif-list-container');
+        const addGifBtn = document.getElementById('add-gif-btn');
+        const saveSettingsBtn = document.getElementById('save-settings-btn');
+        const lockToggle = document.getElementById('gif-interaction-lock');
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+        const gifCountEl = document.getElementById('gif-count');
+        const gifGallerySection = document.getElementById('gif-gallery-section');
+        const noProfileMessage = document.getElementById('no-profile-message');
+
+        // Theme buttons
+        const themeBtnModern = document.getElementById('theme-btn-modern');
+        const themeBtnClassic = document.getElementById('theme-btn-classic');
+
+        // Preset elements
+        const presetSelect = document.getElementById('preset-select');
+        const presetApplyBtn = document.getElementById('preset-apply-btn');
+        const presetDeleteBtn = document.getElementById('preset-delete-btn');
+        const presetNameInput = document.getElementById('preset-name-input');
+        const presetSaveBtn = document.getElementById('preset-save-btn');
+        const presetToggleAddBtn = document.getElementById('preset-toggle-add-btn');
+        const newPresetForm = document.getElementById('new-preset-form');
+
+        // Confirm dialog elements
+        const confirmDeleteOverlay = document.getElementById('confirm-delete-overlay');
+        const confirmDeleteMessage = document.getElementById('confirm-delete-message');
+        const confirmDeleteCancel = document.getElementById('confirm-delete-cancel');
+        const confirmDeleteConfirm = document.getElementById('confirm-delete-confirm');
+
+        // === State ===
+        let gifDataMap = new Map(); // Map<overlayId, {path, settings}>
+        let presetsList = [];       // Array preset dari main process
+        let activePresetId = null;  // ID preset aktif saat ini
+        let pendingDeletePresetId = null; // ID preset yang akan dihapus
+        let skipNextChangeEvent = false; // Flag untuk skip HANYA first change event setelah restore preset di boot
+        let tempPreviousPresetId = null; // Menyimpan ID preset aktif sebelum masuk mode "Buat Profil"
+
+        if (presetToggleAddBtn) {
+            presetToggleAddBtn.addEventListener('click', async () => {
+                const isOpen = newPresetForm.classList.contains('open');
+                if (isOpen) {
+                    // User membatalkan pembuatan preset baru
+                    newPresetForm.classList.remove('open');
+                    presetToggleAddBtn.textContent = '+ Buat Profile Baru';
+                    presetNameInput.value = ''; // Clear input
+
+                    // Restore preset sebelumnya jika ada
+                    if (tempPreviousPresetId) {
+                        console.log('[GIF Standalone] Membatalkan buat preset baru, me-restore preset lama:', tempPreviousPresetId);
+                        activePresetId = tempPreviousPresetId;
+
+                        const result = await ipcRenderer.invoke('gif-preset-apply', activePresetId);
+                        if (result.success) {
+                            await loadSettings();
+                        }
+                    } else {
+                        // Tidak ada preset aktif sebelumnya
+                        console.log('[GIF Standalone] Membatalkan buat preset baru, tidak ada preset lama.');
+                        updateGalleryVisibility();
+                    }
+
+                    // Pastikan dropdown sync dengan state yang dipulihkan
+                    updateActivePresetInfo();
+
+                    tempPreviousPresetId = null; // Reset temp variable
+                } else {
+                    // User ingin membuat preset baru - bersihkan UI dulu
+                    console.log('[GIF Standalone] === PREPARE NEW PRESET ===');
+                    console.log('[GIF Standalone] Membersihkan UI untuk preset baru...');
+
+                    // Simpan ID yang sedang aktif sebelum di-null-kan
+                    tempPreviousPresetId = activePresetId;
+
+                    // Cleanup semua overlay yang sedang ditampilkan
+                    await cleanupAllOverlays({ deleteFiles: false });
+
+                    // Set activePresetId null untuk menandakan state "new preset"
+                    activePresetId = null;
+
+                    // Update UI visibility
+                    updateGalleryVisibility();
+
+                    // Set dropdown ke kosong secara visual
+                    if (presetSelect) presetSelect.value = "";
+
+                    // Buka form
+                    newPresetForm.classList.add('open');
+                    presetToggleAddBtn.textContent = '- Batal Buat Profile';
+                    presetNameInput.focus();
+
+                    console.log(`[GIF Standalone] UI dibersihkan (previous saved: ${tempPreviousPresetId || 'none'}), siap untuk preset baru`);
+                }
+            });
+        }
+
+        // === Fungsi Visibility / UX ===
+        function updateGalleryVisibility() {
+            const hasProfile = presetsList.length > 0;
+            const hasActiveProfile = activePresetId !== null && presetsList.some(p => p.presetId === activePresetId);
+            const isCreatingNewProfile = newPresetForm.classList.contains('open');
+
+            // Tampilkan galeri jika:
+            // 1. Ada preset aktif yang sedang ditampilkan, ATAU
+            // 2. User sedang dalam mode membuat preset baru (form terbuka)
+            if (hasActiveProfile || isCreatingNewProfile) {
+                gifGallerySection.classList.remove('hidden');
+                noProfileMessage.classList.add('hidden');
+            } else {
+                gifGallerySection.classList.add('hidden');
+                noProfileMessage.classList.remove('hidden');
+            }
+        }
+
+        // === Fungsi Cleanup Komprehensif ===
+        // Menutup semua window overlay dan membersihkan UI
+        // Options: { deleteFiles: boolean } - jika true, hapus juga file GIF dari disk
+        async function cleanupAllOverlays(options = {}) {
+            const deleteFiles = options.deleteFiles === true;
+            const uiCount = gifListContainer.querySelectorAll('.gif-card').length;
+            const mapCount = gifDataMap.size;
+
+            console.log('[GIF Standalone] === CLEANUP START ===');
+            console.log(`[GIF Standalone] UI Cards: ${uiCount}, Map entries: ${mapCount}, deleteFiles: ${deleteFiles}`);
+
+            try {
+                // 1. Tutup semua window overlay via main process
+                const result = await ipcRenderer.invoke('gif-overlay-close-all', { deleteFiles });
+                console.log(`[GIF Standalone] Main process closed ${result?.closedCount || 0} windows`);
+
+                // 2. Bersihkan UI
+                gifListContainer.innerHTML = '';
+
+                // 3. Bersihkan state
+                gifDataMap.clear();
+
+                // 4. Update count
+                updateGifCount();
+
+                console.log('[GIF Standalone] === CLEANUP COMPLETE ===');
+                return { success: true, uiCleared: uiCount, windowsClosed: result?.closedCount || 0 };
+            } catch (e) {
+                console.error('[GIF Standalone] Cleanup error:', e);
+                return { success: false, error: e.message };
+            }
+        }
+
+        // === Helper: Log sinkronisasi ===
+        function logSyncStatus(context) {
+            const uiCards = gifListContainer.querySelectorAll('.gif-card').length;
+            const mapEntries = gifDataMap.size;
+            console.log(`[GIF Standalone][${context}] Sync: UI=${uiCards}, Map=${mapEntries}, Preset=${activePresetId || 'null'}`);
+        }
+
+        // === Fungsi Tema ===
+        function applyTheme(themeName) {
+            document.body.className = themeName;
+            localStorage.setItem('gifStandaloneTheme', themeName);
+
+            const modernBtn = document.getElementById('theme-btn-modern');
+            const classicBtn = document.getElementById('theme-btn-classic');
+
+            if (modernBtn) modernBtn.classList.toggle('active', themeName === 'theme-modern');
+            if (classicBtn) classicBtn.classList.toggle('active', themeName === 'theme-classic');
+
+            console.log(`[GIF Standalone] Tema diterapkan: ${themeName}`);
+        }
+
+        // === Fungsi Preset ===
+
+        // Muat daftar preset dari main process
+        async function loadPresetsList() {
+            try {
+                presetsList = await ipcRenderer.invoke('gif-preset-list');
+                console.log(`[GIF Standalone] Memuat ${presetsList.length} preset`);
+                renderPresetDropdown();
+            } catch (e) {
+                console.error('[GIF Standalone] Gagal memuat daftar preset:', e);
+            }
+        }
+
+        // Render dropdown preset
+        function renderPresetDropdown() {
+            presetSelect.innerHTML = '<option value="">-- Pilih Preset --</option>';
+
+            presetsList.forEach(preset => {
+                const option = document.createElement('option');
+                option.value = preset.presetId;
+                option.textContent = `${preset.name} (${preset.overlays.length} GIF)`;
+                presetSelect.appendChild(option);
+            });
+
+            // Update info preset aktif
+            updateActivePresetInfo();
+        }
+
+        // Update info preset aktif (Dropdown sync)
+        // ROBUST APPROACH: Remove event listener sebelum update value untuk prevent auto-trigger
+        let isListenerAttached = false; // Track apakah listener sudah ter-attach
+
+        function updateActivePresetInfo() {
+            console.log(`[GIF Standalone] updateActivePresetInfo called, activePresetId=${activePresetId || 'null'}, listenerAttached=${isListenerAttached}`);
+
+            // ONLY remove listener jika sudah attached (setelah delay init selesai)
+            if (isListenerAttached) {
+                presetSelect.removeEventListener('change', handlePresetChange);
+                console.log('[GIF Standalone] Removed change listener temporarily');
+            }
+
+            if (activePresetId) {
+                const preset = presetsList.find(p => p.presetId === activePresetId);
+                if (preset) {
+                    presetSelect.value = activePresetId;
+                    console.log(`[GIF Standalone] Dropdown set to preset: ${preset.name}`);
+                } else {
+                    presetSelect.value = "";
+                    console.log('[GIF Standalone] Preset not found, dropdown set to empty');
+                }
+            } else {
+                presetSelect.value = "";
+                console.log('[GIF Standalone] No active preset, dropdown set to empty');
+            }
+
+            // ONLY add listener kembali jika sudah pernah attached
+            if (isListenerAttached) {
+                setTimeout(() => {
+                    presetSelect.addEventListener('change', handlePresetChange);
+                    console.log('[GIF Standalone] Change listener re-attached');
+                }, 0);
+            }
+
+            // Panggil visibility toggle setiap kali status preset berubah
+            updateGalleryVisibility();
+        }
+
+        // Simpan konfigurasi saat ini sebagai preset baru
+        async function saveNewPreset() {
+            const name = presetNameInput.value.trim();
+            if (!name) {
+                alert('Masukkan nama untuk preset baru');
+                return;
+            }
+
+            // Kita harus memaksa save state sekarang dulu ke main process
+            // agar preset baru menggunakan konfigurasi yang SEDANG dilihat user, BUKAN konfigurasi lama.
+            try {
+                console.log('[GIF Standalone] === CREATE NEW PRESET ===');
+                console.log(`[GIF Standalone] Creating: "${name}", currentActive: ${activePresetId || 'null'}`);
+                logSyncStatus('create-preset-before');
+
+                // 1. Kumpulkan data terbaru dari UI
+                const currentOverlays = await collectCurrentOverlayData();
+                console.log(`[GIF Standalone] Collected ${currentOverlays.length} overlays from UI`);
+
+                // 2. Simpan ke global settings dulu (agar main process tahu state terakhir)
+                // Kita gunakan activePresetId yang sekarang (atau null jika belum ada), 
+                // ini tidak masalah karena kita akan membuat ID baru.
+                const settingsData = {
+                    gifOverlayLocked: lockToggle.checked,
+                    gifOverlays: currentOverlays,
+                    activePresetId: activePresetId
+                };
+
+                await ipcRenderer.invoke('gif-settings-save', settingsData);
+                console.log('[GIF Standalone] State disimpan sementara sebelum membuat preset baru.');
+
+                // 3. Request pembuatan preset baru 
+                // (Main process akan mengambil data dari settings global yang baru saja kita update)
+                const result = await ipcRenderer.invoke('gif-preset-save', { name });
+
+                if (result.success) {
+                    console.log(`[GIF Standalone] Preset "${name}" berhasil disimpan dengan ID: ${result.preset.presetId}`);
+                    presetNameInput.value = '';
+                    newPresetForm.classList.remove('open'); // Tutup form
+                    if (presetToggleAddBtn) presetToggleAddBtn.textContent = '+ Buat Profile Baru'; // Reset tombol
+
+                    // Update activePresetId ke preset baru
+                    activePresetId = result.preset.presetId;
+                    await loadPresetsList();
+
+                    // Kita tidak perlu reload UI GIF karena UI-nya sudah benar (sesuai yang baru disave)
+                    // Cukup update dropdown dan visibility
+                    updateActivePresetInfo();
+
+                    logSyncStatus('create-preset-after');
+                    console.log('[GIF Standalone] === CREATE PRESET COMPLETE ===');
+                } else {
+                    alert(`Gagal menyimpan preset: ${result.error}`);
+                }
+            } catch (error) {
+                console.error('[GIF Standalone] Error saat saveNewPreset:', error);
+                alert('Gagal membuat profile baru: ' + error.message);
+            }
+        }
+
+        // Terapkan preset yang dipilih
+        async function applySelectedPreset() {
+            const selectedId = presetSelect.value;
+            if (!selectedId) {
+                alert('Pilih preset terlebih dahulu');
+                return;
+            }
+
+            console.log('[GIF Standalone] === APPLY PRESET ===');
+            console.log(`[GIF Standalone] Applying: ${selectedId}, currentActive: ${activePresetId || 'null'}`);
+            logSyncStatus('apply-preset-before');
+
+            // Panggil main process untuk apply preset (ini akan menutup overlay lama dan buat baru)
+            const result = await ipcRenderer.invoke('gif-preset-apply', selectedId);
+            if (result.success) {
+                console.log('[GIF Standalone] Preset berhasil diterapkan:', selectedId);
+                activePresetId = selectedId;
+
+                // Cleanup UI lama
+                gifListContainer.innerHTML = '';
+                gifDataMap.clear();
+
+                // CRITICAL FIX: JANGAN panggil loadSettings() di sini!
+                // Ada race condition: main process masih proses apply preset dan update settings.
+                // Jika kita load settings sekarang, gifOverlays masih kosong (belum ter-update),
+                // yang akan trigger validasi reset activePresetId ke null!
+                //
+                // Main process akan kirim IPC 'gif-preset-changed' setelah selesai apply,
+                // yang akan trigger reload UI dengan data yang sudah benar.
+                //
+                // Untuk sementara, kita buat UI cards dari `result.overlays`:
+                console.log('[GIF Standalone] Creating UI cards from apply result...');
+                if (result.overlays && Array.isArray(result.overlays)) {
+                    for (const overlay of result.overlays) {
+                        const card = await createGifCard(overlay.id, overlay.path, overlay.settings);
+                        gifListContainer.appendChild(card);
+                    }
+                    updateCardNumbers();
+                }
+                updateGifCount();
+
+                // Reload preset list untuk update count di dropdown
+                await loadPresetsList();
+
+                logSyncStatus('apply-preset-after');
+                console.log('[GIF Standalone] === APPLY PRESET COMPLETE ===');
+
+                if (result.missingFiles && result.missingFiles.length > 0) {
+                    alert(`Peringatan: ${result.missingFiles.length} file GIF tidak ditemukan dan dilewati.`);
+                }
+            } else {
+                alert(`Gagal menerapkan preset: ${result.error}`);
+            }
+        }
+
+        // Tampilkan konfirmasi hapus preset
+        function showDeletePresetConfirm() {
+            const selectedId = presetSelect.value;
+            if (!selectedId) {
+                alert('Pilih preset yang ingin dihapus');
+                return;
+            }
+
+            const preset = presetsList.find(p => p.presetId === selectedId);
+            if (preset) {
+                pendingDeletePresetId = selectedId;
+                confirmDeleteMessage.textContent = `Apakah kamu yakin ingin menghapus preset "${preset.name}"?`;
+                confirmDeleteOverlay.classList.add('visible');
+            }
+        }
+
+        // Konfirmasi hapus preset
+        async function confirmDeletePreset() {
+            if (!pendingDeletePresetId) return;
+
+            const wasActivePreset = (activePresetId === pendingDeletePresetId);
+            const presetToDelete = presetsList.find(p => p.presetId === pendingDeletePresetId);
+
+            console.log(`[GIF Standalone] === DELETE PRESET START ===`);
+            console.log(`[GIF Standalone] Deleting: "${presetToDelete?.name}", wasActive: ${wasActivePreset}`);
+            logSyncStatus('preset-delete-before');
+
+            // Hapus preset dan file GIF-nya dari disk
+            const result = await ipcRenderer.invoke('gif-preset-delete', pendingDeletePresetId, { deleteFiles: true });
+
+            if (result.success) {
+                console.log(`[GIF Standalone] Preset dihapus, deletedFiles: ${result.deletedFilesCount || 0}`);
+
+                // Jika preset yang dihapus adalah preset aktif, lakukan cleanup
+                if (wasActivePreset || result.wasActivePreset) {
+                    activePresetId = null;
+                    // Cleanup UI (window sudah ditutup oleh main process)
+                    gifListContainer.innerHTML = '';
+                    gifDataMap.clear();
+                    updateGifCount();
+                    console.log('[GIF Standalone] UI cleared for deleted active preset');
+                }
+
+                await loadPresetsList();
+                updateGalleryVisibility();
+                logSyncStatus('preset-delete-after');
+                console.log('[GIF Standalone] === DELETE PRESET COMPLETE ===');
+            } else {
+                alert(`Gagal menghapus preset: ${result.error}`);
+            }
+
+            pendingDeletePresetId = null;
+            confirmDeleteOverlay.classList.remove('visible');
+        }
+
+        // === Fungsi Utilitas ===
+
+        // Cek apakah file masih ada
+        async function checkFileExists(filePath) {
+            try {
+                return fs.existsSync(filePath);
+            } catch (e) {
+                return false;
+            }
+        }
+
+        // Buat GIF Card dengan gallery layout dan preview
+        async function createGifCard(overlayId = '', path = '', settings = null) {
+            const defaultSettings = {
+                opacity: 1,
+                rotation: 0,
+                hideOnCursor: false
+            };
+
+            const cardSettings = settings || defaultSettings;
+
+            if (overlayId) {
+                gifDataMap.set(overlayId.toString(), {
+                    path: path,
+                    settings: cardSettings
+                });
+            }
+
+            // Cek apakah file masih ada
+            const fileExists = path ? await checkFileExists(path) : true;
+
+            const card = document.createElement('div');
+            card.className = 'gif-card';
+            card.dataset.overlayId = overlayId.toString();
+            card.dataset.fileExists = fileExists.toString();
+
+            // Preview Container
+            const previewContainer = document.createElement('div');
+            previewContainer.className = 'gif-preview-container';
+
+            const numberBadge = document.createElement('div');
+            numberBadge.className = 'gif-number-badge';
+            numberBadge.textContent = gifListContainer.children.length + 1;
+            previewContainer.appendChild(numberBadge);
+
+            // Tambahkan warning badge jika file tidak ditemukan
+            if (path && !fileExists) {
+                const warningBadge = document.createElement('div');
+                warningBadge.className = 'file-warning-badge';
+                warningBadge.innerHTML = '<span class="icon">⚠️</span> File tidak ditemukan';
+                previewContainer.appendChild(warningBadge);
+            }
+
+            if (path && fileExists) {
+                const img = document.createElement('img');
+                img.src = path;
+                img.alt = 'GIF Preview';
+                previewContainer.appendChild(img);
+            } else if (path && !fileExists) {
+                // File tidak ditemukan - tampilkan placeholder dengan pesan
+                const placeholder = document.createElement('div');
+                placeholder.className = 'gif-preview-placeholder';
+                placeholder.innerHTML = `
+                    <div class="text" style="color: #ff6b6b;">Klik "Pilih GIF" untuk memilih ulang</div>
+                `;
+                previewContainer.appendChild(placeholder);
+            } else {
+                const placeholder = document.createElement('div');
+                placeholder.className = 'gif-preview-placeholder';
+                placeholder.innerHTML = `
+                    <div class="text">Belum ada GIF dipilih</div>
+                `;
+                previewContainer.appendChild(placeholder);
+            }
+
+            // Card Content
+            const content = document.createElement('div');
+            content.className = 'gif-card-content';
+
+            const infoSection = document.createElement('div');
+            infoSection.className = 'gif-info-section';
+
+            const filename = document.createElement('div');
+            filename.className = path ? (fileExists ? 'gif-filename' : 'gif-filename') : 'gif-filename empty';
+            filename.textContent = path ? path.split(/[/\\]/).pop() : 'Belum ada file dipilih';
+            filename.title = path || '';
+            if (path && !fileExists) {
+                filename.style.color = '#ff6b6b';
+            }
+
+            const status = document.createElement('div');
+            status.className = overlayId ? 'gif-status active' : 'gif-status';
+            status.textContent = overlayId ? '● Aktif' : 'Belum dikonfigurasi';
+
+            infoSection.appendChild(filename);
+            infoSection.appendChild(status);
+
+            const actionsRow = document.createElement('div');
+            actionsRow.className = 'gif-actions-row';
+
+            const browseBtn = document.createElement('button');
+            browseBtn.className = 'gif-card-btn browse';
+            browseBtn.innerHTML = '📁 Pilih GIF';
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'gif-card-btn delete';
+            deleteBtn.textContent = '✕';
+
+            actionsRow.appendChild(browseBtn);
+            actionsRow.appendChild(deleteBtn);
+
+            const settingsToggle = document.createElement('button');
+            settingsToggle.className = 'gif-settings-toggle';
+            settingsToggle.innerHTML = '⚙️ Pengaturan';
+
+            const settingsPanel = document.createElement('div');
+            settingsPanel.className = 'gif-settings-panel';
+
+            const settingsContent = document.createElement('div');
+            settingsContent.className = 'gif-settings-content';
+
+            const opacityRow = document.createElement('div');
+            opacityRow.className = 'gif-setting-row';
+            opacityRow.innerHTML = `
+                <label>Opacity</label>
+                <input type="range" class="opacity-slider" min="0.1" max="1" step="0.1" value="${cardSettings.opacity}">
+                <div class="range-display">
+                    <span>10%</span>
+                    <span class="current opacity-value">${Math.round(cardSettings.opacity * 100)}%</span>
+                    <span>100%</span>
+                </div>
+            `;
+
+            const rotationRow = document.createElement('div');
+            rotationRow.className = 'gif-setting-row';
+            rotationRow.innerHTML = `
+                <label>Rotation</label>
+                <input type="range" class="rotation-slider" min="0" max="360" step="15" value="${cardSettings.rotation}">
+                <div class="range-display">
+                    <span>0°</span>
+                    <span class="current rotation-value">${cardSettings.rotation}°</span>
+                    <span>360°</span>
+                </div>
+            `;
+
+            const hideToggleRow = document.createElement('div');
+            hideToggleRow.className = 'gif-toggle-setting';
+            hideToggleRow.innerHTML = `
+                <div class="toggle-info">
+                    <div class="toggle-label">Menghilang saat didekati kursor</div>
+                    <div class="toggle-desc">Hanya bekerja jika posisi dikunci</div>
+                </div>
+                <label class="toggle-switch" style="margin-left: 10px;">
+                    <input type="checkbox" class="hide-on-cursor-toggle" ${cardSettings.hideOnCursor ? 'checked' : ''}>
+                    <span class="slider"></span>
+                </label>
+            `;
+
+            settingsContent.appendChild(opacityRow);
+            settingsContent.appendChild(rotationRow);
+            settingsContent.appendChild(hideToggleRow);
+
+            // === ANIMATION SETTINGS ===
+            const animSettings = cardSettings.animation || { type: 'none', speed: 2, enabled: true };
+
+            const animationTypeRow = document.createElement('div');
+            animationTypeRow.className = 'gif-setting-row';
+            animationTypeRow.innerHTML = `
+                <label>Animasi Gerakan</label>
+                <select class="animation-type-select" style="flex: 1; padding: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; font-size: 13px;">
+                    <option value="none" ${animSettings.type === 'none' ? 'selected' : ''}>Tidak Ada</option>
+                    <option value="dvd" ${animSettings.type === 'dvd' ? 'selected' : ''}>DVD Bouncing</option>
+                    <option value="linear" ${animSettings.type === 'linear' ? 'selected' : ''}>Linear (Wrap Around)</option>
+                    <option value="circular" ${animSettings.type === 'circular' ? 'selected' : ''}>Melingkar (Orbit)</option>
+                    <option value="random" ${animSettings.type === 'random' ? 'selected' : ''}>Random Walk</option>
+                    <option value="patrol" ${animSettings.type === 'patrol' ? 'selected' : ''}>Patroli (Flip)</option>
+                    <option value="patrol-wave" ${animSettings.type === 'patrol-wave' ? 'selected' : ''}>Patroli Bergelombang (Flip)</option>
+                    <option value="patrol-vertical" ${animSettings.type === 'patrol-vertical' ? 'selected' : ''}>Patroli Vertikal (Flip)</option>
+                    <option value="patrol-wave-vertical" ${animSettings.type === 'patrol-wave-vertical' ? 'selected' : ''}>Patroli Vertikal Bergelombang (Flip)</option>
+                </select>
+            `;
+
+            const animationSpeedRow = document.createElement('div');
+            animationSpeedRow.className = 'gif-setting-row animation-speed-row';
+            animationSpeedRow.style.display = animSettings.type !== 'none' ? 'flex' : 'none';
+            animationSpeedRow.innerHTML = `
+                <label>Kecepatan</label>
+                <input type="range" class="animation-speed-slider" min="1" max="10" step="1" value="${animSettings.speed}">
+                <div class="range-display">
+                    <span>1</span>
+                    <span class="current animation-speed-value">${animSettings.speed}</span>
+                    <span>10</span>
+                </div>
+            `;
+
+            settingsContent.appendChild(animationTypeRow);
+            settingsContent.appendChild(animationSpeedRow);
+            settingsPanel.appendChild(settingsContent);
+
+            content.appendChild(infoSection);
+            content.appendChild(actionsRow);
+            content.appendChild(settingsToggle);
+            content.appendChild(settingsPanel);
+
+            card.appendChild(previewContainer);
+            card.appendChild(content);
+
+            // === Event Listeners ===
+
+            settingsToggle.addEventListener('click', () => {
+                settingsPanel.classList.toggle('expanded');
+                settingsToggle.classList.toggle('active');
+                settingsToggle.innerHTML = settingsPanel.classList.contains('expanded')
+                    ? '⚙️ Tutup Pengaturan'
+                    : '⚙️ Pengaturan';
+            });
+
+            browseBtn.addEventListener('click', async () => {
+                const result = await ipcRenderer.invoke('gif-overlay-browse-file');
+                if (result && result.filePath) {
+                    // Copy file ke folder internal aplikasi
+                    const importResult = await ipcRenderer.invoke('gif-overlay-import-file', result.filePath);
+
+                    if (!importResult.success) {
+                        alert(`Gagal mengimport file: ${importResult.error}`);
+                        return;
+                    }
+
+                    // Tampilkan peringatan jika file besar
+                    if (importResult.warning) {
+                        console.warn(`[GIF Standalone] ${importResult.warning}`);
+                        // Tidak memblokir, hanya log
+                    }
+
+                    const newPath = importResult.internalPath;
+
+                    // Hapus warning badge jika ada
+                    const warningBadge = previewContainer.querySelector('.file-warning-badge');
+                    if (warningBadge) warningBadge.remove();
+
+                    const existingImg = previewContainer.querySelector('img');
+                    const placeholder = previewContainer.querySelector('.gif-preview-placeholder');
+
+                    if (placeholder) {
+                        placeholder.remove();
+                    }
+
+                    if (existingImg) {
+                        existingImg.src = newPath;
+                    } else {
+                        const img = document.createElement('img');
+                        img.src = newPath;
+                        img.alt = 'GIF Preview';
+                        previewContainer.appendChild(img);
+                    }
+
+                    filename.textContent = newPath.split(/[/\\]/).pop();
+                    filename.title = newPath;
+                    filename.classList.remove('empty');
+                    filename.style.color = ''; // Reset warna jika sebelumnya merah
+
+                    // Update data dan status
+                    card.dataset.fileExists = 'true';
+                    const currentData = gifDataMap.get(card.dataset.overlayId) || { settings: defaultSettings };
+                    currentData.path = newPath;
+                    gifDataMap.set(card.dataset.overlayId, currentData);
+
+                    if (card.dataset.overlayId) {
+                        ipcRenderer.send('set-gif-overlay-image-by-id', {
+                            id: parseInt(card.dataset.overlayId),
+                            path: newPath
+                        });
+                        status.className = 'gif-status active';
+                        status.textContent = '● Aktif';
+                        console.log(`[GIF Standalone] Update overlay ID ${card.dataset.overlayId} dengan: ${newPath}`);
+                    } else {
+                        const newId = await ipcRenderer.invoke('create-new-gif-overlay', newPath);
+                        if (newId) {
+                            card.dataset.overlayId = newId.toString();
+                            gifDataMap.set(newId.toString(), {
+                                path: newPath,
+                                settings: defaultSettings
+                            });
+                            status.className = 'gif-status active';
+                            status.textContent = '● Aktif';
+                            console.log(`[GIF Standalone] Overlay baru dibuat dengan ID: ${newId}`);
+                        }
+                    }
+                    updateGifCount();
+                }
+            });
+
+            deleteBtn.addEventListener('click', () => {
+                const overlayId = card.dataset.overlayId;
+                const overlayData = gifDataMap.get(overlayId);
+                const gifPath = overlayData?.path || null;
+
+                console.log(`[GIF Standalone] Menghapus GIF: ID=${overlayId}, Path=${gifPath}`);
+
+                if (overlayId) {
+                    // Kirim dengan opsi deleteFile untuk menghapus file dari disk
+                    ipcRenderer.send('close-gif-overlay-by-id', {
+                        id: parseInt(overlayId),
+                        deleteFile: true  // Hapus file dari gif-storage
+                    });
+                    gifDataMap.delete(overlayId);
+                    console.log(`[GIF Standalone] Overlay ID ${overlayId} dihapus dengan file`);
+                }
+                card.remove();
+                updateCardNumbers();
+                updateGifCount();
+                logSyncStatus('delete-gif');
+            });
+
+            const opacitySlider = opacityRow.querySelector('.opacity-slider');
+            const opacityValue = opacityRow.querySelector('.opacity-value');
+            opacitySlider.addEventListener('input', () => {
+                const val = parseFloat(opacitySlider.value);
+                opacityValue.textContent = `${Math.round(val * 100)}%`;
+                updateOverlaySettings(card);
+            });
+
+            const rotationSlider = rotationRow.querySelector('.rotation-slider');
+            const rotationValue = rotationRow.querySelector('.rotation-value');
+            rotationSlider.addEventListener('input', () => {
+                const val = parseInt(rotationSlider.value);
+                rotationValue.textContent = `${val}°`;
+                updateOverlaySettings(card);
+            });
+
+            const hideToggle = hideToggleRow.querySelector('.hide-on-cursor-toggle');
+            hideToggle.addEventListener('change', () => {
+                updateOverlaySettings(card);
+            });
+
+            // Animation controls event listeners
+            const animationTypeSelect = animationTypeRow.querySelector('.animation-type-select');
+            const animationSpeedSlider = animationSpeedRow.querySelector('.animation-speed-slider');
+            const animationSpeedValue = animationSpeedRow.querySelector('.animation-speed-value');
+
+            animationTypeSelect.addEventListener('change', () => {
+                const selectedType = animationTypeSelect.value;
+                // Show/hide speed slider based on type
+                animationSpeedRow.style.display = selectedType !== 'none' ? 'flex' : 'none';
+                updateOverlaySettings(card);
+            });
+
+            animationSpeedSlider.addEventListener('input', () => {
+                const val = parseInt(animationSpeedSlider.value);
+                animationSpeedValue.textContent = val.toString();
+                updateOverlaySettings(card);
+            });
+
+            return card;
+        }
+
+        function updateOverlaySettings(card) {
+            const overlayId = card.dataset.overlayId;
+            if (!overlayId) return;
+
+            const opacitySlider = card.querySelector('.opacity-slider');
+            const rotationSlider = card.querySelector('.rotation-slider');
+            const hideToggle = card.querySelector('.hide-on-cursor-toggle');
+            const animationTypeSelect = card.querySelector('.animation-type-select');
+            const animationSpeedSlider = card.querySelector('.animation-speed-slider');
+
+            const settings = {
+                condition: 'always',
+                value: '',
+                opacity: parseFloat(opacitySlider.value),
+                rotation: parseInt(rotationSlider.value),
+                hideOnCursor: hideToggle.checked,
+                // Animation settings
+                animation: {
+                    type: animationTypeSelect ? animationTypeSelect.value : 'none',
+                    speed: animationSpeedSlider ? parseInt(animationSpeedSlider.value) : 2,
+                    enabled: true
+                }
+            };
+
+            const currentData = gifDataMap.get(overlayId) || {};
+            currentData.settings = settings;
+            gifDataMap.set(overlayId, currentData);
+
+            ipcRenderer.send('update-gif-overlay-settings', {
+                id: parseInt(overlayId),
+                settings: settings
+            });
+
+            console.log(`[GIF Standalone] Settings diupdate untuk overlay ${overlayId}:`, settings);
+        }
+
+        function updateCardNumbers() {
+            const cards = gifListContainer.querySelectorAll('.gif-card');
+            cards.forEach((card, index) => {
+                const numberEl = card.querySelector('.gif-number-badge');
+                if (numberEl) {
+                    numberEl.textContent = index + 1;
+                }
+            });
+        }
+
+        function updateGifCount() {
+            const activeCount = gifListContainer.querySelectorAll('.gif-card[data-overlay-id]:not([data-overlay-id=""])').length;
+            gifCountEl.textContent = `${activeCount} GIF`;
+        }
+
+        function updateStatus(active) {
+            if (active) {
+                statusDot.classList.remove('inactive');
+                statusText.textContent = 'Overlay aktif';
+            } else {
+                statusDot.classList.add('inactive');
+                statusText.textContent = 'Overlay tidak aktif';
+            }
+        }
+
+        // Helper baru untuk mengambil data overlay dari UI
+        async function collectCurrentOverlayData() {
+            // Ambil bounds dari main process untuk setiap overlay
+            const overlayPromises = [];
+            const cards = gifListContainer.querySelectorAll('.gif-card');
+
+            cards.forEach(card => {
+                const overlayId = card.dataset.overlayId;
+                // Hanya simpan overlay dengan file yang ada
+                const fileExists = card.dataset.fileExists === 'true';
+
+                if (overlayId && overlayId !== '' && fileExists) {
+                    const data = gifDataMap.get(overlayId);
+                    if (data && data.path) {
+                        // Minta bounds dari main process
+                        const boundsPromise = ipcRenderer.invoke('get-gif-overlay-bounds', parseInt(overlayId))
+                            .then(bounds => ({
+                                id: parseInt(overlayId),
+                                path: data.path,
+                                settings: data.settings || { opacity: 1, rotation: 0, hideOnCursor: false },
+                                bounds: bounds || { x: 100, y: 100, width: 200, height: 200 }
+                            }))
+                            .catch(() => ({
+                                id: parseInt(overlayId),
+                                path: data.path,
+                                settings: data.settings || { opacity: 1, rotation: 0, hideOnCursor: false },
+                                bounds: { x: 100, y: 100, width: 200, height: 200 }
+                            }));
+                        overlayPromises.push(boundsPromise);
+                    }
+                }
+            });
+
+            // Tunggu semua bounds didapatkan
+            return await Promise.all(overlayPromises);
+        }
+
+        async function saveSettings() {
+            try {
+                // Gunakan helper function
+                const currentOverlays = await collectCurrentOverlayData();
+
+                const settingsData = {
+                    gifOverlayLocked: lockToggle.checked,
+                    gifOverlays: currentOverlays,
+                    activePresetId: activePresetId
+                };
+
+                // Simpan ke main process
+                const result = await ipcRenderer.invoke('gif-settings-save', settingsData);
+
+                if (result.success) {
+                    console.log('[GIF Standalone] Settings disimpan ke main process:', settingsData);
+                    // Reload metadata preset untuk update count GIF di dropdown jika perlu
+                    // (misal update jumlah GIF di nama preset)
+                    await loadPresetsList();
+                } else {
+                    console.error('[GIF Standalone] Gagal menyimpan settings:', result.error);
+                }
+
+                // Visual feedback
+                saveSettingsBtn.classList.add('saved');
+                saveSettingsBtn.textContent = '✓ Tersimpan!';
+                setTimeout(() => {
+                    saveSettingsBtn.classList.remove('saved');
+                    saveSettingsBtn.innerHTML = 'Simpan Setting';
+                }, 2000);
+
+            } catch (error) {
+                console.error('[GIF Standalone] Error saveSettings:', error);
+                alert('Gagal menyimpan pengaturan: ' + error.message);
+            }
+        }
+
+        // Muat settings dari main process (bukan localStorage lagi)
+        // Parameter skipWindowRestore: true jika hanya ingin sync UI (window sudah dibuat oleh main.js)
+        async function loadSettings(options = {}) {
+            const skipWindowRestore = options.skipWindowRestore === true;
+
+            try {
+                console.log('[GIF Standalone] === LOAD SETTINGS ===');
+                console.log(`[GIF Standalone] skipWindowRestore: ${skipWindowRestore}`);
+
+                // Muat dari main process
+                const settings = await ipcRenderer.invoke('gif-settings-load');
+                console.log(`[GIF Standalone] Presets tersedia: ${(settings.gifOverlayPresets || []).length}, Active Preset ID: ${settings.activePresetId || 'null'}`);
+                console.log(`[GIF Standalone] Overlays di settings: ${(settings.gifOverlays || []).length}`);
+
+                // === CLEANUP SEBELUM MEMUAT DATA BARU ===
+                // Bersihkan UI lama untuk mencegah duplikasi
+                console.log('[GIF Standalone] Clearing UI before load...');
+                gifListContainer.innerHTML = '';
+                gifDataMap.clear();
+
+                // Update state lokal
+                activePresetId = settings.activePresetId || null;
+                presetsList = settings.gifOverlayPresets || [];
+                renderPresetDropdown();
+
+                if (settings.gifOverlayLocked !== undefined) {
+                    lockToggle.checked = settings.gifOverlayLocked;
+                    ipcRenderer.send('set-gif-overlay-locked', settings.gifOverlayLocked);
+                }
+
+                // Hanya muat overlays jika ada preset aktif
+                // Jika tidak ada preset aktif, tidak perlu memuat overlay apapun
+                if (activePresetId && settings.gifOverlays && Array.isArray(settings.gifOverlays)) {
+                    // VALIDASI: Jika activePresetId ada tapi overlay kosong, berarti data tidak konsisten
+                    // Reset activePresetId untuk mencegah auto-apply
+                    if (settings.gifOverlays.length === 0) {
+                        console.log('[GIF Standalone] activePresetId ada tapi tidak ada overlay, reset activePresetId');
+                        activePresetId = null;
+                        ipcRenderer.send('gif-preset-set-active', null);
+                        updateGifCount();
+                        logSyncStatus('load-no-preset');
+                    } else {
+                        console.log(`[GIF Standalone] Loading ${settings.gifOverlays.length} overlays for active preset...`);
+
+                        for (const overlay of settings.gifOverlays) {
+                            // Buat UI card di standalone manager (async karena cek file)
+                            const card = await createGifCard(overlay.id, overlay.path, overlay.settings);
+                            gifListContainer.appendChild(card);
+
+                            // HANYA buat window overlay jika TIDAK di-skip
+                            // Skip saat boot karena main.js sudah merestore windows
+                            if (!skipWindowRestore && overlay.path) {
+                                console.log(`[GIF Standalone] Membuat window overlay untuk ID ${overlay.id}`);
+                                ipcRenderer.send('restore-gif-overlay-window', {
+                                    id: overlay.id,
+                                    path: overlay.path,
+                                    settings: overlay.settings || { condition: 'always', value: '', opacity: 1, rotation: 0, hideOnCursor: false },
+                                    bounds: overlay.bounds
+                                });
+                            } else if (skipWindowRestore && overlay.path) {
+                                console.log(`[GIF Standalone] Skipping window restore for ID ${overlay.id} (already restored by main.js)`);
+                            }
+                        }
+                        updateCardNumbers();
+                        updateGifCount();
+                        logSyncStatus('load-complete');
+                    }
+                } else {
+                    console.log('[GIF Standalone] Tidak ada preset aktif, tidak memuat overlay apapun');
+                    updateGifCount();
+                    logSyncStatus('load-no-preset');
+                }
+
+                console.log('[GIF Standalone] === LOAD SETTINGS COMPLETE ===');
+            } catch (e) {
+                console.error('[GIF Standalone] Error memuat settings:', e);
+
+                // Fallback: coba muat dari localStorage (migrasi dari versi lama)
+                const savedData = localStorage.getItem('gifOverlaySettings');
+                if (savedData) {
+                    console.log('[GIF Standalone] Migrasi dari localStorage...');
+                    try {
+                        const oldSettings = JSON.parse(savedData);
+
+                        if (oldSettings.gifOverlayLocked !== undefined) {
+                            lockToggle.checked = oldSettings.gifOverlayLocked;
+                            ipcRenderer.send('set-gif-overlay-locked', oldSettings.gifOverlayLocked);
+                        }
+
+                        if (oldSettings.gifOverlays && Array.isArray(oldSettings.gifOverlays)) {
+                            for (const overlay of oldSettings.gifOverlays) {
+                                const card = await createGifCard(overlay.id, overlay.path, overlay.settings);
+                                gifListContainer.appendChild(card);
+
+                                if (overlay.path) {
+                                    ipcRenderer.send('restore-gif-overlay-window', {
+                                        id: overlay.id,
+                                        path: overlay.path,
+                                        settings: overlay.settings || { condition: 'always', value: '', opacity: 1, rotation: 0, hideOnCursor: false },
+                                        bounds: overlay.bounds
+                                    });
+                                }
+                            }
+                            updateCardNumbers();
+                            updateGifCount();
+                        }
+
+                        // Simpan ke main process dan hapus localStorage
+                        await saveSettings();
+                        localStorage.removeItem('gifOverlaySettings');
+                        console.log('[GIF Standalone] Migrasi selesai, localStorage dihapus');
+                    } catch (parseError) {
+                        console.error('[GIF Standalone] Error parsing localStorage:', parseError);
+                    }
+                }
+            }
+        }
+
+        // === Event Listeners ===
+
+        addGifBtn.addEventListener('click', async () => {
+            const card = await createGifCard();
+            gifListContainer.appendChild(card);
+            updateCardNumbers();
+            console.log('[GIF Standalone] Card baru ditambahkan');
+        });
+
+        saveSettingsBtn.addEventListener('click', () => {
+            saveSettings();
+        });
+
+        lockToggle.addEventListener('change', () => {
+            const isLocked = lockToggle.checked;
+            ipcRenderer.send('set-gif-overlay-locked', isLocked);
+            console.log(`[GIF Standalone] Lock overlay: ${isLocked}`);
+        });
+
+        themeBtnModern.addEventListener('click', () => {
+            applyTheme('theme-modern');
+        });
+
+        themeBtnClassic.addEventListener('click', () => {
+            applyTheme('theme-classic');
+        });
+
+        // Preset event listeners
+        // Handler function untuk dropdown change (sebagai named function agar bisa di-remove/add)
+        async function handlePresetChange() {
+            console.log(`[GIF Standalone] Dropdown 'change' event fired. skipNextChangeEvent=${skipNextChangeEvent}, value=${presetSelect.value}`);
+
+            // SKIP hanya first change event setelah init (karena preset sudah di-restore oleh main.js)
+            if (skipNextChangeEvent) {
+                console.log('[GIF Standalone] Skipping first change event (preset already restored by main.js)');
+                skipNextChangeEvent = false; // Reset flag setelah skip pertama kali
+                return;
+            }
+
+            console.log(`[GIF Standalone] User action detected, processing preset change...`);
+
+            if (presetSelect.value) {
+                // User memilih preset, terapkan
+                console.log(`[GIF Standalone] User clicked preset: ${presetSelect.value}`);
+                applySelectedPreset();
+            } else {
+                // User memilih opsi default "-- Pilih Preset --"
+                // Ini berarti user ingin deselect preset aktif
+                console.log('[GIF Standalone] === DESELECT PRESET ===');
+                console.log(`[GIF Standalone] Previous active: ${activePresetId}`);
+                logSyncStatus('deselect-before');
+
+                // Reset state lokal DULU
+                const previousPreset = activePresetId;
+                activePresetId = null;
+
+                // Update di main process
+                ipcRenderer.send('gif-preset-set-active', null);
+
+                // Cleanup semua overlay (TANPA hapus file dari disk)
+                // Karena ini hanya deselect, bukan delete
+                const result = await cleanupAllOverlays({ deleteFiles: false });
+                console.log(`[GIF Standalone] Cleanup result: ${JSON.stringify(result)}`);
+
+                // Update UI visibility
+                updateGalleryVisibility();
+
+                logSyncStatus('deselect-after');
+                console.log('[GIF Standalone] === DESELECT COMPLETE ===');
+            }
+        }
+
+        // ===================================================================
+        // Event listener change akan di-attach setelah delay 1 detik di init()
+        // Ini untuk prevent browser cache/autocomplete trigger auto-apply
+        // ===================================================================
+
+        // User bisa klik tombol "Terapkan" untuk apply preset (backup option)
+        presetApplyBtn.addEventListener('click', applySelectedPreset);
+        presetDeleteBtn.addEventListener('click', showDeletePresetConfirm);
+        presetSaveBtn.addEventListener('click', saveNewPreset);
+
+        // Konfirmasi hapus preset
+        confirmDeleteCancel.addEventListener('click', () => {
+            pendingDeletePresetId = null;
+            confirmDeleteOverlay.classList.remove('visible');
+        });
+        confirmDeleteConfirm.addEventListener('click', confirmDeletePreset);
+
+        // === Kontrol Window ===
+        document.getElementById('btn-min').onclick = () => ipcRenderer.send('gif-standalone-control', 'minimize');
+        document.getElementById('btn-max').onclick = () => ipcRenderer.send('gif-standalone-control', 'maximize');
+        document.getElementById('btn-close').onclick = () => ipcRenderer.send('gif-standalone-control', 'close');
+
+        // === IPC Handlers ===
+
+        ipcRenderer.on('gif-overlay-status-changed', (event, enabled) => {
+            updateStatus(enabled);
+        });
+
+        // === Listener untuk sinkronisasi preset dari window lain ===
+        // Menangani kasus ketika preset diubah dari native-player.html
+        ipcRenderer.on('gif-preset-changed', async (event, data) => {
+            console.log('[GIF Standalone] Preset changed from another window:', data);
+
+            // Update state lokal
+            activePresetId = data.presetId || null;
+
+            // Clear UI lama
+            gifListContainer.innerHTML = '';
+            gifDataMap.clear();
+
+            // Restore UI dengan data baru
+            if (data.overlays && Array.isArray(data.overlays)) {
+                for (const overlay of data.overlays) {
+                    const card = await createGifCard(overlay.id, overlay.path, overlay.settings);
+                    gifListContainer.appendChild(card);
+                }
+                updateCardNumbers();
+                updateGifCount();
+                console.log(`[GIF Standalone] Synced ${data.overlays.length} GIF overlays from preset change`);
+            }
+
+            // Reload preset list dan sync dropdown
+            await loadPresetsList();
+            updateActivePresetInfo();
+            updateGalleryVisibility();
+        });
+
+        // === Inisialisasi ===
+        async function init() {
+            console.log('[GIF Standalone] === INIT START ===');
+
+            const savedTheme = localStorage.getItem('gifStandaloneTheme') || 'theme-modern';
+            applyTheme(savedTheme);
+
+            ipcRenderer.send('set-gif-overlay-enabled', true);
+            updateStatus(true);
+
+            // Tambahkan autocomplete=off pada dropdown untuk mencegah browser auto-fill
+            presetSelect.setAttribute('autocomplete', 'off');
+
+            // Muat settings dari main process (sudah termasuk preset)
+            // IMPORTANT: skipWindowRestore=true karena main.js SUDAH merestore windows saat boot
+            // loadSettings() cukup sync UI saja tanpa membuat window baru
+            await loadSettings({ skipWindowRestore: true });
+
+            // Jika tidak ada preset aktif, pastikan semua overlay di-cleanup
+            // Ini menangani kasus jika ada overlay dari window lain yang sudah di-create
+            if (!activePresetId) {
+                console.log('[GIF Standalone] Tidak ada preset aktif saat init, memastikan cleanup...');
+                await cleanupAllOverlays({ deleteFiles: false }); // Jangan hapus file saat init
+            }
+
+            logSyncStatus('init-complete');
+            console.log(`[GIF Standalone] === INIT COMPLETE === Presets: ${presetsList.length}, Active: ${activePresetId || 'null'}`);
+
+            // CRITICAL: Force reset dropdown value untuk prevent browser autocomplete/cache restore
+            // Browser bisa auto-restore dropdown value terakhir yang ter-save di cache,
+            // yang akan trigger event change dan menyebabkan auto-apply!
+            console.log('[GIF Standalone] Force resetting dropdown value to prevent cache restore...');
+            presetSelect.value = activePresetId || '';
+
+            // Set flag untuk skip first change event HANYA jika ada preset yang ter-restore
+            // (activePresetId tidak null berarti main.js sudah restore preset)
+            if (activePresetId) {
+                skipNextChangeEvent = true;
+                console.log('[GIF Standalone] skipNextChangeEvent set to true (will skip change events in first 100ms after listener attached)');
+
+                // Auto-reset flag setelah 1.1 detik (1 detik delay + 100ms safe window)
+                // Ini memberi waktu browser untuk trigger autocomplete, tapi tidak akan interfere dengan user interaction
+                setTimeout(() => {
+                    if (skipNextChangeEvent) {
+                        skipNextChangeEvent = false;
+                        console.log('[GIF Standalone] skipNextChangeEvent auto-reset (safe window passed, user interactions now allowed)');
+                    }
+                }, 1100); // 1000ms delay + 100ms safe window
+            }
+
+            // Enable event listener setelah delay 1 detik
+            // Ini memberikan waktu untuk browser selesai restore apa pun tanpa trigger auto-apply
+            setTimeout(() => {
+                console.log('[GIF Standalone] Attaching change event listener after delay...');
+
+                // CRITICAL: Pastikan dropdown value sudah di-set sebelum attach listener
+                // untuk mencegah event change dengan value kosong (yang trigger deselect)
+                console.log(`[GIF Standalone] Final check: dropdown.value = "${presetSelect.value}", activePresetId = ${activePresetId || 'null'}`);
+                if (activePresetId && presetSelect.value === "") {
+                    console.log('[GIF Standalone] Dropdown value empty but activePresetId exists, setting dropdown value...');
+                    presetSelect.value = activePresetId;
+                }
+
+                presetSelect.addEventListener('change', handlePresetChange);
+                isListenerAttached = true; // Mark bahwa listener sudah attached
+                console.log('[GIF Standalone] Event listener attached, auto-apply now enabled');
+            }, 1000); // 1 second delay
+        }
+
+        init();
+    </script>
+</body>
+
+</html>

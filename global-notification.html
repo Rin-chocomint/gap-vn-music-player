@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        /* lexend-300 - latin */
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 300;
+            src: url('./aset/fonts/lexend-v26-latin-300.woff2') format('woff2');
+        }
+
+        /* lexend-regular - latin */
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 400;
+            src: url('./aset/fonts/lexend-v26-latin-regular.woff2') format('woff2');
+        }
+
+        /* lexend-700 - latin */
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 700;
+            src: url('./aset/fonts/lexend-v26-latin-700.woff2') format('woff2');
+        }
+
+        /* Pengaturan Dasar Halaman */
+        body {
+            font-family: 'Lexend', sans-serif;
+            margin: 0;
+            overflow: hidden;
+            background-color: transparent;
+        }
+
+        /* Kontainer Utama Animasi */
+        #notification-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        /* Canvas untuk menggambar bar */
+        #notification-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 120%;
+            height: 100%;
+        }
+
+        /* Konten Teks, diposisikan di atas canvas */
+        #text-content {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            /* Teks tetap di tengah vertikal */
+
+            box-sizing: border-box;
+            padding: 0 35px;
+            /* Padding kiri-kanan untuk teks */
+
+            color: #333;
+            opacity: 0;
+            /* Awalnya transparan */
+            transition: opacity 0.2s ease-in-out;
+            /* Animasi fade */
+        }
+
+        #text-content p,
+        #text-content span {
+            margin: 0;
+        }
+
+        #text-content p {
+            font-weight: bold;
+            font-size: 1rem;
+        }
+
+        #text-content span {
+            font-size: 0.95rem;
+            margin-top: 5px;
+            white-space: normal;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="notification-container">
+        <canvas id="notification-canvas"></canvas>
+        <div id="text-content">
+            <p id="notif-title"></p>
+            <span id="notif-message"></span>
+        </div>
+    </div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+        const canvas = document.getElementById('notification-canvas');
+        const ctx = canvas.getContext('2d');
+        const textContent = document.getElementById('text-content');
+        const notifTitle = document.getElementById('notif-title');
+        const notifMessage = document.getElementById('notif-message');
+
+        const DURATION_SWIPE_IN = 290;
+        const DURATION_SWIPE_OUT = 290;
+        const DURATION_STAY = 4100;
+        const GREY = '#ddd7d7';
+        const PINK_BORDER_WIDTH = 10;
+
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        ctx.scale(dpr, dpr);
+        const effectiveWidth = canvas.width / dpr;
+        const effectiveHeight = canvas.height / dpr;
+
+        let animationFrameId;
+        let state = {};
+
+        const colorMap = {
+            'error': '#F44336',
+            'success': '#4CAF50',
+            'warning': '#FFC107',
+            'default': '#f3557a'
+        };
+        let primaryColor = colorMap['default'];
+
+        function easeInOutCubic(t) {
+            return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = primaryColor;
+            ctx.fillRect(state.primaryBar.x, 0, effectiveWidth, effectiveHeight);
+            ctx.fillStyle = GREY;
+            ctx.fillRect(state.greyBar.x, 0, effectiveWidth, effectiveHeight);
+        }
+
+        function animate(timestamp) {
+            if (!state.startTime) state.startTime = timestamp;
+            const elapsed = timestamp - state.startTime;
+
+            switch (state.phase) {
+                case 'intro_primary_in': {
+                    const progress = Math.min(elapsed / DURATION_SWIPE_IN, 1);
+                    state.primaryBar.x = effectiveWidth - (effectiveWidth * easeInOutCubic(progress));
+                    if (progress >= 1) {
+                        state.phase = 'overlay_grey_in';
+                        state.startTime = timestamp;
+                    }
+                    break;
+                }
+                case 'overlay_grey_in': {
+                    const progress = Math.min(elapsed / DURATION_SWIPE_IN, 1);
+                    const targetX = PINK_BORDER_WIDTH;
+                    const startX = effectiveWidth;
+                    state.greyBar.x = startX + ((targetX - startX) * easeInOutCubic(progress));
+                    if (progress >= 1) {
+                        textContent.style.opacity = '1';
+                        state.phase = 'staying';
+                        state.startTime = timestamp;
+                    }
+                    break;
+                }
+                case 'staying': {
+                    if (elapsed >= DURATION_STAY) {
+                        textContent.style.opacity = '0';
+                        state.phase = 'outro_grey_out';
+                        state.startTime = timestamp;
+                    }
+                    break;
+                }
+                case 'outro_grey_out': {
+                    const progress = Math.min(elapsed / DURATION_SWIPE_OUT, 1);
+                    const startX = PINK_BORDER_WIDTH;
+                    const targetX = effectiveWidth;
+                    state.greyBar.x = startX + ((targetX - startX) * easeInOutCubic(progress));
+                    if (progress >= 1) {
+                        state.phase = 'outro_primary_out';
+                        state.startTime = timestamp;
+                    }
+                    break;
+                }
+                case 'outro_primary_out': {
+                    const progress = Math.min(elapsed / DURATION_SWIPE_OUT, 1);
+                    state.primaryBar.x = effectiveWidth * easeInOutCubic(progress);
+                    if (progress >= 1) {
+                        ipcRenderer.send('notification-finished');
+                        cancelAnimationFrame(animationFrameId);
+                        return;
+                    }
+                    break;
+                }
+            }
+            draw();
+            animationFrameId = requestAnimationFrame(animate);
+        }
+
+        ipcRenderer.on('set-notification-data', (event, { title, message, type }) => {
+            notifTitle.textContent = title || '';
+            notifMessage.textContent = message || '';
+            primaryColor = colorMap[type] || colorMap['default'];
+
+            state = {
+                phase: 'intro_primary_in',
+                startTime: 0,
+                primaryBar: { x: effectiveWidth },
+                greyBar: { x: -effectiveWidth }
+            };
+
+            cancelAnimationFrame(animationFrameId);
+            requestAnimationFrame(animate);
+        });
+    </script>
+</body>
+
+</html>

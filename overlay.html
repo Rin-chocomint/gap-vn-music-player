@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 300;
+            src: url('./aset/fonts/lexend-v26-latin-300.woff2') format('woff2');
+        }
+
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 400;
+            src: url('./aset/fonts/lexend-v26-latin-regular.woff2') format('woff2');
+        }
+
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 700;
+            src: url('./aset/fonts/lexend-v26-latin-700.woff2') format('woff2');
+        }
+    </style>
+    <title>Music Overlay</title>
+    <style>
+        /* Mencegah seleksi teks yang tidak diinginkan, kecuali pada input */
+        * {
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        input,
+        textarea {
+            -webkit-user-select: auto;
+            user-select: auto;
+        }
+
+        /* === VARIABEL TEMA (Digunakan oleh kedua tema) === */
+        :root {
+            --bg-main: rgba(30, 32, 37, 0.95);
+            --bg-secondary: #2a2e37;
+            --bg-tertiary: rgba(62, 68, 81, 0.7);
+            --bg-playlist: rgba(42, 46, 55, 0.5);
+            --text-primary: #e8eaed;
+            --text-secondary: #9aa0a6;
+            --accent-color: #ff6b6b;
+            --accent-gradient: linear-gradient(45deg, #ff6b6b, #f06595);
+            --playlist-border: rgba(154, 160, 166, 0.2);
+            --font-family: 'Lexend', sans-serif;
+        }
+
+        body.theme-classic {
+            --bg-main: #373737;
+            --bg-secondary: #636060;
+            --bg-tertiary: #4a4a4a;
+            --bg-playlist: #636060;
+            --text-primary: #ffffff;
+            --text-secondary: #cccccc;
+            --accent-color: #f3557a;
+            --accent-gradient: linear-gradient(90deg, #f3557a, #f37da2);
+            --playlist-border: #777;
+        }
+
+        /* === STYLE DASAR === */
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: transparent;
+            font-family: var(--font-family);
+            color: var(--text-primary);
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* === CONTAINER UTAMA & PANEL === */
+        .overlay-container {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 380px;
+            height: 100vh;
+            background-color: var(--bg-main);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transform: translateX(100%);
+            transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            display: flex;
+            flex-direction: column;
+            box-shadow: -5px 0 20px rgba(0, 0, 0, 0.3);
+            border-left: 1px solid rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+            /* Mencegah konten keluar saat animasi */
+        }
+
+        .overlay-container.visible {
+            transform: translateX(0);
+        }
+
+        /* === HEADER UTAMA === */
+        .header {
+            background-color: var(--bg-secondary);
+            padding: 10px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+            -webkit-app-region: drag;
+        }
+
+        .header-controls button {
+            -webkit-app-region: no-drag;
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 5px;
+            line-height: 1;
+            transition: color 0.2s;
+        }
+
+        .header-controls button:hover {
+            color: var(--accent-color);
+        }
+
+        /* === KONTEN UTAMA (PLAYER & PLAYLIST) === */
+        .main-content {
+            padding: 20px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            /* Jarak antar elemen utama */
+            overflow: hidden;
+        }
+
+        .player-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            flex-shrink: 0;
+        }
+
+        #album-art {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background-color: #222;
+            background-size: cover;
+            background-position: center;
+            border: 3px solid var(--bg-secondary);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+        }
+
+        #album-art.playing {
+            animation: spin 12s linear infinite;
+        }
+
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        #now-playing {
+            font-size: 0.9rem;
+            text-align: center;
+            font-weight: 400;
+            max-width: 100%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .progress-container {
+            width: 100%;
+            height: 6px;
+            background-color: var(--bg-secondary);
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        #progress-bar {
+            width: 0%;
+            height: 100%;
+            background: var(--accent-gradient);
+            border-radius: 5px;
+            transition: width 0.1s linear;
+        }
+
+        #time-info {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            width: 100%;
+            text-align: center;
+            margin-top: -10px;
+        }
+
+        .controls-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            width: 100%;
+            justify-content: center;
+        }
+
+        #volume-slider {
+            width: 80px;
+            -webkit-appearance: none;
+            background: var(--bg-secondary);
+            height: 5px;
+            border-radius: 5px;
+            outline: none;
+        }
+
+        #volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 15px;
+            height: 15px;
+            background: var(--text-primary);
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+        .player-buttons button {
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: transform 0.2s, color 0.2s;
+        }
+
+        .player-buttons button:hover {
+            color: var(--accent-color);
+            transform: scale(1.1);
+        }
+
+        #visualizer-canvas {
+            width: 120px;
+            height: 40px;
+        }
+
+        #comet-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            pointer-events: none;
+            clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* Kepala komet */
+        .comet {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: radial-gradient(circle,
+                    rgba(255, 255, 255, 1) 0%,
+                    rgba(255, 255, 255, 0.8) 40%,
+                    rgba(173, 216, 230, 0.5) 70%,
+                    rgba(173, 216, 230, 0) 100%);
+            border-radius: 50%;
+            box-shadow: 0 0 15px 5px var(--comet-glow-color, rgba(173, 216, 230, 0.3));
+
+            animation-delay: 2s;
+        }
+
+        /* Ekor komet yang estetik */
+        .comet::after {
+            content: '';
+            position: absolute;
+            top: 4px;
+            /* Posisi relatif terhadap kepala komet */
+            left: 4px;
+            width: var(--comet-tail-length, 300px);
+            height: 1px;
+            /* Ketebalan ekor */
+            background: linear-gradient(to right,
+                    rgba(255, 255, 255, 0.6),
+                    transparent);
+            transform-origin: top left;
+            transform: rotate(-135deg);
+            /* Arah ekor, sesuaikan dengan arah jatuh */
+        }
+
+        /* Keyframes untuk animasi jatuh */
+        @keyframes fall-comet {
+            0% {
+                /* Mulai dari luar layar, kiri atas */
+                transform: translate(-50px, -50px);
+                opacity: 0;
+            }
+
+            10% {
+                /* Muncul di dalam layar */
+                opacity: 1;
+            }
+
+            100% {
+                /* Selesai di luar layar, kanan bawah */
+                transform: translate(500px, 500px);
+            }
+        }
+
+        /* === BAGIAN PLAYLIST (Struktur dari V1) === */
+        .playlist-header {
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--playlist-border);
+            flex-shrink: 0;
+        }
+
+        #playlist-toggle-btn-overlay {
+            background-color: rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--playlist-border);
+            color: var(--text-secondary);
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-family: var(--font-family);
+            transition: all 0.2s ease;
+        }
+
+        #playlist-toggle-btn-overlay:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+            color: var(--text-primary);
+        }
+
+        #playlist-toggle-btn-overlay.online-mode {
+            color: var(--accent-color);
+            border-color: var(--accent-color);
+        }
+
+        .playlist-section {
+            background-color: var(--bg-playlist);
+            border-radius: 12px;
+            padding: 10px;
+            /* Sedikit padding agar tidak terlalu mepet */
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+
+        .playlist-section::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .playlist-section::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .playlist-section::-webkit-scrollbar-thumb {
+            background: var(--bg-secondary);
+            border-radius: 3px;
+        }
+
+        .playlist-section ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Style untuk item playlist lokal */
+        .playlist-section li {
+            padding: 10px 8px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--playlist-border);
+            font-size: 0.9rem;
+            transition: background-color 0.2s;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .playlist-section li:last-child {
+            border-bottom: none;
+        }
+
+        .playlist-section li.active {
+            color: var(--accent-color);
+            font-weight: bold;
+        }
+
+        .playlist-section li:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        /* Style untuk item playlist online (dari V2) */
+        .online-playlist-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .online-playlist-item img {
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+
+        .online-playlist-item .song-info {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            flex-grow: 1;
+        }
+
+        .online-playlist-item .title {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .online-playlist-item .artist {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .online-playlist-item .duration {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            padding-left: 10px;
+        }
+
+        /* === PANEL PENGATURAN (Fitur & Animasi dari V2) === */
+        #settings-panel {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-main);
+            display: flex;
+            flex-direction: column;
+            transform: translateX(100%);
+            transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            z-index: 200;
+            /* Di atas konten utama */
+        }
+
+        #settings-panel.visible {
+            transform: translateX(0);
+        }
+
+        .settings-header {
+            background-color: var(--bg-secondary);
+            padding: 10px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+            -webkit-app-region: drag;
+        }
+
+        .settings-header button {
+            -webkit-app-region: no-drag;
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 5px;
+            line-height: 1;
+        }
+
+        .settings-content {
+            padding: 20px;
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+
+        .settings-section {
+            margin-bottom: 25px;
+        }
+
+        .settings-section h3 {
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-top: 0;
+            margin-bottom: 15px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid var(--playlist-border);
+        }
+
+        .theme-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .theme-buttons button {
+            flex: 1;
+            padding: 10px;
+            font-family: var(--font-family);
+            font-size: 0.9rem;
+            border: 1px solid var(--bg-tertiary);
+            background-color: transparent;
+            color: var(--text-primary);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .theme-buttons button.active {
+            border-color: var(--accent-color);
+            background-color: rgba(255, 107, 107, 0.1);
+            color: var(--accent-color);
+        }
+
+        .theme-buttons button:hover:not(.active) {
+            background-color: var(--bg-tertiary);
+        }
+
+        /* === TOGGLE SWITCH (dari V2) === */
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--bg-tertiary);
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked+.slider {
+            background-color: var(--accent-color);
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(20px);
+        }
+    </style>
+</head>
+
+<body class="theme-modern">
+    <div class="overlay-container" id="overlay">
+        <!-- Header Utama -->
+        <div class="header">
+            <span class="header-title">GAP Music Player</span>
+            <div class="header-controls">
+                <button id="more-options-btn" title="Pengaturan">⋮</button>
+                <button id="close-overlay-btn" title="Tutup">×</button>
+            </div>
+        </div>
+
+        <div id="comet-container"></div>
+
+        <!-- Panel Utama (Player & Playlist) -->
+        <div class="main-content" id="main-content">
+            <div class="player-section">
+
+                <div id="album-art"></div>
+                <p id="now-playing">Tidak ada musik</p>
+                <div class="progress-container" id="progress-container">
+                    <div id="progress-bar"></div>
+                </div>
+                <span id="time-info">0:00 / 0:00</span>
+                <div class="controls-wrapper">
+                    <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="0.5">
+                    <div class="player-buttons">
+                        <button id="prev-btn" title="Sebelumnya">⏮</button>
+                        <button id="play-pause-btn" title="Putar/Jeda">▶</button>
+                        <button id="next-btn" title="Berikutnya">⏭</button>
+                    </div>
+                </div>
+                <canvas id="visualizer-canvas"></canvas>
+            </div>
+
+            <!-- Header Playlist (Struktur dari V1) -->
+            <div class="playlist-header">
+                <button id="playlist-toggle-btn-overlay">Local Playlist</button>
+            </div>
+
+            <!-- Daftar Putar -->
+            <div class="playlist-section">
+                <ul id="playlist"></ul>
+            </div>
+        </div>
+
+        <!-- Panel Pengaturan (Tersembunyi, dari V2) -->
+        <div id="settings-panel">
+            <div class="settings-header">
+                <button id="back-to-main-btn" title="Kembali">←</button>
+                <span class="header-title">Pengaturan Overlay</span>
+                <div style="width: 30px;"></div> <!-- Spacer -->
+            </div>
+            <div class="settings-content">
+                <div class="settings-section">
+                    <h3>Tampilan</h3>
+                    <div class="theme-buttons">
+                        <button id="theme-btn-modern" data-theme="theme-modern">Modern</button>
+                        <button id="theme-btn-classic" data-theme="theme-classic">Classic Chocomint cafe</button>
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <h3>Fitur Remote</h3>
+                    <div class="setting-item">
+                        <span>Efek Salju</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="snow-toggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <span>Mini Player</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="mini-player-toggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Pastikan kode ini berjalan di lingkungan Electron
+        const { ipcRenderer } = require('electron');
+
+        // --- ELEMEN DOM ---
+        const overlayContainer = document.getElementById('overlay');
+        const closeBtn = document.getElementById('close-overlay-btn');
+        const mainContent = document.getElementById('main-content');
+
+        // Player
+        const albumArt = document.getElementById('album-art');
+        const nowPlayingEl = document.getElementById('now-playing');
+        const progressContainer = document.getElementById('progress-container');
+        const progressBar = document.getElementById('progress-bar');
+        const timeInfoEl = document.getElementById('time-info');
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        const volumeSlider = document.getElementById('volume-slider');
+        const playlistEl = document.getElementById('playlist');
+        const playlistToggleBtnOverlay = document.getElementById('playlist-toggle-btn-overlay');
+        const canvas = document.getElementById('visualizer-canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Pengaturan
+        const settingsPanel = document.getElementById('settings-panel');
+        const moreOptionsBtn = document.getElementById('more-options-btn');
+        const backToMainBtn = document.getElementById('back-to-main-btn');
+        const themeBtnModern = document.getElementById('theme-btn-modern');
+        const themeBtnClassic = document.getElementById('theme-btn-classic');
+        const snowToggle = document.getElementById('snow-toggle');
+        const miniPlayerToggle = document.getElementById('mini-player-toggle');
+
+        // --- VARIABEL & STATE ---
+        const NUM_BARS = 42;
+        let lastVisualizerData = new Array(NUM_BARS).fill(0);
+
+        // --- FUNGSI UI & PANEL ---
+        function hidePanel() {
+            overlayContainer.classList.remove('visible');
+            ipcRenderer.send('make-overlay-pass-through');
+        }
+        function showPanel() {
+            overlayContainer.classList.add('visible');
+            ipcRenderer.send('make-overlay-interactive');
+            ipcRenderer.send('request-overlay-focus');
+        }
+        function showSettingsPanel() {
+            settingsPanel.classList.add('visible');
+        }
+        function hideSettingsPanel() {
+            settingsPanel.classList.remove('visible');
+        }
+        function applyTheme(themeName) {
+            document.body.className = themeName;
+            localStorage.setItem('overlayTheme', themeName);
+            themeBtnModern.classList.toggle('active', themeName === 'theme-modern');
+            themeBtnClassic.classList.toggle('active', themeName === 'theme-classic');
+        }
+        function setupCanvas() {
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+        }
+
+        // --- FUNGSI RENDER & FORMAT ---
+        const formatTime = (seconds) => {
+            if (isNaN(seconds) || seconds < 0) return '0:00';
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = Math.floor(seconds % 60).toString().padStart(2, '0');
+            return `${minutes}:${remainingSeconds}`;
+        };
+
+        function createComet() {
+            const cometContainer = document.getElementById('comet-container');
+            if (!cometContainer) return;
+
+            const comet = document.createElement('div');
+            comet.classList.add('comet');
+
+            // --- Variasi Estetik ---
+            const scale = 0.6 + Math.random() * 0.6;
+            const tailLength = 150 + (scale * 150);
+            const opacity = 0.5 + (scale * 0.5);
+
+            // --- Variasi Waktu & Gerakan ---
+            // Kecepatan jatuh yang berbeda-beda (antara 1.2 hingga 2.5 detik)
+            const duration = 1.2 + Math.random() * 1.3;
+            // Jeda sebelum animasi dimulai
+            const delay = Math.random() * 2;
+
+            comet.style.opacity = opacity;
+            comet.style.transform = `scale(${scale})`;
+            comet.style.setProperty('--comet-tail-length', `${tailLength}px`);
+
+            comet.style.animation = `fall-comet ${duration}s ease-in ${delay}s`;
+
+            const startX = -50 - (Math.random() * 150);
+            const startY = -50 - (Math.random() * 150);
+            comet.style.left = `${startX}px`;
+            comet.style.top = `${startY}px`;
+
+            cometContainer.appendChild(comet);
+
+            comet.addEventListener('animationend', () => {
+                comet.remove();
+            });
+        }
+        function spawnComets() {
+            createComet();
+
+            const randomInterval = 500 + Math.random() * 1500;
+            setTimeout(spawnComets, randomInterval);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const cometManager = {
+                container: document.getElementById('comet-container'),
+
+                // Konfigurasi untuk setiap fase "cuaca" komet
+                states: {
+                    CALM: { minInterval: 5000, maxInterval: 12000, burstChance: 0.02 },
+                    BUILD_UP: { minInterval: 2000, maxInterval: 6000, burstChance: 0.08 },
+                    SHOWER: { minInterval: 400, maxInterval: 1000, burstChance: 0.25 },
+                    FADING_OUT: { minInterval: 3000, maxInterval: 8000, burstChance: 0.03 }
+                },
+                stateDurations: {
+                    CALM: 90000,
+                    BUILD_UP: 15000,
+                    SHOWER: 10000,
+                    FADING_OUT: 25000,
+                },
+
+                currentState: 'CALM',
+                stateCycle: ['CALM', 'BUILD_UP', 'SHOWER', 'FADING_OUT'],
+                currentStateIndex: 0,
+                // Properti cooldown dan kuadran sudah tidak diperlukan lagi
+
+                spawnComet() {
+                    if (!this.container) return;
+
+                    const config = this.states[this.currentState];
+
+                    if (Math.random() < config.burstChance) {
+                        const burstCount = 2 + Math.floor(Math.random() * 2);
+                        for (let i = 0; i < burstCount; i++) {
+                            setTimeout(() => this.createComet('faint'), i * 150);
+                        }
+                    } else {
+                        const rand = Math.random();
+                        let type = 'standard';
+                        if (rand < 0.4) type = 'faint';
+                        else if (rand > 0.95) type = 'bright';
+
+                        this.createComet(type);
+                    }
+
+                    const nextSpawnTime = config.minInterval + Math.random() * (config.maxInterval - config.minInterval);
+                    setTimeout(() => this.spawnComet(), nextSpawnTime);
+                },
+
+                // CREATECOMET
+                createComet(type = 'standard') {
+                    if (!this.container) return;
+                    const comet = document.createElement('div');
+                    comet.classList.add('comet');
+
+                    // UNTUK POSISI ACAK DI TEPI
+                    let startX, startY;
+                    const containerWidth = this.container.offsetWidth;
+                    const containerHeight = this.container.offsetHeight;
+
+                    if (Math.random() > 0.5) {
+                        startX = Math.random() * containerWidth;
+                        startY = -50;
+                    } else {
+                        startX = -50;
+                        startY = Math.random() * containerHeight;
+                    }
+
+                    comet.style.left = `${startX}px`;
+                    comet.style.top = `${startY}px`;
+
+                    // === Logika visual komet (tetap sama) ===
+                    let scale, tailLength, opacity, glowColor, duration;
+                    switch (type) {
+                        case 'faint':
+                            scale = 0.5 + Math.random() * 0.3;
+                            duration = 1.2 + Math.random() * 0.6;
+                            opacity = 0.4 + Math.random() * 0.3;
+                            glowColor = 'rgba(173, 216, 230, 0.15)';
+                            break;
+                        case 'bright':
+                            scale = 1.0 + Math.random() * 0.5;
+                            duration = 2.0 + Math.random() * 1.0;
+                            opacity = 0.85 + Math.random() * 0.15;
+                            glowColor = 'rgba(200, 255, 255, 0.6)';
+                            break;
+                        default:
+                            scale = 0.8 + Math.random() * 0.4;
+                            duration = 1.6 + Math.random() * 0.8;
+                            opacity = 0.6 + Math.random() * 0.4;
+                            glowColor = 'rgba(173, 216, 230, 0.3)';
+                            break;
+                    }
+
+                    tailLength = 100 + (scale * 150);
+
+                    comet.style.opacity = 0; // Mulai dengan transparan
+                    comet.style.transform = `scale(${scale})`;
+                    comet.style.setProperty('--comet-tail-length', `${tailLength}px`);
+                    comet.style.setProperty('--comet-glow-color', glowColor);
+
+                    this.container.appendChild(comet);
+
+                    // === ANIMASI
+                    const travelDistance = containerWidth + 50;
+                    const animation = comet.animate([
+                        { opacity: 0, transform: `scale(${scale}) translate(0, 0)` },
+                        { opacity: opacity, offset: 0.1 },
+                        { opacity: 0, transform: `scale(${scale}) translate(${travelDistance}px, ${travelDistance}px)` }
+                    ], {
+                        duration: (duration * 1000) * 1.5,
+                        easing: 'ease-in'
+                    });
+
+                    animation.onfinish = () => {
+                        comet.remove();
+                    };
+                },
+
+                transitionState() {
+                    this.currentStateIndex = (this.currentStateIndex + 1) % this.stateCycle.length;
+                    this.currentState = this.stateCycle[this.currentStateIndex];
+
+                    // console.log(`[Comet System] State changed to: ${this.currentState}`);
+
+                    const nextTransitionTime = this.stateDurations[this.currentState];
+                    setTimeout(() => this.transitionState(), nextTransitionTime);
+                },
+
+                init() {
+                    if (!this.container) {
+                        console.error('Comet container not found. Animation will not start.');
+                        return;
+                    }
+                    // console.log('[Comet System] Initializing...');
+                    this.spawnComet();
+                    setTimeout(() => this.transitionState(), this.stateDurations.CALM);
+                }
+            };
+            cometManager.init();
+        });
+
+        function drawVisualizer(data) {
+            if (!ctx || !canvas) return;
+
+            const canvasWidth = canvas.width / (window.devicePixelRatio || 1);
+            const canvasHeight = canvas.height / (window.devicePixelRatio || 1);
+
+            const BAR_WIDTH = 2;
+            const BAR_GAP = 4;
+            const BASE_HEIGHT = 1;
+            const BAR_COLOR = '#dadada';
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = BAR_COLOR;
+
+            const totalBarAreaWidth = (NUM_BARS * BAR_WIDTH) + ((NUM_BARS - 1) * BAR_GAP);
+            let startX = (canvasWidth - totalBarAreaWidth) / 2;
+            const maxExtension = canvasHeight - BASE_HEIGHT;
+
+            for (let i = 0; i < NUM_BARS; i++) {
+                const normalizedFactor = data[i] || 0;
+                const barHeight = BASE_HEIGHT + (normalizedFactor * maxExtension);
+                const yPosition = (canvasHeight - barHeight) / 2;
+
+                ctx.fillRect(startX, yPosition, BAR_WIDTH, barHeight);
+                startX += BAR_WIDTH + BAR_GAP;
+            }
+        }
+
+        function renderOnlinePlaylistOverlay(songsData, currentIndex) {
+            const existingListItems = playlistEl.querySelectorAll('li');
+            const newDataLength = songsData.length;
+
+            // 1. Hapus item jika data baru lebih sedikit
+            if (existingListItems.length > newDataLength) {
+                for (let i = existingListItems.length - 1; i >= newDataLength; i--) {
+                    playlistEl.removeChild(existingListItems.item(i));
+                }
+            }
+
+            songsData.forEach((song, index) => {
+                let listItem = existingListItems.item(index);
+                let shouldUpdateContent = false;
+
+                // 2. Buat item baru jika tidak ada
+                if (!listItem) {
+                    listItem = document.createElement('li');
+                    playlistEl.appendChild(listItem);
+                    shouldUpdateContent = true;
+                } else if (listItem.dataset.title !== song.title) {
+                    // Cek apakah konten perlu diperbarui
+                    shouldUpdateContent = true;
+                }
+
+                if (shouldUpdateContent) {
+                    listItem.innerHTML = `<div class="online-playlist-item"><img src="${song.thumbnail}" onerror="this.onerror=null;this.src='./aset/musik.png';"><div class="song-info"><span class="title" title="${song.title}">${song.title}</span><span class="artist" title="${song.artist}">${song.artist}</span></div><span class="duration">${song.duration}</span></div>`;
+                    listItem.style.cursor = 'pointer';
+                    listItem.dataset.index = index;
+                    listItem.dataset.title = song.title;
+
+                    listItem.onclick = () => ipcRenderer.send('player-control-action', { type: 'play-online-from-playlist', index: index });
+                }
+
+                // Update active state
+                const isCurrentlyActive = listItem.classList.contains('active');
+                const shouldBeActive = index === currentIndex;
+
+                if (shouldBeActive && !isCurrentlyActive) {
+                    listItem.classList.add('active');
+                } else if (!shouldBeActive && isCurrentlyActive) {
+                    listItem.classList.remove('active');
+                }
+            });
+        }
+
+        function renderLocalPlaylist(playlistData, currentIndex) {
+            // Optimasi bisa dipertahankan di sini karena data lokal tidak berubah-ubah
+            const firstChild = playlistEl.firstChild;
+            if (playlistEl.childElementCount === playlistData.length && firstChild?.dataset?.title === playlistData[0]?.title) {
+                playlistEl.childNodes.forEach((li, index) => {
+                    li.classList.toggle('active', index === currentIndex);
+                });
+                return;
+            }
+
+            playlistEl.innerHTML = '';
+            if (!playlistData || playlistData.length === 0) {
+                playlistEl.innerHTML = '<li style="color: var(--text-secondary); cursor: default; padding: 15px; text-align: center;">Playlist lokal kosong.</li>';
+                return;
+            }
+            playlistData.forEach((song, index) => {
+                const li = document.createElement('li');
+                li.textContent = song.title;
+                li.dataset.title = song.title; // Tambahkan dataset untuk optimasi
+                li.title = song.title;
+                if (index === currentIndex) li.classList.add('active');
+                li.addEventListener('click', () => ipcRenderer.send('player-control-action', { type: 'play-from-playlist', index: index }));
+                playlistEl.appendChild(li);
+            });
+        }
+
+        // --- EVENT LISTENERS ---
+        // Kontrol Jendela & Panel
+        closeBtn.addEventListener('click', hidePanel);
+        moreOptionsBtn.addEventListener('click', showSettingsPanel);
+        backToMainBtn.addEventListener('click', hideSettingsPanel);
+
+        // Kontrol Player
+        playPauseBtn.addEventListener('click', () => ipcRenderer.send('player-control-action', 'play-pause'));
+        document.getElementById('next-btn').addEventListener('click', () => ipcRenderer.send('player-control-action', 'next'));
+        document.getElementById('prev-btn').addEventListener('click', () => ipcRenderer.send('player-control-action', 'prev'));
+        volumeSlider.addEventListener('input', (e) => ipcRenderer.send('player-control-action', { type: 'set-volume', value: parseFloat(e.target.value) }));
+        playlistToggleBtnOverlay.addEventListener('click', () => ipcRenderer.send('player-control-action', 'toggle-playlist-mode'));
+        progressContainer.addEventListener('click', (e) => {
+            const bounds = progressContainer.getBoundingClientRect();
+            const percentage = (e.clientX - bounds.left) / bounds.width;
+            ipcRenderer.send('player-control-action', { type: 'seek', percentage: percentage });
+        });
+
+        progressContainer.addEventListener('click', (e) => {
+            const bounds = progressContainer.getBoundingClientRect();
+            const percentage = (e.clientX - bounds.left) / bounds.width;
+            ipcRenderer.send('player-control-action', { type: 'seek', percentage: percentage });
+        });
+
+        // Kontrol Pengaturan
+        themeBtnModern.addEventListener('click', () => applyTheme('theme-modern'));
+        themeBtnClassic.addEventListener('click', () => applyTheme('theme-classic'));
+        snowToggle.addEventListener('change', (e) => ipcRenderer.send('overlay-toggle-snow', { isEnabled: e.target.checked }));
+        miniPlayerToggle.addEventListener('change', (e) => ipcRenderer.send('overlay-toggle-mini-player', { isEnabled: e.target.checked }));
+
+        // --- IPC RENDERER LISTENERS ---
+        ipcRenderer.on('toggle-overlay-panel', () => {
+            overlayContainer.classList.contains('visible') ? hidePanel() : showPanel();
+        });
+        closeBtn.addEventListener('click', hidePanel);
+
+        document.body.addEventListener('click', (event) => {
+            // Logika untuk menyembunyikan panel jika klik di luar
+            if (overlayContainer.classList.contains('visible') && !overlayContainer.contains(event.target)) {
+                hidePanel();
+            }
+
+            // Logika untuk menyembunyikan menu tema jika klik di luar tombol opsi
+            if (themeMenu.classList.contains('visible') && event.target.id !== 'more-options-btn') {
+                themeMenu.classList.remove('visible');
+            }
+        });
+        // Hentikan propagasi klik di dalam overlay agar tidak dianggap "klik di luar"
+        overlayContainer.addEventListener('click', (event) => event.stopPropagation());
+
+        ipcRenderer.on('shared-player-state-updated', (event, state) => {
+            if (!nowPlayingEl || !state) return;
+
+            // Update Info Player
+            const coverUrl = state.coverSrc ? state.coverSrc.replace(/\\/g, '/') : './aset/musik.png';
+            albumArt.style.backgroundImage = `url('${coverUrl}')`;
+            const songTitle = `${state.title}${state.artist ? ' - ' + state.artist : ''}`;
+            nowPlayingEl.textContent = songTitle;
+            nowPlayingEl.title = songTitle;
+            progressBar.style.width = `${state.progressPercent || 0}%`;
+            timeInfoEl.textContent = `${formatTime(state.currentTime)} / ${formatTime(state.duration)}`;
+            playPauseBtn.textContent = state.isPlaying ? '▐▐' : '▶';
+            state.isPlaying ? albumArt.classList.add('playing') : albumArt.classList.remove('playing');
+            if (document.activeElement !== volumeSlider) {
+                volumeSlider.value = state.volume;
+            }
+
+            // Update Playlist berdasarkan mode
+            if (state.playlistMode === 'online') {
+                renderOnlinePlaylistOverlay(state.onlinePlaylist, state.onlineCurrentIndex);
+                playlistToggleBtnOverlay.textContent = 'Online Playlist';
+                playlistToggleBtnOverlay.classList.add('online-mode');
+            } else {
+                renderLocalPlaylist(state.playlist, state.currentSongIndex);
+                playlistToggleBtnOverlay.textContent = 'Local Playlist';
+                playlistToggleBtnOverlay.classList.remove('online-mode');
+            }
+        });
+
+        ipcRenderer.on('visualizer-data-stream', (event, data) => {
+            lastVisualizerData = data && data.length > 0 ? data : new Array(NUM_BARS).fill(0);
+        });
+
+        // Sinkronisasi status awal dari fitur remote
+        ipcRenderer.on('initial-settings-sync', (event, settings) => {
+            if (settings.snow !== undefined) {
+                snowToggle.checked = settings.snow;
+            }
+            if (settings.miniPlayer !== undefined) {
+                miniPlayerToggle.checked = settings.miniPlayer;
+            }
+        });
+        // Sinkronisasi jika ada perubahan dari tempat lain
+        ipcRenderer.on('snow-feature-status-changed', (event, isEnabled) => {
+            snowToggle.checked = isEnabled;
+        });
+        ipcRenderer.on('mini-player-feature-status-changed', (event, isEnabled) => {
+            miniPlayerToggle.checked = isEnabled;
+        });
+
+        // --- INISIALISASI ---
+        function renderLoop() {
+            drawVisualizer(lastVisualizerData);
+            requestAnimationFrame(renderLoop);
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            setupCanvas();
+            renderLoop();
+
+            const savedTheme = localStorage.getItem('overlayTheme') || 'theme-modern';
+            applyTheme(savedTheme);
+
+            // Meminta status awal dari main process saat overlay siap
+            ipcRenderer.send('overlay-is-ready');
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Ad Skipper</title>
+    <style>
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 300;
+            src: url('./aset/fonts/lexend-v26-latin-300.woff2') format('woff2');
+        }
+
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 400;
+            src: url('./aset/fonts/lexend-v26-latin-regular.woff2') format('woff2');
+        }
+
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 700;
+            src: url('./aset/fonts/lexend-v26-latin-700.woff2') format('woff2');
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Lexend', sans-serif;
+        }
+
+        body {
+            background-color: transparent;
+            color: white;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            user-select: none;
+        }
+
+        .container {
+            width: 440px;
+            height: 80px;
+            background-color: #3d3a3a;
+            backdrop-filter: blur(10px);
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            padding: 10px;
+            gap: 10px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        /* --- Bagian Kiri: Gambar --- */
+        .thumb-wrapper {
+            width: 105px;
+            height: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+            background-color: #000;
+            flex-shrink: 0;
+            position: relative;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        #next-video-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.8;
+            transition: opacity 0.3s;
+        }
+
+        .no-img-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(45deg, #222, #333);
+            color: #555;
+            font-size: 20px;
+        }
+
+        /* --- Bagian Kanan: Konten --- */
+        .content-area {
+            flex-grow: 1;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: flex-start;
+            position: relative;
+            min-width: 0;
+            padding-bottom: 4px;
+        }
+
+        #ad-count-badge {
+            position: absolute;
+            top: 8px;
+            right: 10px;
+            font-size: 0.55rem;
+            background-color: rgba(99, 96, 96, 1);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid rgba(231, 85, 124, 1);
+            font-weight: 600;
+            display: none;
+            z-index: 10;
+        }
+
+        #status-label {
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+            color: #888;
+            margin-bottom: 4px;
+        }
+
+        #status-text {
+            font-size: 0.8rem;
+            color: #e0e0e0;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            width: 100%;
+            line-height: 1.4;
+        }
+
+        @keyframes pulse-opacity {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .waiting-text {
+            animation: pulse-opacity 1.5s infinite ease-in-out;
+            color: #aaa !important;
+        }
+
+        /* --- Tombol Skip --- */
+        #skip-button {
+            margin-top: 5px;
+            background: transparent;
+            color: white;
+            border: 1px solid rgba(231, 85, 124, 1);
+            padding: 0 15px;
+            height: 32px;
+            width: 100%;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: transform 0.1s ease, border-color 0.2s ease, color 0.2s ease;
+            box-shadow: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        #skip-button:hover {
+            border-color: #ff6b6b;
+            color: #ff6b6b;
+            background: rgba(255, 76, 76, 0.05);
+        }
+
+        #skip-button:active {
+            transform: scale(0.96);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .progress-track {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background-color: rgba(255, 255, 255, 0.1);
+            z-index: 5;
+            display: block;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            position: absolute;
+            left: 0;
+            top: 0;
+            transform-origin: left;
+            transition: width 0.3s ease, background 0.3s ease;
+        }
+
+        /* Animasi Waiting: Biru Cyan bergerak */
+        .progress-fill.loading {
+            width: 60%;
+            height: 100%;
+            background: linear-gradient(80deg, #0a99b3, #e81183, #ee5d9e, #0181ce, #f38112, #00a2b9, #da1784, #e88409, #0085cd, #0899ac, #0a99b3, #e81183, #ee5d9e);
+            background-size: 800% 100%;
+            animation: loading-scan 1s infinite linear;
+            border-radius: 8px;
+        }
+
+        /* Animasi Ready: Merah/Solid penuh */
+        .progress-fill.ready {
+            background: #ff4c4c;
+            width: 100%;
+            box-shadow: 0 0 10px rgba(255, 76, 76, 0.5);
+        }
+
+        @keyframes loading-scan {
+            0% {
+                left: -50%;
+            }
+
+            100% {
+                left: 100%;
+            }
+        }
+
+        /* --- DEV HELPER --- */
+        #dev-helper-panel {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: #111;
+            border-top: 1px solid #333;
+            padding: 4px;
+            display: flex;
+            gap: 4px;
+            z-index: 9999;
+        }
+
+        .dev-btn {
+            background: #222;
+            color: #aaa;
+            border: 1px solid #444;
+            padding: 2px 6px;
+            cursor: pointer;
+            font-size: 9px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <span id="ad-count-badge">Ad 1/2</span>
+        <div class="thumb-wrapper">
+            <img id="next-video-img" src="" alt="Next" class="hidden">
+            <div id="no-img-placeholder" class="no-img-placeholder">
+                <span>🎵</span>
+            </div>
+        </div>
+
+        <div class="content-area">
+            <div id="status-label">Status</div>
+            <div id="status-text">Ada iklan, sedang menunggu tombol skip...</div>
+            <button id="skip-button" class="hidden">
+                Skip Ad
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="white">
+                    <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
+                </svg>
+            </button>
+        </div>
+
+        <div class="progress-track">
+            <div id="progress-indicator" class="progress-fill"></div>
+        </div>
+    </div>
+
+    <div id="dev-helper-panel" style="display: none;">
+        <button class="dev-btn" onclick="testState('waiting', '0:15', false, '1 / 2', false)">Wait</button>
+        <button class="dev-btn" onclick="testState('skippable', null, true, '2 / 2', false)">Ready</button>
+        <button class="dev-btn" onclick="testState('waiting', '0:15', false, '1 / 2', true)">Wait (Muted)</button>
+        <button class="dev-btn" onclick="testState('skippable', null, true, '2 / 2', true)">Ready (Muted)</button>
+        <button class="dev-btn" onclick="testState('none')">Hide</button>
+    </div>
+
+    <script>
+        let ipcRenderer;
+        try {
+            const electron = require('electron');
+            ipcRenderer = electron.ipcRenderer;
+        } catch (e) {
+            document.getElementById('dev-helper-panel').style.display = 'flex';
+            document.body.style.background = '#333';
+        }
+
+        const statusText = document.getElementById('status-text');
+        const statusLabel = document.getElementById('status-label');
+        const skipButton = document.getElementById('skip-button');
+        const nextImg = document.getElementById('next-video-img');
+        const noImgPlaceholder = document.getElementById('no-img-placeholder');
+        const adCountBadge = document.getElementById('ad-count-badge');
+        const progressIndicator = document.getElementById('progress-indicator');
+        const progressTrack = document.querySelector('.progress-track');
+        let isMuted = false;
+
+        function updateAdSkipperUI(state, details = {}) {
+            let displayText = details.textInfo; // Info Status (Countdown)
+            let durationText = details.remainingTime; // Info Waktu Badge (0:28)
+
+            // Ambil label tombol dari YouTube, kalau tidak ada pakai default 'Skip Ad'
+            let skipLabelText = details.skipLabel || 'Skip Ad';
+
+            // Gambar
+            if (details.nextImage) {
+                nextImg.src = details.nextImage;
+                nextImg.classList.remove('hidden');
+                noImgPlaceholder.classList.add('hidden');
+            } else {
+                nextImg.classList.add('hidden');
+                noImgPlaceholder.classList.remove('hidden');
+            }
+
+            // Handle Teks & Angka
+            let badgeContent = '';
+
+            if (details.adCount) {
+                // Cek apakah string mengandung angka (untuk kasus "1 / 2")
+                const hasNumbers = /\d/.test(details.adCount);
+
+                if (hasNumbers) {
+                    badgeContent = `${details.adCount}`;
+                } else {
+                    badgeContent = details.adCount;
+                }
+            }
+
+            // Gabungkan dengan Waktu (jika ada)
+            if (durationText) {
+                // Jika sudah ada badgeContent, tambahkan pemisah. Jika belum, langsung waktunya.
+                badgeContent = badgeContent ? `${badgeContent} • ${durationText}` : durationText;
+            }
+
+            // Render ke elemen
+            if (badgeContent) {
+                adCountBadge.textContent = badgeContent;
+                adCountBadge.style.display = 'block';
+            } else {
+                adCountBadge.style.display = 'none';
+            }
+
+            // 4. Update Status UI
+            if (state === 'waiting') {
+                statusLabel.textContent = `Ada iklan...`;
+                statusLabel.style.color = '#888';
+
+                if (isMuted) {
+                    statusText.innerHTML = `Kamu tidak perlu menghirauikannya, wkwkwkw...`;
+                    statusText.style.color = '#ff6b6b';
+                } else {
+                    statusText.textContent = displayText ? `Sedang menunggu tombol skip jika ada` : 'Iklan sedang berlangsung...';
+                    statusText.style.color = '#e0e0e0';
+                }
+
+                statusText.classList.add('waiting-text');
+                statusText.classList.remove('hidden');
+
+                skipButton.classList.add('hidden');
+
+                progressIndicator.className = 'progress-fill loading';
+                progressTrack.style.display = 'block';
+
+            } else if (state === 'skippable') {
+                if (isMuted) {
+                    statusLabel.innerHTML = 'Skip iklan sekarang?';
+                } else {
+                    statusLabel.textContent = 'Skip Iklan?';
+                }
+                statusLabel.style.color = 'white';
+
+                statusText.classList.add('hidden');
+                statusText.classList.remove('waiting-text');
+
+                skipButton.classList.remove('hidden');
+                skipButton.disabled = false;
+
+                // teks asli dari YouTube + Icon SVG
+                skipButton.innerHTML = `${skipLabelText} <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>`;
+
+                progressIndicator.className = 'progress-fill ready';
+                progressTrack.style.display = 'block';
+            } else if (state === 'none') {
+                // Hide everything
+                statusLabel.textContent = '';
+                statusText.classList.add('hidden');
+                skipButton.classList.add('hidden');
+                progressTrack.style.display = 'none';
+                progressIndicator.className = 'progress-fill';
+            }
+        }
+
+        if (ipcRenderer) {
+            ipcRenderer.on('set-state', (event, data) => {
+                let state, details, isAutoMute;
+
+                // Parsing data lengkap
+                if (typeof data === 'string') {
+                    state = data;
+                    details = {};
+                    isAutoMute = false;
+                } else {
+                    state = data.state;
+                    details = data.details || {};
+                    isAutoMute = data.isAutoMute || false;
+                }
+
+                // Update variabel global isMuted
+                isMuted = isAutoMute;
+
+                // Kirim ke fungsi UI
+                updateAdSkipperUI(state, details);
+            });
+
+            skipButton.addEventListener('click', () => {
+                skipButton.disabled = true;
+                skipButton.textContent = 'Skipping...';
+                ipcRenderer.send('ad-skipper-click-skip');
+            });
+        }
+
+        function testState(mode, timerText = null, showImg = false, countText = null, isAutoMuted = false) {
+            isMuted = isAutoMuted;
+            const dummyDetails = {
+                textInfo: timerText,
+                adCount: countText,
+                nextImage: showImg ? 'https://via.placeholder.com/300x169/0000FF/808080?text=Next+Song+HD' : null
+            };
+            updateAdSkipperUI(mode, dummyDetails);
+        }
+    </script>
+</body>
+
+</html>

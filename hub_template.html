@@ -1,0 +1,558 @@
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{NOVEL_TITLE}</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Lexend', sans-serif;
+    }
+
+    @font-face {
+      font-family: 'Lexend';
+      font-style: normal;
+      font-weight: 300;
+      src: url('../../../fonts/lexend-v26-latin-300.woff2') format('woff2');
+    }
+
+    @font-face {
+      font-family: 'Lexend';
+      font-style: normal;
+      font-weight: 400;
+      src: url('../../../fonts/lexend-v26-latin-regular.woff2') format('woff2');
+    }
+
+    @font-face {
+      font-family: 'Lexend';
+      font-style: normal;
+      font-weight: 700;
+      src: url('../../../fonts/lexend-v26-latin-700.woff2') format('woff2');
+    }
+
+    body {
+      background-color: black;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 20px;
+      text-align: center;
+      color: white;
+    }
+
+    .hub-back-button {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      padding: 8px 15px;
+      background-color: rgba(255, 255, 255, 0.8);
+      color: black;
+      border: none;
+      border-radius: 50px;
+      font-weight: bold;
+      font-size: 1rem;
+      cursor: pointer;
+      z-index: 1000;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .hub-back-button:hover {
+      background-color: white;
+      transform: scale(1.05);
+    }
+
+    .content-container {
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+      width: 100%;
+      max-width: 1200px;
+      flex-wrap: wrap;
+      /* Supaya elemen berbaris jika layar kecil */
+    }
+
+    .left-container {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      flex: 1 1 60%;
+      /* Lebar responsif */
+      min-width: 300px;
+    }
+
+    .description {
+      background: #e0e0e0;
+      padding: 20px;
+      border-radius: 10px;
+      font-size: 1rem;
+    }
+
+    .chapter-list {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      width: 100%;
+    }
+
+    .chapter-item {
+      background: #dcdcdc;
+      padding: 6px 15px;
+      border-radius: 8px;
+      text-align: left;
+      color: black;
+      font-size: 1rem;
+      font-weight: bold;
+      text-decoration: none;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .chapter-item h3 {
+      margin-block-start: 0.2em;
+      margin-block-end: 0.2em;
+    }
+
+    .chapter-item:hover {
+      background: #c0c0c0;
+    }
+
+    /* Tambahkan di <style> Hub Novel */
+    .progress-bar-container {
+      width: 100%;
+      height: 8px;
+      background-color: #555;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background-color: #4CAF50;
+      border-radius: 4px;
+      transition: width 0.5s ease;
+    }
+
+    .image-container {
+      flex-shrink: 0;
+      width: 300px;
+      height: 450px;
+      position: relative;
+      overflow: hidden;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .image-container img {
+      width: 100%;
+      height: 100%;
+
+      object-fit: cover;
+      position: absolute;
+      top: 0;
+      opacity: 0;
+      transition: opacity 1s ease-in-out;
+    }
+
+    .image-container img:first-child {
+      opacity: 1;
+    }
+
+    /* Media Queries untuk layar kecil */
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 2rem;
+      }
+
+      .content-container {
+        flex-direction: column;
+        /* Jadi vertikal */
+        align-items: center;
+      }
+
+      .image-container {
+        width: 100%;
+        height: auto;
+        max-width: 300px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <button class="hub-back-button" onclick="goBack()">← Kembali</button>
+  <h1 id="novel-title" class="novel-title">{NOVEL_TITLE}</h1>
+  <div class="content-container">
+    <div class="left-container">
+      <div class="novel-info"
+        style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; margin-bottom: 15px; color: #ddd;">
+        <div style="margin-bottom: 5px;"><strong>Genre:</strong> <span class="genre">{NOVEL_GENRE}</span></div>
+        <div style="margin-bottom: 5px;"><strong>Penulis:</strong> <span class="author">{NOVEL_AUTHOR}</span></div>
+        <div style="margin-bottom: 5px;"><strong>Ilustrator:</strong> <span
+            class="illustrator">{NOVEL_ILLUSTRATOR}</span></div>
+        <div><strong>VN Mapper:</strong> <span class="vn-mapper">{NOVEL_VN_MAPPER}</span></div>
+      </div>
+      <div class="description">
+        {NOVEL_DESCRIPTION}
+      </div>
+
+      <div class="chapter-list" id="chapter-list">Loading chapters...</div>
+    </div>
+
+    <div class="right-column" style="display:flex; flex-direction:column; align-items:center; gap:10px;">
+      <div class="image-container" style="">
+        {IMAGE_TAGS}
+      </div>
+      <button id="continue-btn" class="chapter-item"
+        style="background: #4CAF50; color: white; text-align: center; margin-top: 10px; width: 100%; max-width: 300px; display: none; cursor: pointer; border: none;">Lanjutkan
+        Permainan</button>
+
+      <div class="progress-summary" style="width:100%; max-width:300px;">
+        <h2>Progres Cerita</h2>
+        <p id="completion-status" style="color: aqua;" ;>Belum ada progres.</p>
+        <p id="last-played-status" style="margin-top: 5px; font-size: 0.9em; opacity: 0.8;"></p>
+      </div>
+    </div>
+  </div>
+  <div id="load-modal"
+    style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; flex-direction: column; align-items: center; justify-content: center; color: white;">
+    <h2 style="margin-bottom: 20px;">Load Game</h2>
+    <div id="slots-container"
+      style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; max-width: 900px; width: 90%;">
+      <!-- Slots will be injected here -->
+    </div>
+    <button id="close-load-modal"
+      style="margin-top: 30px; padding: 10px 20px; background: transparent; border: 1px solid white; color: white; cursor: pointer; border-radius: 5px;">Cancel</button>
+  </div>
+
+  <script>
+    console.log('[Hub Script] Eksekusi skrip dimulai!');
+    const { ipcRenderer } = require('electron');
+
+    async function loadChapters() {
+      console.log(`[HUB] ==> Memulai loadChapters(). Waktu: ${new Date().toLocaleTimeString()}`);
+
+      const chapterList = document.getElementById('chapter-list');
+      const storyTitle = decodeURIComponent(location.pathname.split('/').slice(-2, -1)[0]);
+
+      // Update Discord RPC
+      if (typeof ipcRenderer !== 'undefined') {
+        ipcRenderer.send('update-rpc-activity', {
+          details: 'Melihat Detail Novel',
+          state: storyTitle,
+          largeImageKey: 'vn_icon',
+          smallImageKey: 'main_icon',
+          smallImageText: 'Novel Hub'
+        });
+      }
+
+      // --- LOGIKA CONTINUE BUTTON ---
+      const continueBtn = document.getElementById('continue-btn');
+      const loadModal = document.getElementById('load-modal');
+      const slotsContainer = document.getElementById('slots-container');
+      const closeLoadModal = document.getElementById('close-load-modal');
+
+      // Cek apakah ada save slot apapun
+      const slots = await ipcRenderer.invoke('vn-engine:get-save-slots', storyTitle);
+      if (slots.length > 0) {
+        continueBtn.style.display = 'block';
+        continueBtn.addEventListener('click', () => {
+          openLoadModal(slots);
+        });
+      }
+
+      function openLoadModal(slots) {
+        loadModal.style.display = 'flex';
+        slotsContainer.innerHTML = '';
+
+        for (let i = 1; i <= 6; i++) {
+          const slotData = slots.find(s => s.slotId === i);
+          const slotEl = document.createElement('div');
+          slotEl.style.cssText = `
+                background: #333; 
+                border: 2px solid #555; 
+                border-radius: 8px; 
+                overflow: hidden; 
+                cursor: pointer; 
+                position: relative;
+                height: 200px;
+                display: flex;
+                flex-direction: column;
+                transition: transform 0.2s;
+            `;
+
+          if (slotData) {
+            const bgPath = slotData.previewImage ? `./${slotData.chapter}/${slotData.previewImage}` : '';
+            const date = new Date(slotData.timestamp).toLocaleString();
+
+            let mediaContent = '';
+            if (slotData.previewType === 'video' && bgPath) {
+              mediaContent = `<video src="${bgPath}" autoplay muted loop style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0;"></video>`;
+            } else {
+              mediaContent = `<div style="width: 100%; height: 100%; background-image: url('${bgPath}'); background-size: cover; background-position: center; position: absolute; top: 0; left: 0;"></div>`;
+            }
+
+            slotEl.innerHTML = `
+                    <div style="flex: 1; position: relative; background: #000;">
+                        ${mediaContent}
+                        <div style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.7); padding: 5px;">
+                            <div style="font-weight: bold; font-size: 1.1em;">${slotData.chapter}</div>
+                            <div style="font-size: 0.8em; color: #aaa;">${date}</div>
+                        </div>
+                    </div>
+                    <div style="padding: 10px; text-align: center; background: #222;">
+                        Slot ${i}
+                    </div>
+                `;
+
+            slotEl.onclick = () => {
+              if (confirm(`Load Slot ${i}?`)) {
+                ipcRenderer.send('vn-engine:load-game-from-hub', { storyTitle, slotId: i });
+              }
+            };
+          } else {
+            slotEl.innerHTML = `
+                    <div style="flex: 1; display: flex; align-items: center; justify-content: center; background: #222; color: #555;">
+                        Empty
+                    </div>
+                    <div style="padding: 10px; text-align: center; background: #1a1a1a;">
+                        Slot ${i}
+                    </div>
+                `;
+          }
+
+          slotEl.onmouseenter = () => slotEl.style.transform = 'scale(1.05)';
+          slotEl.onmouseleave = () => slotEl.style.transform = 'scale(1)';
+
+          slotsContainer.appendChild(slotEl);
+        }
+      }
+
+      closeLoadModal.onclick = () => {
+        loadModal.style.display = 'none';
+      };
+
+      const chapterData = await ipcRenderer.invoke('get-chapter-list', storyTitle);
+      const { mainChapters, sideStories } = chapterData;
+      mainChapters.sort((a, b) => {
+        const getNumber = (name) => {
+          if (name.toLowerCase().includes('prolog') || name.toLowerCase().includes('pengenalan')) {
+            return 0;
+          }
+
+          const match = name.match(/\d+/);
+
+          return match ? parseInt(match[0], 10) : Infinity;
+        };
+
+        return getNumber(a) - getNumber(b);
+      });
+      console.log('[HUB] Urutan chapter setelah disortir:', mainChapters);
+      const progressDataKey = `progress_${storyTitle.replace(/ /g, '_')}`;
+
+      // Ambil dan log data mentah dari localStorage
+      const rawProgressData = localStorage.getItem(progressDataKey);
+      console.log(`[HUB] Data mentah dari localStorage untuk key '${progressDataKey}':`, rawProgressData);
+
+      let progressData = JSON.parse(rawProgressData) || { chapters: {} };
+
+      // Kalkulasi Progres Keseluruhan (untuk progress-summary)
+      let totalDialoguesRead = 0;
+      let totalDialoguesOverall = 0;
+      if (progressData.chapters) {
+        for (const chap in progressData.chapters) {
+          totalDialoguesRead += progressData.chapters[chap].progress || 0;
+          totalDialoguesOverall += progressData.chapters[chap].totalDialogues || 0;
+        }
+      }
+      const overallPercent = totalDialoguesOverall > 0 ? (totalDialoguesRead / totalDialoguesOverall) * 100 : 0;
+      const completionStatus = document.getElementById('completion-status');
+      completionStatus.textContent = `Progres Keseluruhan Cerita: ${Math.floor(overallPercent)}%`;
+
+      // Menampilkan Waktu Terakhir Bermain
+      const lastPlayedStatus = document.getElementById('last-played-status');
+      if (progressData.lastPlayed) {
+        const lastPlayedDate = new Date(progressData.lastPlayed);
+        lastPlayedStatus.textContent = `Terakhir dimainkan: ${lastPlayedDate.toLocaleString('id-ID')}`;
+      }
+
+      // KOSONGKAN daftar chapter yang ada sebelum mengisi ulang
+      chapterList.innerHTML = '';
+
+      // Modifikasi loop untuk membuat chapter-item dengan pewarnaan selaras dan progress bar
+      mainChapters.forEach((chapter) => {
+        // Hitung progress
+        let progressPercent = 0;
+        if (progressData.chapters && progressData.chapters[chapter]) {
+          const chap = progressData.chapters[chapter];
+          if (chap.totalDialogues > 0) {
+            progressPercent = (chap.progress / chap.totalDialogues) * 100;
+          }
+        }
+
+        // Buat link chapter-item yang simpel namun informatif
+        const chapterLink = document.createElement('a');
+        chapterLink.className = 'chapter-item-simple';
+        chapterLink.style.display = 'block';
+        chapterLink.style.padding = '10px';
+        chapterLink.style.marginBottom = '8px';
+        chapterLink.style.background = '#333';       // Dark gray background
+        chapterLink.style.color = '#fff';           // White text
+        chapterLink.style.textDecoration = 'none';
+        chapterLink.style.borderRadius = '6px';
+        chapterLink.style.fontSize = '0.95rem';
+        chapterLink.style.transition = 'background 0.2s ease';
+
+        // Konten dengan judul dan persentase
+        chapterLink.innerHTML = `
+          <div style="display:flex; justify-content: space-between; align-items: center;">
+            <span>${chapter}</span>
+            <span>${Math.floor(progressPercent)}%</span>
+          </div>
+          <div style="height:6px; width:100%; background:#555; border-radius:3px; overflow:hidden; margin-top:6px;">
+            <div style="height:100%; width:${progressPercent}%; background:#4CAF50; transition:width 0.5s ease;"></div>
+          </div>
+        `;
+
+        // Hover effect
+        chapterLink.addEventListener('mouseenter', () => {
+          chapterLink.style.background = '#3a3a3a';
+        });
+        chapterLink.addEventListener('mouseleave', () => {
+          chapterLink.style.background = '#333';
+        });
+
+        // Klik => simpan progress lalu navigasi
+        chapterLink.addEventListener('click', (e) => {
+          e.preventDefault();
+          progressData.lastPlayed = new Date().toISOString();
+          localStorage.setItem(progressDataKey, JSON.stringify(progressData));
+          document.body.style.opacity = '0';
+          document.body.style.transition = 'opacity 0.4s ease';
+
+          setTimeout(() => {
+            ipcRenderer.send('play-chapter', { storyTitle: storyTitle, chapter: chapter });
+          }, 400);
+        });
+
+        chapterList.appendChild(chapterLink);
+      });
+
+      // Logika untuk side stories tetap sama, tapi gunakan data yang sudah diambil.
+      if (sideStories && sideStories.length > 0) {
+        const title = document.createElement('h2');
+        title.textContent = 'Side Stories / Teaser'; // Nama bisa disesuaikan
+        title.style.fontSize = '1.3rem';
+        title.style.color = '#fff';
+        title.style.marginTop = '20px';
+
+        chapterList.appendChild(title);
+
+        const separator = document.createElement('div');
+        separator.style.width = '100%';
+        separator.style.borderTop = '2px dashed #ccc';
+        separator.style.margin = '10px 0';
+        chapterList.appendChild(separator);
+
+        sideStories.forEach((chapter) => {
+          const chapterLink = document.createElement('a');
+          chapterLink.className = 'chapter-item';
+          chapterLink.innerHTML = `
+                <div class="chapter-card">
+                    <div class="chapter-meta">
+                        <h3>${chapter}</h3>
+                    </div>
+                </div>
+            `;
+          chapterLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            progressData.lastPlayed = new Date().toISOString();
+            localStorage.setItem(progressDataKey, JSON.stringify(progressData));
+
+            document.body.style.opacity = '0';
+            document.body.style.transition = 'opacity 0.4s ease';
+
+            setTimeout(() => {
+              ipcRenderer.send('play-chapter', { storyTitle: storyTitle, chapter: chapter });
+            }, 400);
+          });
+          chapterList.appendChild(chapterLink);
+        });
+      }
+    }
+
+    loadChapters();
+
+    // Metode 1: Menggunakan 'pageshow' untuk menangani back-forward cache
+    window.addEventListener('pageshow', function (event) {
+      if (event.persisted) {
+        console.log('[HUB-EVENT] Event "pageshow" terpicu, halaman dari bfcache. Menjalankan ulang loadChapters().');
+        loadChapters();
+      }
+    });
+
+    // Metode 2: Menggunakan 'visibilitychange' sebagai cadangan
+    document.addEventListener('visibilitychange', function () {
+      // Jalankan hanya jika halaman menjadi terlihat lagi
+      if (document.visibilityState === 'visible') {
+        console.log('[HUB-EVENT] Event "visibilitychange" terpicu, halaman kembali terlihat. Menjalankan ulang loadChapters().');
+        loadChapters();
+      }
+    });
+
+    ipcRenderer.on('chapter-data-response', (event, chapterData) => {
+      renderChapterList(chapterData);
+    });
+
+    // Terima update deskripsi real-time dari editor ----
+    ipcRenderer.on('update-description', (event, newDescription) => {
+      const descElement = document.querySelector('.description');
+      if (descElement) {
+        descElement.innerHTML = newDescription;
+      }
+    });
+
+    ipcRenderer.on('update-title', (event, newTitle) => {
+      console.log(`%c[Dari Hub] Pesan 'update-title' DITERIMA! Nilai baru: "${newTitle}"`, 'color: #00ff00');
+      const titleElement = document.getElementById('novel-title');
+      if (titleElement) {
+        titleElement.textContent = newTitle;
+      } else {
+        console.error('[Dari Hub] Gagal menemukan elemen dengan id="novel-title" untuk diperbarui.');
+      }
+    });
+    function goBack() {
+      window.location.href = '../../vnManager.html';
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+      ipcRenderer.send('get-chapter-list-request');
+
+      const descElement = document.querySelector('.description');
+      if (descElement) {
+        ipcRenderer.send('hub-description-loaded', descElement.innerHTML);
+      }
+      const images = document.querySelectorAll('.image-container img');
+      let currentIndex = 0;
+
+      setInterval(() => {
+        images[currentIndex].style.opacity = 0;
+        currentIndex = (currentIndex + 1) % images.length;
+        images[currentIndex].style.opacity = 1;
+      }, 3000);
+    });
+  </script>
+</body>
+
+</html>

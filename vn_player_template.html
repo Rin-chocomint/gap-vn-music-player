@@ -1,0 +1,4023 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{NOVEL_TITLE} | {CHAPTER_NAME}</title>
+    <style>
+        body {
+            background-color: black;
+            margin: 0;
+            padding: 0;
+            font-family: 'Lexend', sans-serif;
+            overflow: hidden;
+        }
+
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 300;
+            src: url('../../../../fonts/lexend-v26-latin-300.woff2') format('woff2');
+        }
+
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 400;
+            src: url('../../../../fonts/lexend-v26-latin-regular.woff2') format('woff2');
+        }
+
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 700;
+            src: url('../../../../fonts/lexend-v26-latin-700.woff2') format('woff2');
+        }
+
+        @keyframes fadeInScene {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        #transition-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 50;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #transition-overlay.black {
+            background-color: black;
+        }
+
+        #transition-overlay.white {
+            background-color: white;
+        }
+
+        #transition-overlay.active {
+            opacity: 1;
+        }
+
+        #top-right-controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        #auto-mode-button {
+            padding: 10px 15px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: bold;
+            transition: all 0.2s ease;
+            animation: pulse 2s infinite alternate;
+        }
+
+        #auto-mode-button:hover {
+            transform: scale(1.1);
+            background-color: rgba(30, 30, 30, 0.9);
+        }
+
+        #auto-mode-button.active {
+            background-color: #FFD700;
+            color: black;
+            animation: none;
+        }
+
+        #auto-mode-button.active:hover {
+            background-color: #ffe55c;
+            transform: scale(1.1);
+        }
+
+        #history-button {
+            width: 44px;
+            height: 44px;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        #history-button:hover {
+            transform: scale(1.1);
+            background-color: rgba(30, 30, 30, 0.9);
+        }
+
+        #backlog-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            z-index: 200;
+            color: white;
+            padding: 50px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #backlog-content {
+            width: 80%;
+            max-width: 800px;
+            height: 80%;
+            overflow-y: auto;
+            padding-right: 20px;
+            border-bottom: 1px solid #555;
+            margin-bottom: 20px;
+        }
+
+        #backlog-content p {
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+
+        #backlog-content strong {
+            color: #FFD700;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .backlog-controls {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .menu-button {
+            padding: 10px 30px;
+            font-size: 1rem;
+            border: 1px solid white;
+            background-color: transparent;
+            color: white;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: all 0.2s ease;
+        }
+
+        .menu-button:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+            transform: scale(1.05);
+        }
+
+        #background-video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: -2;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+        }
+
+        #text-screen-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: black;
+            z-index: 50;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 2.5em;
+            text-align: center;
+            padding: 20px;
+            white-space: pre-wrap;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+            cursor: pointer;
+            opacity: 0;
+            animation: fadeInScene 0.4s ease-in forwards;
+            animation-delay: 0.1s;
+        }
+
+        #back-to-hub-button {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            width: 44px;
+            height: 44px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.8rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            line-height: 0;
+        }
+
+        #back-to-hub-button:hover {
+            transform: scale(1.1) rotate(-30deg);
+            background-color: rgba(30, 30, 30, 0.9);
+        }
+
+        /* Aturan umum untuk kedua lapisan background */
+        #background,
+        #background-next {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+
+        #background {
+            z-index: -2;
+        }
+
+        #background-next {
+            z-index: -1;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+        }
+
+        #background-next.visible {
+            opacity: 1;
+        }
+
+        @keyframes slideFromBottom {
+            0% {
+                opacity: 0;
+                transform: translateY(8%);
+            }
+
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* TERAPKAN SEMUA ATURAN CSS INI */
+        @keyframes slideFromLeft {
+            0% {
+                opacity: 0;
+                transform: translateX(-15%);
+            }
+
+            100% {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes slideFromRight {
+            0% {
+                opacity: 0;
+                transform: translateX(15%);
+            }
+
+            100% {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes simpleFadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        .anim-loop-shake {
+            animation: shakeSprite 0.5s linear infinite;
+        }
+
+        .anim-loop-pulse {
+            animation: pulseSprite 1.5s ease-in-out infinite;
+        }
+
+        /* Animasi Sekali Eksekusi (One-Shot) */
+        .anim-oneshot-shake {
+            animation: shakeSprite 0.5s linear;
+        }
+
+        .anim-oneshot-jump {
+            animation: jumpSprite 0.5s ease-in-out;
+        }
+
+        @keyframes pulseGlow {
+
+            0%,
+            100% {
+                filter: brightness(1);
+                opacity: 1;
+            }
+
+            50% {
+                filter: brightness(1.15) drop-shadow(0 0 5px rgba(255, 255, 255, 0.5));
+                opacity: 1;
+            }
+        }
+
+        @keyframes gentleFloat {
+
+            0%,
+            100% {
+                transform: translateY(0);
+                opacity: 1;
+            }
+
+            50% {
+                transform: translateY(-8px);
+                opacity: 1;
+            }
+        }
+
+        @keyframes shakeSprite {
+
+            0%,
+            100% {
+                transform: translateX(0);
+                opacity: 1;
+            }
+
+            10%,
+            30%,
+            50%,
+            70%,
+            90% {
+                transform: translateX(-5px);
+                opacity: 1;
+            }
+
+            20%,
+            40%,
+            60%,
+            80% {
+                transform: translateX(5px);
+                opacity: 1;
+            }
+        }
+
+        @keyframes jumpSprite {
+
+            0%,
+            100% {
+                transform: translateY(0);
+                opacity: 1;
+            }
+
+            50% {
+                transform: translateY(-20px);
+                opacity: 1;
+            }
+        }
+
+        @keyframes pulseSprite {
+
+            0%,
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.05);
+                opacity: 1;
+            }
+        }
+
+        /* === CHARACTER SPRITES LAYER (Unified Container) === */
+        #char-sprites-layer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .char-sprite-slot {
+            position: absolute;
+            bottom: 0;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            pointer-events: none;
+        }
+
+        /* === SPRITE POSITIONING MODES === */
+
+        /* MODE AUTO: Flexbox auto-spacing */
+        #char-sprites-layer.mode-auto {
+            display: flex;
+            justify-content: space-evenly;
+            align-items: flex-end;
+            padding: 0 3%;
+        }
+
+        #char-sprites-layer.mode-auto .char-sprite-slot {
+            position: relative !important;
+            /* Override absolute */
+            flex: 0 1 auto;
+            bottom: auto !important;
+            /* Reset semua positioning dari mode custom */
+            left: auto !important;
+            right: auto !important;
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+            transform: none;
+            /* Reset transform - akan diset ulang oleh JS untuk scale */
+        }
+
+        /* Dalam mode auto, slot preset berfungsi sebagai order hint */
+        #char-sprites-layer.mode-auto .char-sprite-slot[data-slot="left"],
+        #char-sprites-layer.mode-auto #char-sprite-slot-left {
+            order: 1;
+        }
+
+        #char-sprites-layer.mode-auto .char-sprite-slot[data-slot="center"],
+        #char-sprites-layer.mode-auto #char-sprite-slot-center {
+            order: 2;
+        }
+
+        #char-sprites-layer.mode-auto .char-sprite-slot[data-slot="right"],
+        #char-sprites-layer.mode-auto #char-sprite-slot-right {
+            order: 3;
+        }
+
+        #char-sprites-layer.mode-auto .char-sprite-slot[data-slot="custom"] {
+            order: 4;
+            /* Custom sprites muncul setelah preset */
+        }
+
+        /* MODE CUSTOM: Absolute positioning (default behavior) */
+        #char-sprites-layer.mode-custom {
+            /* Default mode - mempertahankan positioning absolut */
+            display: block;
+        }
+
+        #char-sprites-layer.mode-custom .char-sprite-slot {
+            position: absolute;
+            bottom: 0;
+        }
+
+        /* Legacy support: sprite containers dengan nama lama */
+        .sprite-container {
+            position: absolute;
+            bottom: 0;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            pointer-events: none;
+        }
+
+        /* Posisi preset untuk char-sprite slots */
+        .char-sprite-slot[data-slot="left"],
+        #char-sprite-slot-left {
+            left: 0;
+            justify-content: flex-start;
+            padding-left: 50px;
+        }
+
+        .char-sprite-slot[data-slot="right"],
+        #char-sprite-slot-right {
+            right: 0;
+            justify-content: flex-end;
+            padding-right: 50px;
+        }
+
+        .char-sprite-slot[data-slot="center"],
+        #char-sprite-slot-center {
+            left: 50%;
+            transform: translateX(-55%);
+            justify-content: center;
+        }
+
+        /* Legacy ID mappings untuk backward compatibility */
+        #sprite-container-left {
+            left: 0;
+            justify-content: flex-start;
+            padding-left: 50px;
+        }
+
+        #sprite-container-right {
+            right: 0;
+            justify-content: flex-end;
+            padding-right: 50px;
+        }
+
+        #sprite-container-center {
+            left: 50%;
+            transform: translateX(-55%);
+            justify-content: center;
+        }
+
+        /* Custom positioning untuk dynamic sprites */
+        .char-sprite-slot[data-slot="custom"] {
+            /* Position will be set dynamically via inline style by processCharSprites() */
+            left: var(--sprite-x, 50%);
+            transform: translateX(-50%);
+        }
+
+        /* === CHARACTER SPRITE IMAGES === */
+        /* Menggunakan viewport-relative sizing untuk responsif */
+        :root {
+            --sprite-base-height: 75vh;
+            /* Base height: 75% of viewport height */
+            --sprite-max-height: 600px;
+            /* Max height agar tidak terlalu besar */
+        }
+
+        .char-sprite-img,
+        #char-sprite-1,
+        #char-sprite-2,
+        #char-sprite-center,
+        /* Legacy support */
+        #character-sprite,
+        #character-sprite-2,
+        #character-sprite-center {
+            height: var(--sprite-base-height);
+            max-height: var(--sprite-max-height);
+            max-width: 45vw;
+            width: auto;
+            object-fit: contain;
+            opacity: 0;
+            transition: opacity 0.4s ease, height 0.3s ease;
+        }
+
+        /* Media queries untuk menyesuaikan ukuran sprite berdasarkan viewport */
+        @media screen and (max-height: 800px) {
+            :root {
+                --sprite-base-height: 70vh;
+                --sprite-max-height: 520px;
+            }
+        }
+
+        @media screen and (max-height: 650px) {
+            :root {
+                --sprite-base-height: 65vh;
+                --sprite-max-height: 420px;
+            }
+        }
+
+        @media screen and (max-height: 500px) {
+            :root {
+                --sprite-base-height: 60vh;
+                --sprite-max-height: 300px;
+            }
+        }
+
+        /* Untuk window sangat kecil (agar tetap terlihat layak) */
+        @media screen and (max-height: 400px) {
+            :root {
+                --sprite-base-height: 55vh;
+                --sprite-max-height: 220px;
+            }
+        }
+
+        .char-sprite-img.hide,
+        #char-sprite-1.hide,
+        #char-sprite-2.hide,
+        #char-sprite-center.hide,
+        /* Legacy support */
+        #character-sprite.hide,
+        #character-sprite-2.hide,
+        #character-sprite-center.hide {
+            opacity: 0;
+        }
+
+
+        /* --- Debug HUD (Preview Mode) - Minimalist Entry Debugger --- */
+        #debug-hud {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            width: 320px;
+            background: rgba(20, 20, 20, 0.9);
+            border: 1px solid #444;
+            border-radius: 4px;
+            color: #ccc;
+            font-family: 'Consolas', monospace;
+            font-size: 12px;
+            z-index: 999999;
+            display: none;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        #debug-hud .debug-header {
+            background: #252525;
+            padding: 10px 12px;
+            border-bottom: 1px solid #444;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        #debug-hud .debug-header-title {
+            font-size: 13px;
+            font-weight: bold;
+            color: #aaa;
+            flex: 1;
+        }
+
+        #debug-hud .debug-header-badge {
+            font-size: 10px;
+            padding: 3px 6px;
+            border-radius: 2px;
+            background: #333;
+            color: #666;
+        }
+
+        #debug-hud .debug-header-badge.has-event {
+            background: #555;
+            color: #fff;
+        }
+
+        /* Section Container */
+        .debug-section {
+            padding: 10px 12px;
+            border-bottom: 1px solid #333;
+        }
+
+        .debug-section:last-child {
+            border-bottom: none;
+        }
+
+        .debug-section-header {
+            margin-bottom: 8px;
+            color: #666;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        /* Entry Context Specifics */
+        .debug-entry-type {
+            display: inline-block;
+            padding: 3px 8px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-bottom: 6px;
+            color: #888;
+        }
+
+        .debug-entry-type.type-dialogue {
+            color: #7ac;
+        }
+
+        .debug-entry-type.type-choice {
+            color: #a7a;
+        }
+
+        .debug-entry-type.type-scene {
+            color: #7a7;
+        }
+
+        .debug-speaker {
+            color: #cc9;
+            font-weight: bold;
+            font-size: 13px;
+            margin-bottom: 4px;
+        }
+
+        .debug-text-preview {
+            color: #888;
+            font-size: 11px;
+            max-height: 36px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.4;
+        }
+
+        .debug-sprites-row {
+            display: flex;
+            gap: 6px;
+            margin-top: 4px;
+        }
+
+        .debug-sprite-indicator {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 10px;
+            color: #555;
+        }
+
+        .debug-sprite-indicator.active {
+            color: #999;
+        }
+
+        .debug-sprite-indicator .sprite-dot {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: #333;
+        }
+
+        .debug-sprite-indicator.active .sprite-dot {
+            background: #888;
+        }
+
+        /* Special Event Section */
+        .debug-section.special-event.hidden {
+            display: none;
+        }
+
+        .debug-event-type {
+            display: inline-block;
+            padding: 3px 8px;
+            font-size: 11px;
+            font-weight: bold;
+            color: #a7a;
+            margin-bottom: 8px;
+        }
+
+        .debug-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 3px;
+        }
+
+        #dbg-duration-bar-container {
+            flex-grow: 1;
+            height: 3px;
+            background: #333;
+            margin: 0 6px;
+        }
+
+        #dbg-duration-bar {
+            height: 100%;
+            width: 0%;
+            background: #777;
+            transition: width 0.1s linear;
+        }
+
+        .debug-label {
+            color: #666;
+            font-size: 11px;
+            min-width: 55px;
+        }
+
+        .debug-value {
+            color: #aaa;
+            font-size: 11px;
+            text-align: right;
+        }
+
+        .debug-tag {
+            display: inline-block;
+            padding: 2px 5px;
+            font-size: 9px;
+        }
+
+        .tag-active {
+            color: #8a8;
+        }
+
+        .tag-inactive {
+            color: #555;
+        }
+
+        .char-sprite-img.visible,
+        #char-sprite-1.visible,
+        #char-sprite-2.visible,
+        #char-sprite-center.visible,
+        /* Legacy support */
+        #character-sprite.visible,
+        #character-sprite-2.visible,
+        #character-sprite-center.visible {
+            opacity: 1;
+        }
+
+        .anim-in-slide-from-bottom {
+            animation: slideFromBottom 0.6s ease-out forwards;
+        }
+
+        .anim-in-slide-from-left {
+            animation: slideFromLeft 0.6s ease-out forwards;
+        }
+
+        .anim-in-slide-from-right {
+            animation: slideFromRight 0.6s ease-out forwards;
+        }
+
+        .anim-in-fade {
+            animation: simpleFadeIn 0.05s forwards;
+        }
+
+        /* Animasi Keluar */
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+            }
+
+            to {
+                opacity: 0;
+            }
+        }
+
+        @keyframes slideToBottom {
+            from {
+                opacity: 1;
+                transform: translateY(0);
+            }
+
+            to {
+                opacity: 0;
+                transform: translateY(8%);
+            }
+        }
+
+        @keyframes slideToLeft {
+            from {
+                opacity: 1;
+                transform: translateX(0);
+            }
+
+            to {
+                opacity: 0;
+                transform: translateX(-15%);
+            }
+        }
+
+        @keyframes slideToRight {
+            from {
+                opacity: 1;
+                transform: translateX(0);
+            }
+
+            to {
+                opacity: 0;
+                transform: translateX(15%);
+            }
+        }
+
+        .anim-out-fade {
+            animation: fadeOut 0.5s ease-in forwards;
+        }
+
+        .anim-out-slide-to-bottom {
+            animation: slideToBottom 0.5s ease-in forwards;
+        }
+
+        .anim-out-slide-to-left {
+            animation: slideToLeft 0.5s ease-in forwards;
+        }
+
+        .anim-out-slide-to-right {
+            animation: slideToRight 0.5s ease-in forwards;
+        }
+
+        .anim-loop-pulse-glow {
+            animation: pulseGlow 2s infinite alternate;
+        }
+
+        .anim-loop-gentle-float {
+            animation: gentleFloat 3s ease-in-out infinite;
+        }
+
+        #dialogue-box {
+            width: 80%;
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            border: 2px solid #fff;
+            border-radius: 10px;
+            padding: 10px 20px;
+            margin-bottom: 10px;
+            text-align: left;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+            z-index: 5;
+        }
+
+        #dialogue-box.visible {
+            opacity: 1;
+        }
+
+        #character-name {
+            font-weight: bold;
+            color: #FFD700;
+            margin-bottom: 5px;
+        }
+
+        #make-choice-container {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            gap: 8px;
+            width: 85%;
+            max-width: 1200px;
+            margin-bottom: 0;
+            margin-top: 0;
+            z-index: 10;
+            overflow: hidden;
+            max-height: 0;
+            opacity: 0;
+            transition: max-height 0.4s ease-out, opacity 0.3s ease-in, margin-top 0.4s ease-out, margin-bottom 0.4s ease-out, padding 0.4s ease-out;
+            pointer-events: none;
+        }
+
+        #make-choice-container.visible {
+            opacity: 1;
+            max-height: 300px;
+            pointer-events: auto;
+            padding: 15px 10px;
+        }
+
+        .choice {
+            padding: 15px 25px;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            border: 2px solid white;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 1.1em;
+            width: 100%;
+            text-align: center;
+            margin: 2px;
+        }
+
+        .choice:hover {
+            background-color: white;
+            color: black;
+            transform: scale(1.03);
+            transform-origin: center;
+            /* <-- Tambahan transform-origin */
+        }
+
+        #dialogue-text.typing::after {
+            content: '...';
+            animation: blink 1s steps(5, start) infinite;
+        }
+
+        @keyframes blink {
+            to {
+                visibility: hidden;
+            }
+        }
+
+        @keyframes shake {
+
+            10%,
+            90% {
+                transform: translate3d(-1px, 0, 0);
+            }
+
+            20%,
+            80% {
+                transform: translate3d(2px, 0, 0);
+            }
+
+            30%,
+            50%,
+            70% {
+                transform: translate3d(-4px, 0, 0);
+            }
+
+            40%,
+            60% {
+                transform: translate3d(4px, 0, 0);
+            }
+        }
+
+        #chapter-end-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            color: white;
+            z-index: 250;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.8s ease-in-out;
+        }
+
+        #chapter-end-screen.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #chapter-end-screen.visible h2,
+        #chapter-end-screen.visible button {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        #chapter-end-screen h2,
+        #chapter-end-screen button {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+        }
+
+        #chapter-end-screen.visible h2 {
+            transition-delay: 0.5s;
+        }
+
+        #chapter-end-screen.visible #next-chapter-btn {
+            transition-delay: 0.8s;
+        }
+
+        #chapter-end-screen.visible #replay-chapter-btn {
+            transition-delay: 1.0s;
+        }
+
+        #chapter-end-screen.visible #back-to-hub-btn {
+            transition-delay: 1.2s;
+        }
+
+        #chapter-end-screen h2 {
+            font-size: 2.5rem;
+            margin-bottom: 30px;
+        }
+
+        #chapter-end-screen button {
+            padding: 15px 25px;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            border: 2px solid white;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 1.1em;
+            width: 300px;
+            margin-top: 15px;
+        }
+
+        #chapter-end-screen button:hover {
+            background-color: white;
+            color: black;
+            transform: scale(1.03);
+        }
+
+        /* === SETTINGS MODAL STYLES (Ultra Deep Black Theme) === */
+        #settings-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(5, 6, 8, 0.95);
+            /* --bg-main with opacity */
+            z-index: 350;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #f5f7fa;
+            /* --text-primary */
+            font-family: 'Lexend', sans-serif;
+            backdrop-filter: blur(5px);
+        }
+
+        .settings-container {
+            background: #0d0e12;
+            /* --bg-secondary */
+            border-radius: 16px;
+            padding: 35px 45px;
+            min-width: 420px;
+            max-width: 500px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            /* --border-color */
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+        }
+
+        .settings-title {
+            font-size: 1.6rem;
+            margin-bottom: 30px;
+            text-align: center;
+            color: #f5f7fa;
+            /* --text-primary */
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .settings-group {
+            margin-bottom: 25px;
+        }
+
+        .settings-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            color: #a4abb6;
+            /* --text-secondary */
+            font-weight: 500;
+        }
+
+        .settings-label .volume-value {
+            background: #16181d;
+            /* --bg-tertiary */
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            min-width: 45px;
+            text-align: center;
+            color: #f5f7fa;
+            /* --text-primary */
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .settings-slider {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #16181d;
+            /* --bg-tertiary */
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+            cursor: pointer;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .settings-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #fff;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+            transition: transform 0.15s ease, box-shadow 0.2s;
+            border: 2px solid #0d0e12;
+            /* Border match bg to make it pop */
+        }
+
+        .settings-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        /* --- Individual Slider Colors (Flat/Formal) --- */
+
+        /* BGM: Cyan / Biru (#05d9e8) */
+        .settings-slider.bgm-slider::-webkit-slider-thumb {
+            background: #05d9e8;
+            box-shadow: none;
+        }
+
+        .settings-slider.bgm-slider {
+            background: rgba(5, 217, 232, 0.1);
+        }
+
+        /* Voice: Pink (#ff2a6d) */
+        .settings-slider.voice-slider::-webkit-slider-thumb {
+            background: #ff2a6d;
+            box-shadow: none;
+        }
+
+        .settings-slider.voice-slider {
+            background: rgba(255, 42, 109, 0.1);
+        }
+
+        /* SFX: Orange (#ff9f1c) */
+        .settings-slider.sfx-slider::-webkit-slider-thumb {
+            background: #ff9f1c;
+            box-shadow: none;
+        }
+
+        .settings-slider.sfx-slider {
+            background: rgba(255, 159, 28, 0.1);
+        }
+
+
+        .settings-divider {
+            height: 1px;
+            background: rgba(255, 255, 255, 0.05);
+            margin: 25px 0;
+        }
+
+        .settings-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .settings-btn {
+            padding: 12px 30px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+
+        .settings-btn.save-btn {
+            background: #ff6b6b;
+            /* Flat Accent Color */
+            color: white;
+            box-shadow: none;
+        }
+
+        .settings-btn.save-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .settings-btn.close-btn {
+            background: rgba(255, 255, 255, 0.07);
+            /* --button-hover */
+            color: #a4abb6;
+            /* --text-secondary */
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .settings-btn.close-btn:hover {
+            background: rgba(255, 255, 255, 0.12);
+            color: #f5f7fa;
+        }
+
+        /* Toggle Switch untuk Settings */
+        .settings-toggle-wrapper {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+        }
+
+        .settings-toggle-label {
+            font-size: 0.95rem;
+            color: #a4abb6;
+            /* --text-secondary */
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 46px;
+            height: 24px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #16181d;
+            /* --bg-tertiary */
+            transition: 0.3s;
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background-color: #5f6368;
+            /* --text-muted */
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        .toggle-switch input:checked+.toggle-slider {
+            background-color: rgba(255, 107, 107, 0.2);
+            border-color: #ff6b6b;
+        }
+
+        .toggle-switch input:checked+.toggle-slider:before {
+            transform: translateX(22px);
+            background-color: #ff6b6b;
+            /* --accent-color */
+            box-shadow: none;
+        }
+
+        .settings-section-title {
+            font-size: 0.75rem;
+            color: #5f6368;
+            /* --text-muted */
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 12px;
+            margin-top: 5px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="game-container">
+        <div id="transition-overlay"></div>
+        <div id="back-to-hub-button" title="Kembali ke Menu Novel">
+            <span>&#8617;</span>
+        </div>
+        <div id="top-right-controls">
+            <div id="auto-mode-button">AUTO</div>
+            <div id="history-button">📜</div>
+        </div>
+        <div id="backlog-overlay" style="display: none;">
+            <div id="backlog-content"></div>
+            <div class="backlog-controls">
+                <button id="save-button" class="menu-button">Save</button>
+                <button id="load-button" class="menu-button">Load</button>
+                <button id="close-backlog-button" class="menu-button">Tutup</button>
+                <button id="setting-button" class="menu-button">Setting</button>
+            </div>
+        </div>
+
+        <div id="save-load-modal"
+            style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 300; flex-direction: column; align-items: center; justify-content: center; color: white;">
+            <h2 id="save-load-title" style="margin-bottom: 20px;">Select Slot</h2>
+            <div id="slots-container"
+                style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; max-width: 900px; width: 90%;">
+                <!-- Slots will be injected here -->
+            </div>
+            <button id="close-save-load-modal" class="menu-button" style="margin-top: 30px;">Cancel</button>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal">
+            <div class="settings-container">
+                <h2 class="settings-title">⚙️ Pengaturan</h2>
+
+                <div class="settings-section-title">🔊 Audio</div>
+
+                <div class="settings-group">
+                    <div class="settings-label">
+                        <span>Volume BGM</span>
+                        <span class="volume-value" id="bgm-volume-display">80%</span>
+                    </div>
+                    <input type="range" id="setting-bgm-volume" class="settings-slider bgm-slider" min="0" max="100"
+                        value="80">
+                </div>
+
+                <div class="settings-group">
+                    <div class="settings-label">
+                        <span>Volume Voice</span>
+                        <span class="volume-value" id="voice-volume-display">80%</span>
+                    </div>
+                    <input type="range" id="setting-voice-volume" class="settings-slider voice-slider" min="0" max="100"
+                        value="80">
+                </div>
+
+                <div class="settings-group">
+                    <div class="settings-label">
+                        <span>Volume SFX</span>
+                        <span class="volume-value" id="sfx-volume-display">80%</span>
+                    </div>
+                    <input type="range" id="setting-sfx-volume" class="settings-slider sfx-slider" min="0" max="100"
+                        value="80">
+                </div>
+
+                <div class="settings-divider"></div>
+
+                <div class="settings-section-title">🖥️ Tampilan</div>
+
+                <div class="settings-group">
+                    <div class="settings-toggle-wrapper">
+                        <span class="settings-toggle-label">Mode Fullscreen</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="setting-fullscreen-toggle">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="settings-divider"></div>
+
+                <div class="settings-buttons">
+                    <button id="close-settings-modal" class="settings-btn close-btn">Tutup</button>
+                    <button id="save-settings-btn" class="settings-btn save-btn">Simpan</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="background"></div>
+        <div id="background-next"></div>
+        <video id="background-video" loop playsinline></video>
+        <div id="text-screen-overlay">
+            <p></p>
+        </div>
+
+        <!-- === CHARACTER SPRITES LAYER (Unified Multi-Sprite Container) === -->
+        <div id="char-sprites-layer">
+            <!-- Legacy sprite slots (untuk backward compatibility) -->
+            <div id="char-sprite-slot-left" class="char-sprite-slot sprite-container" data-slot="left">
+                <img id="char-sprite-2" class="char-sprite-img" alt="Character Left" />
+            </div>
+            <div id="char-sprite-slot-right" class="char-sprite-slot sprite-container" data-slot="right">
+                <img id="char-sprite-1" class="char-sprite-img" alt="Character Right" />
+            </div>
+            <div id="char-sprite-slot-center" class="char-sprite-slot sprite-container" data-slot="center">
+                <img id="char-sprite-center" class="char-sprite-img" alt="Character Center" />
+            </div>
+            <!-- Dynamic sprites will be appended here by JavaScript -->
+        </div>
+
+        <!-- Legacy sprite containers (hidden, for backward compatibility in old chapters) -->
+        <div id="sprite-container-left" class="sprite-container" style="display:none;">
+            <img id="character-sprite-2" alt="Character 2" />
+        </div>
+        <div id="sprite-container-right" class="sprite-container" style="display:none;">
+            <img id="character-sprite" alt="Character 1" />
+        </div>
+        <div id="sprite-container-center" class="sprite-container" style="display:none;">
+            <img id="character-sprite-center" alt="Character Center" />
+        </div>
+        <div id="dialogue-box">
+            <p id="character-name"></p>
+            <p id="dialogue-text"></p>
+        </div>
+        <div id="make-choice-container"></div>
+        <audio id="bgm-audio" loop></audio>
+        <audio id="sfx-audio"></audio>
+        <audio id="voice-audio"></audio>
+        <div id="chapter-end-screen">
+            <h2>Chapter Selesai</h2>
+            <button id="next-chapter-btn">Chapter Selanjutnya</button>
+            <button id="replay-chapter-btn">Ulangi Chapter</button>
+            <button id="back-to-hub-btn">Kembali ke Menu</button>
+        </div>
+    </div>
+    <!-- Debug HUD Overlay - Universal Entry Debugger -->
+    <div id="debug-hud">
+        <!-- Header -->
+        <div class="debug-header">
+            <span class="debug-header-title">Preview Inspector</span>
+            <span class="debug-header-badge" id="dbg-event-badge">NO EVENT</span>
+        </div>
+
+        <!-- Section: Entry Context -->
+        <div class="debug-section entry-context">
+            <div class="debug-section-header">Entry Context</div>
+            <div class="debug-entry-type type-dialogue" id="dbg-entry-type">
+                <span>💬</span> DIALOGUE
+            </div>
+            <div class="debug-speaker" id="dbg-speaker">-</div>
+            <div class="debug-text-preview" id="dbg-text-preview">Tidak ada teks dialog...</div>
+            <div class="debug-sprites-row">
+                <div class="debug-sprite-indicator" id="dbg-sprite-left">
+                    <span class="sprite-dot"></span>Kiri
+                </div>
+                <div class="debug-sprite-indicator" id="dbg-sprite-center">
+                    <span class="sprite-dot"></span>Tengah
+                </div>
+                <div class="debug-sprite-indicator" id="dbg-sprite-right">
+                    <span class="sprite-dot"></span>Kanan
+                </div>
+            </div>
+        </div>
+
+        <!-- Section: Special Event (Hidden by default) -->
+        <div class="debug-section special-event hidden" id="dbg-special-event-section">
+            <div class="debug-section-header">Special Event</div>
+            <div class="debug-event-type" id="dbg-event-type">
+                <span></span> <span id="dbg-type">-</span>
+            </div>
+            <div class="debug-row">
+                <span class="debug-label">Duration</span>
+                <div id="dbg-duration-bar-container">
+                    <div id="dbg-duration-bar"></div>
+                </div>
+                <span class="debug-value" id="dbg-duration">0 ms</span>
+            </div>
+            <div class="debug-row">
+                <span class="debug-label">Intensity</span>
+                <span class="debug-value" id="dbg-intensity">1.0</span>
+            </div>
+            <div class="debug-row">
+                <span class="debug-label">Blocking</span>
+                <span class="debug-value">
+                    <span id="dbg-wait" class="debug-tag tag-inactive">OFF</span>
+                </span>
+            </div>
+            <div class="debug-row">
+                <span class="debug-label">SFX</span>
+                <span class="debug-value" id="dbg-sfx" style="font-size: 10px; color: #888;">None</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================================================================
+        // BAGIAN 1: INISIALISASI & DEKLARASI
+        // ==================================================================
+
+        // Modul Electron untuk komunikasi dengan main process
+        const { ipcRenderer } = require('electron');
+
+        // --- Kumpulan Referensi Elemen DOM ---
+        // Mengambil semua elemen HTML yang akan kita manipulasi dan menyimpannya di variabel.
+        const transitionOverlay = document.getElementById('transition-overlay');
+        const gameContainer = document.getElementById("game-container");
+        const backgroundElement = document.getElementById("background");
+        const backgroundNextElement = document.getElementById("background-next");
+        const backgroundVideo = document.getElementById('background-video');
+        const textScreenOverlay = document.getElementById('text-screen-overlay');
+        const dialogueBox = document.getElementById("dialogue-box");
+        const characterNameElement = document.getElementById("character-name");
+        const dialogueTextElement = document.getElementById("dialogue-text");
+        const makeChoiceContainer = document.getElementById("make-choice-container");
+
+        // --- Character Sprites (yang baru refaktor) ---
+        const charSpritesLayer = document.getElementById("char-sprites-layer");
+        const charSprite1 = document.getElementById("char-sprite-1");
+        const charSprite2 = document.getElementById("char-sprite-2");
+        const charSpriteCenter = document.getElementById("char-sprite-center");
+
+        // --- Sprite References lama (Backward Compatibility) ---
+        const characterSprite = charSprite1; // Alias ke char-sprite-1
+        const characterSprite2 = charSprite2; // Alias ke char-sprite-2  
+        const characterSpriteCenter = charSpriteCenter; // Alias ke char-sprite-center
+
+        const bgmAudio = document.getElementById("bgm-audio");
+        const sfxAudio = document.getElementById("sfx-audio");
+        const voiceAudio = document.getElementById("voice-audio");
+        const historyButton = document.getElementById('history-button');
+        const autoModeButton = document.getElementById('auto-mode-button');
+        const backlogOverlay = document.getElementById('backlog-overlay');
+        const backlogContent = document.getElementById('backlog-content');
+        const closeBacklogButton = document.getElementById('close-backlog-button');
+        const endScreen = document.getElementById('chapter-end-screen');
+        const nextChapterBtn = document.getElementById('next-chapter-btn');
+        const replayChapterBtn = document.getElementById('replay-chapter-btn');
+        const backToHubBtn = document.getElementById('back-to-hub-btn');
+        const backToHubButtonIcon = document.getElementById('back-to-hub-button');
+
+        const saveButton = document.getElementById('save-button');
+        const loadButton = document.getElementById('load-button');
+        const settingButton = document.getElementById('setting-button');
+
+        // --- Variabel State ---
+        let isTyping = false;
+        let typewriterTimeout;
+        let currentFullText = '';
+        const TYPE_SPEED = 45; // Kecepatan efek ketik (ms per karakter)
+        let isAutoMode = false;
+        let autoModeTimeout;
+        const transitionDuration = 500; // Durasi default untuk transisi (ms)
+        let currentData = {};
+        let pendingExitTransition = null;
+        let isPreviewMode = false; // Flag untuk mode preview (Debug HUD hanya tampil di preview)
+        let isLabelPreviewMode = false; // Flag khusus untuk mode preview label (navigasi multi-entri)
+        let labelPreviewInfo = null; // Info preview label (labelName, currentIndex, totalEntries)
+
+        // --- web audio api ---
+        let audioContext = null;
+        let bgmSource = null, sfxSource = null, voiceSource = null;
+        let bgmPanner = null, sfxPanner = null, voicePanner = null;
+        let globalVolume = 0.8; // Volume global default
+
+        let originalPhaseBgmVolume = 0.5;
+        let isPhaseBgmCurrentlyMuted = false;
+
+        // --- Responsive Sprite Scaling ---
+        const REFERENCE_HEIGHT = 900; // Tinggi window referensi (saat ukuran sprites "ideal")
+        let currentResponsiveScale = 1; // Faktor skala responsif saat ini
+
+        /**
+         * Menghitung faktor skala responsif berdasarkan ukuran window
+         * Pada window yang lebih kecil, skala sprite dikurangi agar tidak overflow
+         * @returns {number} Faktor skala (0.5 - 1.0)
+         */
+        function getResponsiveScaleFactor() {
+            const windowHeight = window.innerHeight;
+            const ratio = windowHeight / REFERENCE_HEIGHT;
+            // Clamp nilai antara 0.5 dan 1.0
+            return Math.max(0.5, Math.min(1.0, ratio));
+        }
+
+        /**
+         * Update CSS variable untuk responsif scaling
+         */
+        function updateResponsiveScaling() {
+            currentResponsiveScale = getResponsiveScaleFactor();
+            document.documentElement.style.setProperty('--responsive-scale', currentResponsiveScale);
+            console.log(`[Responsive] Window height: ${window.innerHeight}px, Scale factor: ${currentResponsiveScale.toFixed(2)}`);
+        }
+
+        /**
+         * Refresh scale semua sprite container yang aktif
+         * Dipanggil saat window di-resize untuk update transformasi secara real-time
+         */
+        function refreshSpriteScales() {
+            const allSpriteSlots = document.querySelectorAll('.char-sprite-slot');
+            const isAutoMode = charSpritesLayer && charSpritesLayer.classList.contains('mode-auto');
+
+            allSpriteSlots.forEach(container => {
+                const img = container.querySelector('img');
+                if (!img || !img.classList.contains('visible')) return;
+
+                // Ambil scale asli dari data attribute (default 1)
+                const originalScale = parseFloat(container.dataset.originalScale || '1');
+                const effectiveScale = originalScale * currentResponsiveScale;
+
+                // Dalam mode auto, hanya apply scale (tanpa translateX)
+                if (isAutoMode) {
+                    container.style.transform = `scale(${effectiveScale})`;
+                } else {
+                    // Mode custom: apply transform sesuai tipe container
+                    const isCenterContainer = container.id === 'char-sprite-slot-center' || container.dataset.slot === 'center';
+                    const hasCustomPosition = container.style.getPropertyValue('--sprite-x-offset');
+
+                    if (hasCustomPosition) {
+                        container.style.transform = `translateX(-50%) scale(${effectiveScale})`;
+                    } else if (isCenterContainer) {
+                        container.style.transform = `translateX(-55%) scale(${effectiveScale})`;
+                    } else {
+                        container.style.transform = `scale(${effectiveScale})`;
+                    }
+                }
+            });
+        }
+
+        // Inisialisasi dan listen untuk resize
+        updateResponsiveScaling();
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            updateResponsiveScaling();
+            // Debounce refresh untuk performa
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                refreshSpriteScales();
+            }, 100);
+        });
+
+        // ==================================================================
+        // BAGIAN 2: PUSTAKA TRANSISI (TRANSITION HANDLERS)
+        // ==================================================================
+        // Objek ini berfungsi sebagai "kamus" animasi. Setiap key adalah nama transisi
+        const transitionHandlers = {
+            // Transisi 'cut' sekarang menerima 'data' (argumen ke-4) tapi tidak menggunakannya
+            'cut': function (renderCallback, sfx, volume, delay, pan, data, completionCallback) {
+                playSFX(sfx, volume, delay, pan);
+                renderCallback(false); // 'false' karena ini bukan transisi berat (layar tidak tertutup)
+                if (completionCallback) completionCallback();
+            },
+
+            // Fungsi _fade internal
+            _fade: function (renderCallback, sfx, volume, delay, pan, color, data, completionCallback) {
+                console.log(`%c[Player LOG] Handler _fade(${color}) [keyframes ver] dipanggil.`, 'color: cyan; font-weight: bold;');
+                console.log(`%c[Player LOG]    Data yang diterima:`, 'color: cyan;', data ? JSON.parse(JSON.stringify(data)) : 'null/undefined');
+                console.log(`%c[Player LOG]    Status overlay saat ini: classList='${transitionOverlay.className}', style.animation='${transitionOverlay.style.animation}'`, 'color: cyan;');
+                playSFX(sfx, volume, delay, pan);
+
+                // Cek optimisasi (tetap sama)
+                const isOverlayAnimatingOrActiveStyle = transitionOverlay.style.animation !== '' || parseFloat(window.getComputedStyle(transitionOverlay).opacity) > 0;
+                if (data && data.isChainedTransition && isOverlayAnimatingOrActiveStyle) {
+                    console.log(`%c[Player LOG] -> OPTIMISASI terpicu (isChainedTransition=true DAN layar aktif/animasi). Melewatkan fade-out.`, 'color: cyan;');
+                    renderCallback(true); // Langsung render
+                    // Jangan lakukan apa-apa lagi, biarkan animasi yg sedang jalan (jika ada) selesai
+                    if (completionCallback) completionCallback();
+                    return;
+                }
+
+                // Nama unik untuk animasi standar fade
+                const animationName = `standardFade_${color}`;
+                const totalDuration = transitionDuration * 2; // Fade out + Fade in
+
+                // Buat @keyframes jika belum ada
+                if (!dynamicStyles.innerHTML.includes(`@keyframes ${animationName}`)) {
+                    dynamicStyles.innerHTML += `
+                    @keyframes ${animationName} {
+                        0%   { opacity: 0; background-color: ${color}; } /* Mulai transparan */
+                        50%  { opacity: 1; background-color: ${color}; } /* Jadi pekat di tengah */
+                        100% { opacity: 0; background-color: ${color}; } /* Kembali transparan */
+                    }
+                `;
+                }
+
+                // Set timer untuk memanggil renderCallback TEPAT di tengah animasi (saat opacity = 1)
+                const midpoint = totalDuration / 2; // = transitionDuration (500ms)
+                setTimeout(() => {
+                    console.log(`%c[Player LOG] -> Midpoint (${midpoint}ms) standard fade. Memanggil renderCallback(true).`, 'color: cyan;');
+                    renderCallback(true); // Ganti konten
+                }, midpoint);
+
+                // Set timer untuk cleanup setelah animasi selesai
+                setTimeout(() => {
+                    console.log(`%c[Player LOG] -> Standard fade (${color}) selesai. Membersihkan style.`, 'color: cyan;');
+                    transitionOverlay.style.animation = '';
+                    transitionOverlay.style.opacity = '0'; // Pastikan kembali ke 0
+                    transitionOverlay.style.backgroundColor = ''; // Hapus background color
+                    if (completionCallback) completionCallback();
+                }, totalDuration);
+
+                // Jalankan animasi
+                console.log(`%c[Player LOG] -> Memulai animasi '${animationName}' selama ${totalDuration}ms.`, 'color: cyan;');
+                transitionOverlay.style.opacity = '1'; // Paksa terlihat SEBELUM animasi mulai (penting!)
+                transitionOverlay.style.backgroundColor = color; // Atur warna background
+                transitionOverlay.style.animation = `${animationName} ${totalDuration}ms ease-in-out forwards`;
+            },
+
+            'swipe_black_left': function (renderCallback, sfx, volume, delay, pan, data, completionCallback) {
+                playSFX(sfx, volume, delay, pan);
+                const duration = transitionDuration;
+
+                // Pastiin warna background-nya hitam biar nutupin konten
+                transitionOverlay.style.backgroundColor = 'black';
+
+                // Keyframe buat gerakan ke Kiri (Kanan -> Tengah -> Kiri)
+                if (!dynamicStyles.innerHTML.includes('@keyframes slideInFromRight')) {
+                    dynamicStyles.innerHTML += `
+                    @keyframes slideInFromRight {
+                        from { transform: translateX(100%); opacity: 1; }
+                        to   { transform: translateX(0); opacity: 1; }
+                    }
+                    @keyframes slideOutToLeft {
+                        from { transform: translateX(0); opacity: 1; }
+                        to   { transform: translateX(-100%); opacity: 1; }
+                    }
+                `;
+                }
+
+                // 1. Geser Masuk (Nutupin)
+                transitionOverlay.style.opacity = '1';
+                transitionOverlay.style.animation = `slideInFromRight ${duration}ms ease-out forwards`;
+
+                setTimeout(() => {
+                    // 2. Ganti Konten
+                    renderCallback(true);
+
+                    // 3. Geser Keluar (Nampilin)
+                    transitionOverlay.style.animation = `slideOutToLeft ${duration}ms ease-in forwards`;
+
+                    setTimeout(() => {
+                        // Pembersihan
+                        transitionOverlay.style.animation = '';
+                        transitionOverlay.style.transform = '';
+                        transitionOverlay.style.opacity = '0';
+                        transitionOverlay.style.backgroundColor = '';
+                        if (completionCallback) completionCallback();
+                    }, duration);
+
+                }, duration);
+            },
+
+            'swipe_black_right': function (renderCallback, sfx, volume, delay, pan, data, completionCallback) {
+                playSFX(sfx, volume, delay, pan);
+                const duration = transitionDuration;
+
+                // Pastiin warna background-nya hitam biar nutupin konten
+                transitionOverlay.style.backgroundColor = 'black';
+
+                // Keyframe buat gerakan ke Kanan (Kiri -> Tengah -> Kanan)
+                if (!dynamicStyles.innerHTML.includes('@keyframes slideInFromLeft')) {
+                    dynamicStyles.innerHTML += `
+                    @keyframes slideInFromLeft {
+                        from { transform: translateX(-100%); opacity: 1; }
+                        to   { transform: translateX(0); opacity: 1; }
+                    }
+                    @keyframes slideOutToRight {
+                        from { transform: translateX(0); opacity: 1; }
+                        to   { transform: translateX(100%); opacity: 1; }
+                    }
+                `;
+                }
+
+                // 1. Geser Masuk (Nutupin)
+                transitionOverlay.style.opacity = '1';
+                transitionOverlay.style.animation = `slideInFromLeft ${duration}ms ease-out forwards`;
+
+                setTimeout(() => {
+                    // 2. Ganti Konten
+                    renderCallback(true);
+
+                    // 3. Geser Keluar (Nampilin)
+                    transitionOverlay.style.animation = `slideOutToRight ${duration}ms ease-in forwards`;
+
+                    setTimeout(() => {
+                        // Pembersihan
+                        transitionOverlay.style.animation = '';
+                        transitionOverlay.style.transform = '';
+                        transitionOverlay.style.opacity = '0';
+                        transitionOverlay.style.backgroundColor = '';
+                        if (completionCallback) completionCallback();
+                    }, duration);
+
+                }, duration);
+            },
+
+            // Alias untuk kompatibilitas dengan "Animasi Masuk" atau save file lama
+            'slide_left': function (renderCallback, sfx, volume, delay, pan, data, completionCallback) {
+                transitionHandlers.swipe_black_left(renderCallback, sfx, volume, delay, pan, data, completionCallback);
+            },
+            'slide_right': function (renderCallback, sfx, volume, delay, pan, data, completionCallback) {
+                transitionHandlers.swipe_black_right(renderCallback, sfx, volume, delay, pan, data, completionCallback);
+            },
+
+            'combined_fade_white_to_slide_right': function (renderCallback, sfx, volume, delay, pan, completionCallback) {
+                console.log("%c[Player] Menjalankan transisi GABUNGAN SPESIAL: FADE-WHITE-KE-SLIDE-RIGHT", 'color: #FFD700');
+                playSFX(sfx, volume, delay, pan);
+                const duration = transitionDuration * 1.5; // Sedikit lebih lama
+
+                // Buat @keyframes jika belum ada
+                if (!dynamicStyles.innerHTML.includes('@keyframes whiteToSlideRight')) {
+                    dynamicStyles.innerHTML += `
+                    @keyframes whiteToSlideRight {
+                        0%   { opacity: 0; background-color: white; transform: translateX(0%); } /* Mulai transparan */
+                        33%  { opacity: 1; background-color: white; transform: translateX(0%); } /* Jadi putih pekat */
+                        66%  { opacity: 1; background-color: white; transform: translateX(-100%); } /* Gambar baru didorong masuk dari kanan */
+                        100% { opacity: 1; background-color: transparent; transform: translateX(-100%); } /* Background putih hilang */
+                    }
+                `;
+                }
+
+                const midpoint = duration * 0.4; // Ganti konten sedikit lebih awal
+
+                setTimeout(() => {
+                    console.log('[Player] Titik tengah FADE-WHITE-KE-SLIDE-RIGHT: Merender scene berikutnya.');
+                    renderCallback(true); // Ganti konten (panggil request-next-line)
+                }, midpoint);
+
+                setTimeout(() => {
+                    console.log('[Player] Transisi FADE-WHITE-KE-SLIDE-RIGHT selesai.');
+                    transitionOverlay.style.animation = '';
+                    transitionOverlay.style.opacity = '0'; // Pastikan kembali transparan
+                    transitionOverlay.style.transform = ''; // Reset transform
+                    if (completionCallback) completionCallback();
+                }, duration);
+
+                // Jalankan animasi!
+                transitionOverlay.style.animation = `whiteToSlideRight ${duration}ms ease-in-out forwards`;
+                transitionOverlay.style.opacity = '1'; // Pastikan terlihat saat animasi dimulai
+            },
+
+            // Handler fade_black dan fade_white sekarang meneruskan argumen ke _fade
+            'fade_black': function (renderCallback, sfx, volume, delay, pan, data, completionCallback) {
+                transitionHandlers._fade(renderCallback, sfx, volume, delay, pan, 'black', data, completionCallback);
+            },
+            'fade_white': function (renderCallback, sfx, volume, delay, pan, data, completionCallback) {
+                transitionHandlers._fade(renderCallback, sfx, volume, delay, pan, 'white', data, completionCallback);
+            }
+
+        };
+
+        const dynamicStyles = document.head.appendChild(document.createElement('style'));
+
+        /**
+         * Membuat @keyframes untuk transisi gabungan (seperti eks.html Test 3)
+         * {string} name - Nama animasi
+         * {string} outColor - Warna fade-out (misal: 'white')
+         * {string} inColor - Warna fade-in (misal: 'black')
+         */
+        function createCombinedFadeAnimation(name, outColor, inColor) {
+            const keyframes = `
+            @keyframes ${name} {
+                /* Tahap 1: Fade-out ke outColor */
+                0%   { opacity: 0; background-color: ${outColor}; }
+                33%  { opacity: 1; background-color: ${outColor}; } 
+                
+                /* Tahap 2: Pudar dari outColor ke inColor (layar tetap tertutup) */
+                66%  { opacity: 1; background-color: ${inColor}; }  
+                
+                /* Tahap 3: Fade-in dari inColor */
+                100% { opacity: 0; background-color: ${inColor}; }
+            }
+        `;
+            dynamicStyles.innerHTML = keyframes;
+        }
+
+        transitionHandlers.combined_fade_white_to_fade_black = function (renderCallback, sfx, volume, completionCallback) {
+            const outColor = 'white';
+            const inColor = 'black';
+            console.log(`%c[Player] Menjalankan transisi GABUNGAN: ${outColor}-ke-${inColor}`, 'color: #FFD700');
+            playSFX(sfx, volume);
+
+            const animationName = `combinedFade_${outColor}_to_${inColor}`;
+            const totalDuration = transitionDuration * 3; // 1500ms
+
+            // 1. Buat CSS @keyframes
+            createCombinedFadeAnimation(animationName, outColor, inColor);
+
+            // 2. Set timer untuk mengganti scene SETELAH layar menjadi PUTIH PEKAT
+            // Layar putih pekat di 33% (500ms). Kita panggil callback sedikit setelahnya, misal di 40%.
+            const renderTime = totalDuration * 0.40; // 1500ms * 0.40 = 600ms
+
+            setTimeout(() => {
+                // Pada 600ms, layar masih putih pekat (belum mulai pudar ke hitam)
+                console.log(`[Player] Titik render (${renderTime}ms) transisi gabungan: Merender scene berikutnya.`);
+                renderCallback(true); // Ganti konten (panggil request-next-line)
+            }, renderTime);
+
+            // 3. Set timer untuk cleanup setelah animasi selesai (tetap sama)
+            setTimeout(() => {
+                console.log('[Player] Transisi gabungan selesai.');
+                transitionOverlay.style.animation = '';
+                transitionOverlay.style.opacity = '0';
+                if (completionCallback) completionCallback();
+            }, totalDuration);
+
+            // 4. Jalankan animasi! (tetap sama)
+            transitionOverlay.style.opacity = '1';
+            transitionOverlay.style.animation = `${animationName} ${totalDuration}ms linear forwards`;
+        };
+
+        // ==================================================================
+        // BAGIAN 3: FUNGSI-FUNGSI HELPER
+        // ==================================================================
+        // Kumpulan fungsi kecil yang melakukan tugas spesifik seperti memutar audio,
+        // menampilkan karakter, dll.
+
+        // == Fungsi untuk Inisialisasi AudioContext ==
+        function ensureAudioContext() {
+            if (audioContext && audioContext.state !== 'closed') {
+                // Jika context sudah ada dan belum ditutup, coba resume jika suspended
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume().catch(e => console.error("Gagal resume AudioContext:", e));
+                }
+                return true;
+            }
+            try {
+                console.log("[WebAudio] Mencoba membuat AudioContext baru...");
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                console.log("[WebAudio] AudioContext berhasil dibuat. State:", audioContext.state);
+                return true;
+            } catch (e) {
+                console.error("[WebAudio] Gagal membuat AudioContext:", e);
+                audioContext = null; // Set ke null jika gagal
+                showNotification("Browser tidak mendukung Web Audio API, efek panning tidak akan berfungsi.", "error");
+                return false;
+            }
+        }
+
+        function changeBackground(newBackground, withFade = true, mode = 'cover') {
+            // <-- LOG 2: Memeriksa data yang diteruskan ke fungsi inti -->
+            console.log(`%c[Player] changeBackground dipanggil. Mode diterima: ${mode}`, 'color: #90EE90');
+
+            if (!newBackground || backgroundElement.style.backgroundImage.includes(newBackground)) {
+                console.log(" -> Aksi dibatalkan (background sama atau tidak ada).");
+                return;
+            }
+
+            const newBackgroundSize = (mode === 'contain') ? 'contain' : 'cover';
+
+            // <-- LOG 3: Konfirmasi nilai CSS yang akan diterapkan -->
+            console.log(` -> Style 'backgroundSize' akan diatur menjadi: '${newBackgroundSize}'`);
+
+            if (withFade) {
+                backgroundNextElement.style.backgroundSize = newBackgroundSize;
+                backgroundNextElement.style.backgroundImage = `url('${newBackground}')`;
+                backgroundNextElement.classList.add('visible');
+
+                setTimeout(() => {
+                    backgroundElement.style.backgroundSize = newBackgroundSize;
+                    backgroundElement.style.backgroundImage = backgroundNextElement.style.backgroundImage;
+                    backgroundNextElement.classList.remove('visible');
+                }, 500);
+
+            } else {
+                backgroundElement.style.backgroundSize = newBackgroundSize;
+                backgroundElement.style.backgroundImage = `url('${newBackground}')`;
+            }
+        }
+
+        /**
+         * Update sprite karakter dengan animasi dan transformasi.
+         * @param {HTMLElement} spriteElement - Elemen img sprite
+         * @param {string} newSpriteUrl - URL sprite baru
+         * @param {string} newAnimationType - Tipe animasi sprite
+         * @param {number} scale - Factor skala (default 1)
+         * @param {number|null} positionX - Posisi X dalam persen (opsional)
+         * @param {Object} transitionConfig - Konfigurasi transisi (opsional)
+         * @param {boolean} transitionConfig.enabled - Apakah transisi diaktifkan
+         * @param {number} transitionConfig.duration - Durasi transisi dalam ms
+         */
+        function updateCharacterSprite(spriteElement, newSpriteUrl, newAnimationType, scale = 1, positionX = null, transitionConfig = null) {
+            const previousSpriteUrl = spriteElement.dataset.currentSrc || null;
+            const previousAnimation = spriteElement.dataset.currentAnim || null;
+            const finalAnimation = newAnimationType || 'anim-in-fade';
+
+            // --- LOGIKA SKALA (SCALE) dan POSISI X ---
+            const container = spriteElement.parentElement;
+            if (container) {
+                container.style.transformOrigin = 'bottom center'; // Pastikan tumbuh dari bawah
+
+                // === SPRITE TRANSITION SYSTEM ===
+                // Jika transisi diaktifkan dan sprite sudah ada sebelumnya, terapkan CSS transition
+                if (transitionConfig && transitionConfig.enabled && previousSpriteUrl) {
+                    const duration = transitionConfig.duration || 500;
+                    container.style.transition = `transform ${duration}ms ease-out, left ${duration}ms ease-out, right ${duration}ms ease-out`;
+                    console.log(`%c[CharSprites] Transisi diaktifkan: ${duration}ms`, 'color: #00CED1; font-weight: bold;');
+                } else {
+                    // Hapus transition jika tidak diaktifkan
+                    container.style.transition = '';
+                }
+
+                // Cek apakah ini container center (baik ID baru maupun lama)
+                const isCenterContainer = container.id === 'sprite-container-center' ||
+                    container.id === 'char-sprite-slot-center' ||
+                    container.dataset.slot === 'center';
+
+                // Cek apakah ini container left
+                const isLeftContainer = container.id === 'sprite-container-left' ||
+                    container.id === 'char-sprite-slot-left' ||
+                    container.dataset.slot === 'left';
+
+                // Cek apakah ini container right
+                const isRightContainer = container.id === 'sprite-container-right' ||
+                    container.id === 'char-sprite-slot-right' ||
+                    container.dataset.slot === 'right';
+
+                // Simpan scale asli ke data attribute untuk refresh saat resize
+                container.dataset.originalScale = scale;
+
+                // Deteksi apakah parent layer dalam mode auto (flexbox)
+                const isAutoMode = charSpritesLayer && charSpritesLayer.classList.contains('mode-auto');
+
+                // === MODE AUTO: Flexbox compatible ===
+                if (isAutoMode) {
+                    // Dalam mode auto, JANGAN apply left/right positioning (flexbox handles it)
+                    // Hanya apply scale
+                    const effectiveScale = scale * currentResponsiveScale;
+                    container.style.transform = `scale(${effectiveScale})`;
+                    container.style.left = '';
+                    container.style.right = '';
+                    container.style.paddingLeft = '';
+                    container.style.paddingRight = '';
+                }
+                // === MODE CUSTOM: Absolute positioning ===
+                else {
+                    // === POSISI X ===
+                    // Jika positionX diberikan, terapkan sebagai offset dari posisi default
+                    if (positionX !== null && positionX !== undefined) {
+                        // Set CSS variable untuk posisi X
+                        container.style.setProperty('--sprite-x-offset', `${positionX}%`);
+
+                        // Reset posisi default dan gunakan posisi kustom
+                        container.style.left = `${positionX}%`;
+                        container.style.right = 'auto';
+                        container.style.paddingLeft = '0';
+                        container.style.paddingRight = '0';
+
+                        // Untuk scale, gunakan translateX(-50%) untuk center pada posisi baru
+                        // Terapkan responsive scale factor untuk menyesuaikan ukuran saat window kecil
+                        const effectiveScale = scale * currentResponsiveScale;
+                        container.style.transform = `translateX(-50%) scale(${effectiveScale})`;
+                    } else {
+                        // Posisi default berdasarkan slot
+                        // SET POSISI EKSPLISIT untuk menghindari masalah CSS specificity
+                        container.style.removeProperty('--sprite-x-offset');
+
+                        // Terapkan responsive scale factor
+                        const effectiveScale = scale * currentResponsiveScale;
+
+                        // === PRESET SLOTS: Set posisi eksplisit ===
+                        if (isLeftContainer) {
+                            // LEFT: Posisi di kiri (left: 0)
+                            container.style.left = '0';
+                            container.style.right = 'auto';
+                            container.style.paddingLeft = '50px';
+                            container.style.paddingRight = '';
+                            container.style.transform = `scale(${effectiveScale})`;
+                        } else if (isCenterContainer) {
+                            // CENTER: Posisi di tengah (left: 50%, translateX untuk centering)
+                            container.style.left = '50%';
+                            container.style.right = 'auto';
+                            container.style.paddingLeft = '';
+                            container.style.paddingRight = '';
+                            container.style.transform = `translateX(-55%) scale(${effectiveScale})`;
+                        } else if (isRightContainer) {
+                            // RIGHT: Posisi di kanan (right: 0)
+                            container.style.left = 'auto';
+                            container.style.right = '0';
+                            container.style.paddingLeft = '';
+                            container.style.paddingRight = '50px';
+                            container.style.transform = `scale(${effectiveScale})`;
+                        } else {
+                            // === CUSTOM SLOT TANPA POSISI X ===
+                            // Default: posisi center
+                            container.style.left = '50%';
+                            container.style.right = 'auto';
+                            container.style.paddingLeft = '';
+                            container.style.paddingRight = '';
+                            container.style.transform = `translateX(-50%) scale(${effectiveScale})`;
+                        }
+                    }
+                }
+            }
+
+            // 1. KASUS: Sembunyikan sprite
+            if (!newSpriteUrl) {
+                if (previousSpriteUrl) {
+                    // Hapus visible dan animasi lama, tambahkan hide
+                    // Jangan gunakan className = 'hide' karena akan menghapus char-sprite-img
+                    spriteElement.classList.remove('visible');
+                    if (previousAnimation) {
+                        spriteElement.classList.remove(previousAnimation);
+                    }
+                    spriteElement.classList.add('hide');
+                }
+                spriteElement.dataset.currentSrc = '';
+                spriteElement.dataset.currentAnim = '';
+                return;
+            }
+            spriteElement.classList.remove('hide');
+            spriteElement.classList.add('visible');
+
+            // 2. Atur sumber gambar jika memang baru
+            if (newSpriteUrl !== previousSpriteUrl) {
+                spriteElement.src = newSpriteUrl;
+            }
+
+            // 3. Logika animasi yang disempurnakan
+            const isOneShot = finalAnimation.startsWith('anim-oneshot-');
+
+            if (finalAnimation !== previousAnimation || isOneShot) {
+                // SELALU hapus kelas animasi lama jika ada, untuk menghindari konflik.
+                if (previousAnimation) {
+                    spriteElement.classList.remove(previousAnimation);
+                }
+
+                const isEntryAnimation = finalAnimation.startsWith('anim-in-');
+                const isFirstAppearance = (newSpriteUrl !== previousSpriteUrl);
+
+                // Tambahkan animasi baru HANYA jika:
+                // - Ini BUKAN animasi masuk (berarti ini loop atau keluar atau one-shot), ATAU
+                // - Ini adalah animasi masuk PADA saat karakter pertama kali muncul.
+                if (!isEntryAnimation || isFirstAppearance) {
+                    void spriteElement.offsetHeight; // Paksa reflow untuk memastikan animasi berjalan
+                    spriteElement.classList.add(finalAnimation);
+                }
+                // KASUS PENTING: Jika sprite sudah ada & animasi baru adalah 'anim-in' (tidak dijalankan),
+                // tapi animasi sebelumnya tidak ada, pastikan sprite tetap terlihat.
+                else if (isEntryAnimation && !isFirstAppearance && !previousAnimation) {
+                    // Ini untuk mencegah sprite menjadi tidak terlihat jika entri sebelumnya tidak punya animasi.
+                    spriteElement.classList.add(finalAnimation);
+                }
+            }
+
+            // 4. Perbarui state untuk pemanggilan berikutnya
+            spriteElement.dataset.currentSrc = newSpriteUrl;
+            spriteElement.dataset.currentAnim = finalAnimation;
+        }
+
+        /**
+         * MULTI-SPRITE SYSTEM: processCharSprites()
+         * Fungsi ini menangani sistem char sprite baru yang fleksibel.
+         * Mendukung kombinasi format lama (sprite, sprite2, spriteCenter) + charSprites array.
+         * Mendukung mode "auto" (flexbox auto-spacing) dan "custom" (absolute positioning).
+         * 
+         * @param {Object} data - Payload data dari engine
+         */
+        function processCharSprites(data) {
+            // === STEP 0: Tentukan sprite mode ===
+            const spriteMode = data.spriteMode || 'custom'; // Default: custom (backward compatible)
+
+            // Apply mode class ke container
+            if (spriteMode === 'auto') {
+                charSpritesLayer.classList.add('mode-auto');
+                charSpritesLayer.classList.remove('mode-custom');
+                console.log('%c[CharSprites] MODE: AUTO (flexbox spacing)', 'color: #00FF7F; font-weight: bold;');
+            } else {
+                charSpritesLayer.classList.add('mode-custom');
+                charSpritesLayer.classList.remove('mode-auto');
+                console.log('%c[CharSprites] MODE: CUSTOM (absolute positioning)', 'color: #FF6347; font-weight: bold;');
+            }
+
+            // === STEP 1: SELALU proses sprite preset (sprite, sprite2, spriteCenter) ===
+            // Ini memastikan backward compatibility dan kombinasi dengan charSprites
+            const hasPresetSprites = data.sprite || data.sprite2 || data.spriteCenter;
+
+            if (hasPresetSprites) {
+                console.log('%c[CharSprites] Memproses sprite PRESET (sprite, sprite2, spriteCenter)', 'color: #FFD700;');
+            }
+
+            // Untuk mode auto, posisi X diabaikan (flexbox handles positioning)
+            const usePositionX = (spriteMode === 'custom');
+
+            // === SPRITE TRANSITION SYSTEM ===
+            // Buat konfigurasi transisi untuk setiap slot
+            const spriteTransitionConfig = data.spriteTransition ? { enabled: true, duration: data.spriteTransitionDuration || 500 } : null;
+            const sprite2TransitionConfig = data.sprite2Transition ? { enabled: true, duration: data.sprite2TransitionDuration || 500 } : null;
+            const spriteCenterTransitionConfig = data.spriteCenterTransition ? { enabled: true, duration: data.spriteCenterTransitionDuration || 500 } : null;
+
+            // Sprite Kanan (sprite) - posisi X dari data.spriteX (hanya jika mode custom)
+            updateCharacterSprite(charSprite1, data.sprite, data.spriteAnim, data.spriteScale, usePositionX ? data.spriteX : null, spriteTransitionConfig);
+            // Sprite Kiri (sprite2) - posisi X dari data.sprite2X
+            updateCharacterSprite(charSprite2, data.sprite2, data.sprite2Anim, data.sprite2Scale, usePositionX ? data.sprite2X : null, sprite2TransitionConfig);
+            // Sprite Tengah (spriteCenter) - posisi X dari data.spriteCenterX
+            updateCharacterSprite(charSpriteCenter, data.spriteCenter, data.spriteCenterAnim, data.spriteCenterScale, usePositionX ? data.spriteCenterX : null, spriteCenterTransitionConfig);
+
+            // === STEP 2: Proses charSprites untuk sprite CUSTOM tambahan ===
+            if (data.charSprites && Array.isArray(data.charSprites) && data.charSprites.length > 0) {
+                console.log('%c[CharSprites] Memproses sprite CUSTOM (charSprites array)', 'color: #00CED1; font-weight: bold;');
+
+                // Track aktif sprite IDs untuk cleanup
+                const activeSlotIds = new Set();
+
+                data.charSprites.forEach((spriteData, index) => {
+                    const slot = spriteData.slot || 'custom';
+
+                    // Skip jika ini adalah preset slot (sudah dihandle di atas)
+                    if (slot === 'left' || slot === 'right' || slot === 'center') {
+                        console.log(`[CharSprites] Skip preset slot: ${slot} (sudah diproses)`);
+                        return;
+                    }
+
+                    const slotId = spriteData.id || `dynamic-sprite-${index}`;
+                    activeSlotIds.add(slotId);
+
+                    // Custom slot - buat atau temukan elemen dinamis
+                    let targetSlotElement = document.getElementById(slotId);
+                    let targetImgElement = null;
+
+                    if (!targetSlotElement) {
+                        // Buat slot baru
+                        targetSlotElement = document.createElement('div');
+                        targetSlotElement.id = slotId;
+                        targetSlotElement.className = 'char-sprite-slot';
+                        targetSlotElement.dataset.slot = 'custom';
+                        targetSlotElement.dataset.dynamic = 'true';
+                        // Set order untuk flexbox agar urutan stabil (custom sprites setelah preset)
+                        targetSlotElement.style.order = 10 + index; // Order 10+n untuk custom sprites
+
+                        targetImgElement = document.createElement('img');
+                        targetImgElement.className = 'char-sprite-img';
+                        targetImgElement.alt = `Dynamic Sprite ${index}`;
+                        targetSlotElement.appendChild(targetImgElement);
+
+                        charSpritesLayer.appendChild(targetSlotElement);
+                    } else {
+                        targetImgElement = targetSlotElement.querySelector('img');
+                    }
+
+                    // Update sprite menggunakan fungsi existing
+                    // Untuk mode auto, posisi X diabaikan
+                    if (targetImgElement) {
+                        updateCharacterSprite(
+                            targetImgElement,
+                            spriteData.src,
+                            spriteData.anim || spriteData.animation,
+                            spriteData.scale || 1,
+                            usePositionX ? spriteData.x : null // Posisi X hanya untuk mode custom
+                        );
+                    }
+                });
+
+                // Cleanup: sembunyikan dynamic slot yang tidak lagi digunakan
+                const allDynamicSlots = charSpritesLayer.querySelectorAll('[data-dynamic="true"]');
+                allDynamicSlots.forEach(slot => {
+                    if (!activeSlotIds.has(slot.id)) {
+                        const img = slot.querySelector('img');
+                        if (img) {
+                            img.classList.add('hide');
+                            img.classList.remove('visible');
+                        }
+                    }
+                });
+            } else {
+                // Jika tidak ada charSprites, cleanup semua dynamic slots
+                const allDynamicSlots = charSpritesLayer.querySelectorAll('[data-dynamic="true"]');
+                allDynamicSlots.forEach(slot => {
+                    const img = slot.querySelector('img');
+                    if (img) {
+                        img.classList.add('hide');
+                        img.classList.remove('visible');
+                    }
+                });
+            }
+        }
+
+        /**
+         * Menghapus semua dynamic sprite slots yang dibuat runtime
+         */
+        function clearDynamicCharSprites() {
+            const dynamicSlots = charSpritesLayer.querySelectorAll('[data-dynamic="true"]');
+            dynamicSlots.forEach(slot => slot.remove());
+        }
+
+        /** Memutar Background Music (BGM) dengan Web Audio API untuk Pan */
+        function playBGM(src, volume, delay, pan) {
+            if (!ensureAudioContext()) return;
+
+            // Fungsi internal untuk memutar audio
+            const playAudio = () => {
+                // --- Inisialisasi Node Web Audio (jika belum) ---
+                if (!bgmSource) {
+                    try {
+                        bgmSource = audioContext.createMediaElementSource(bgmAudio);
+                        bgmPanner = audioContext.createStereoPanner();
+                        bgmSource.connect(bgmPanner).connect(audioContext.destination);
+                        console.log("[WebAudio] Node BGM berhasil dibuat dan dihubungkan.");
+                    } catch (e) {
+                        console.error("[WebAudio] Gagal membuat node BGM:", e);
+                        bgmSource = null; // Reset jika gagal
+                        bgmPanner = null;
+                        return; // Hentikan jika node gagal dibuat
+                    }
+                }
+
+                const currentSrcDecoded = bgmAudio.src ? decodeURIComponent(bgmAudio.src) : null;
+                const baseVolume = (volume !== undefined) ? volume : 0.5;
+                const finalVolume = baseVolume * bgmVolumeMultiplier * globalVolume; // Terapkan multiplier setting + globalVolume
+                bgmAudio.dataset.baseVolume = baseVolume; // Simpan untuk real-time update
+
+                // Atur Panning
+                if (bgmPanner && pan !== undefined) {
+                    bgmPanner.pan.value = pan;
+                    console.log(`%c[AUDIO LOG] BGM Pan diatur ke: ${pan}`, 'color: #90EE90;');
+                } else if (bgmPanner && pan === undefined) {
+                    bgmPanner.pan.value = 0; // Default ke tengah jika pan tidak dispesifikkan
+                }
+
+                // Kasus 1: Sumber BGM baru
+                if (src && (!currentSrcDecoded || !currentSrcDecoded.endsWith(src))) {
+                    bgmAudio.src = src;
+                    originalPhaseBgmVolume = (volume !== undefined) ? volume : 0.5; // Simpan volume spesifik (tanpa global)
+
+                    if (!isPhaseBgmCurrentlyMuted) {
+                        bgmAudio.volume = finalVolume; // Volume elemen audio (sudah dikali global)
+                        console.log(`%c[AUDIO LOG] BGM BARU: '${src}'. Volume: ${finalVolume.toFixed(2)} (Global: ${globalVolume}), Delay: ${delay || 0}ms`, 'color: #90EE90; font-weight:bold;');
+                    } else {
+                        bgmAudio.volume = 0;
+                        console.log(`%c[AUDIO LOG] BGM BARU: '${src}'. Volume asli ${originalPhaseBgmVolume}, tapi MUTE by scene.`, 'color: #FF8C00;');
+                    }
+                    bgmAudio.play().catch(e => console.error("Gagal play BGM:", e));
+
+                    // Kasus 2: Sumber BGM sama
+                } else if (src && currentSrcDecoded && currentSrcDecoded.endsWith(src)) {
+                    originalPhaseBgmVolume = (volume !== undefined) ? volume : originalPhaseBgmVolume;
+                    const newFinalVolume = originalPhaseBgmVolume * globalVolume;
+
+                    if (!isPhaseBgmCurrentlyMuted) {
+                        if (bgmAudio.volume !== newFinalVolume) {
+                            console.log(`%c[AUDIO LOG] BGM sama ('${src}'), update volume ke: ${newFinalVolume.toFixed(2)}`, 'color: #90EE90;');
+                            bgmAudio.volume = newFinalVolume;
+                        }
+                    } else {
+                        console.log(`%c[AUDIO LOG] BGM sama ('${src}'), volume asli ${originalPhaseBgmVolume}, tetap MUTE by scene.`, 'color: #FF8C00;');
+                        bgmAudio.volume = 0;
+                    }
+                    if (bgmAudio.paused && bgmAudio.duration > 0) {
+                        bgmAudio.play().catch(e => console.error("Gagal resume BGM:", e));
+                    }
+                    // Kasus 3: Tidak ada sumber BGM
+                } else if (!src) {
+                    if (isPhaseBgmCurrentlyMuted) {
+                        bgmAudio.volume = 0;
+                    } else {
+                        if (!bgmAudio.paused) { bgmAudio.pause(); }
+                        bgmAudio.currentTime = 0;
+                        bgmAudio.removeAttribute('src');
+                        originalPhaseBgmVolume = 0.5;
+                    }
+                }
+            };
+
+            // Logika Delay
+            const finalDelay = delay || 0;
+            if (finalDelay > 0) {
+                console.log(`%c[AUDIO LOG] BGM '${src || 'current'}' akan diproses setelah delay ${finalDelay}ms.`, 'color: #90EE90;');
+                setTimeout(playAudio, finalDelay);
+            } else {
+                playAudio();
+            }
+        }
+
+        /** Memutar Sound Effect (SFX) dengan Web Audio API untuk Pan */
+        function playSFX(src, volume, delay, pan) {
+            if (!src) return;
+            if (!ensureAudioContext()) return;
+
+            const playAudio = () => {
+                // --- Inisialisasi Node Web Audio (jika belum) ---
+                if (!sfxSource) {
+                    try {
+                        sfxSource = audioContext.createMediaElementSource(sfxAudio);
+                        sfxPanner = audioContext.createStereoPanner();
+                        sfxSource.connect(sfxPanner).connect(audioContext.destination);
+                        console.log("[WebAudio] Node SFX berhasil dibuat dan dihubungkan.");
+                    } catch (e) {
+                        console.error("[WebAudio] Gagal membuat node SFX:", e);
+                        sfxSource = null; sfxPanner = null; return;
+                    }
+                }
+                // ---------------------------------------------
+
+                sfxAudio.src = src;
+                const baseVolume = (volume !== undefined) ? volume : 0.8;
+                const finalVolume = baseVolume * sfxVolumeMultiplier * globalVolume; // Terapkan multiplier setting + globalVolume
+                sfxAudio.volume = finalVolume;
+
+                // Atur Panning
+                if (sfxPanner && pan !== undefined) {
+                    sfxPanner.pan.value = pan;
+                    console.log(`%c[AUDIO LOG] SFX Pan diatur ke: ${pan}`, 'color: #FFD700;');
+                } else if (sfxPanner && pan === undefined) {
+                    sfxPanner.pan.value = 0; // Default ke tengah
+                }
+
+                console.log(`%c[AUDIO LOG] SFX: '${src}'. Volume: ${finalVolume.toFixed(2)}, Delay: ${delay || 0}ms`, 'color: #FFD700;');
+                sfxAudio.play();
+            };
+
+            // Logika Delay
+            const finalDelay = delay || 0;
+            if (finalDelay > 0) {
+                console.log(`%c[AUDIO LOG] SFX '${src}' akan dimainkan setelah delay ${finalDelay}ms.`, 'color: #FFD700;');
+                setTimeout(playAudio, finalDelay);
+            } else {
+                playAudio();
+            }
+        }
+
+        /** Memutar Voice over dengan Web Audio API untuk Pan */
+        function playVoice(src, volume, delay, pan) {
+            if (!src) return;
+            if (!ensureAudioContext()) return;
+
+            const playAudio = () => {
+                // --- Inisialisasi Node Web Audio (jika belum) ---
+                if (!voiceSource) {
+                    try {
+                        voiceSource = audioContext.createMediaElementSource(voiceAudio);
+                        voicePanner = audioContext.createStereoPanner();
+                        voiceSource.connect(voicePanner).connect(audioContext.destination);
+                        console.log("[WebAudio] Node Voice berhasil dibuat dan dihubungkan.");
+                    } catch (e) {
+                        console.error("[WebAudio] Gagal membuat node Voice:", e);
+                        voiceSource = null; voicePanner = null; return;
+                    }
+                }
+                // ---------------------------------------------
+
+                voiceAudio.src = src;
+                const baseVolume = (volume !== undefined) ? volume : 1.0;
+                const finalVolume = baseVolume * voiceVolumeMultiplier * globalVolume; // Terapkan multiplier setting + globalVolume
+                voiceAudio.volume = finalVolume;
+                voiceAudio.dataset.baseVolume = baseVolume; // Simpan untuk real-time update
+
+                // Atur Panning
+                if (voicePanner && pan !== undefined) {
+                    voicePanner.pan.value = pan;
+                    console.log(`%c[AUDIO LOG] Voice Pan diatur ke: ${pan}`, 'color: #FFB6C1;');
+                } else if (voicePanner && pan === undefined) {
+                    voicePanner.pan.value = 0; // Default ke tengah
+                }
+
+                console.log(`%c[AUDIO LOG] Voice: '${src}'. Volume: ${finalVolume.toFixed(2)}, Delay: ${delay || 0}ms`, 'color: #FFB6C1;');
+                voiceAudio.play();
+            };
+
+            // Logika Delay (tetap sama)
+            const finalDelay = delay || 0;
+            if (finalDelay > 0) {
+                console.log(`%c[AUDIO LOG] Voice '${src}' akan dimainkan setelah delay ${finalDelay}ms.`, 'color: #FFB6C1;');
+                setTimeout(playAudio, finalDelay);
+            } else {
+                playAudio();
+            }
+        }
+
+        /** Menangani efek visual seperti guncangan layar. */
+        function handleEffect(effectData) {
+            if (!effectData) return;
+            if (effectData.name === 'shake') {
+                gameContainer.style.animation = `shake ${effectData.duration || 500}ms`;
+                setTimeout(() => { gameContainer.style.animation = ''; }, effectData.duration || 500);
+            }
+        }
+
+        // Flag untuk memblokir input user saat Special Event berlangsung (mode wait=true)
+        let isEventBlocking = false;
+
+        /** [NEW] Centralized Handler untuk Special Events (Extension/Legacy) */
+        function executeSpecialEvent(eventData) {
+            if (!eventData) return;
+            const { eventType: legacyType, type: newType, delay } = eventData;
+            const eventType = newType || legacyType;
+
+            // [DELAY LOGIC]
+            if (delay && delay > 0) {
+                console.log(`[Special Event] Delayed execution by ${delay}ms`);
+
+                // Update Debug HUD to show pending status with COUNTDOWN (ONLY in preview mode)
+                const hud = document.getElementById('debug-hud');
+                const specialEventSection = document.getElementById('dbg-special-event-section');
+                let countdownInterval = null;
+
+                if (hud && isPreviewMode && specialEventSection) {
+                    hud.style.display = 'block';
+                    specialEventSection.classList.remove('hidden');
+
+                    // Update badge ke PENDING
+                    const eventBadge = document.getElementById('dbg-event-badge');
+                    if (eventBadge) {
+                        eventBadge.classList.add('has-event');
+                        eventBadge.textContent = 'PENDING';
+                    }
+
+                    document.getElementById('dbg-type').textContent = eventType.toUpperCase().replace(/_/g, ' ');
+                    document.getElementById('dbg-duration').textContent = (eventData.duration || 1000) + ' ms';
+                    const targetIntensity = parseFloat(eventData.intensity || 1.0);
+                    document.getElementById('dbg-intensity').textContent = targetIntensity.toFixed(1);
+
+                    const waitTag = document.getElementById('dbg-wait');
+                    if (waitTag) {
+                        waitTag.className = 'debug-tag';
+                        waitTag.style.background = '#e67e22';
+                        waitTag.style.color = '#fff';
+
+                        let remaining = delay;
+                        const updateTimer = () => {
+                            waitTag.textContent = `⏳ ${(remaining / 1000).toFixed(1)}s`;
+                        };
+                        updateTimer();
+
+                        countdownInterval = setInterval(() => {
+                            remaining -= 100;
+                            if (remaining <= 0) remaining = 0;
+                            updateTimer();
+                        }, 100);
+                    }
+                }
+
+                setTimeout(() => {
+                    if (countdownInterval) clearInterval(countdownInterval);
+                    // Executing with delay removed
+                    executeSpecialEvent({ ...eventData, delay: 0 });
+                }, delay);
+                return;
+            }
+
+            const { duration, autoContinue, sfx, intensity: rawIntensity, wait } = eventData;
+
+            // Perkaya payload path aset jika relatif (optional, tapi disarankan)
+            // ... (rest of logic)
+
+            // Periksa apakah event ini harus memblokir input
+            // 1. Legacy: autoContinue !== false (berarti blocking, engine menunggu)
+            // 2. Extension: wait === true (berarti blocking, user tidak bisa klik next manual)
+            // Kita gabungkan logikanya:
+            const shouldBlock = (wait === true) || (typeof autoContinue !== 'undefined' && autoContinue !== false);
+
+            if (shouldBlock) {
+                console.log('[Special Event] Input Blocked (Wait Mode Active)');
+                isEventBlocking = true;
+            }
+
+            // Safety: Ensure intensity is a number
+            let intensity = parseFloat(rawIntensity);
+            if (isNaN(intensity)) intensity = 1.0;
+
+            console.log(`[Special Event] Triggered: ${eventType}, Duration: ${duration}ms, Intensity: ${intensity}`);
+
+            // [DEBUG HUD LOGIC] - Update Special Event section saat event dieksekusi
+            const hud = document.getElementById('debug-hud');
+            const specialEventSection = document.getElementById('dbg-special-event-section');
+
+            if (hud && isPreviewMode && specialEventSection) {
+                // HUD dan section special event visible
+                hud.style.display = 'block';
+                specialEventSection.classList.remove('hidden');
+
+                // Update event badge
+                const eventBadge = document.getElementById('dbg-event-badge');
+                if (eventBadge) {
+                    eventBadge.classList.add('has-event');
+                }
+
+                // Update special event details
+                document.getElementById('dbg-type').textContent = eventType.toUpperCase().replace(/_/g, ' ');
+                document.getElementById('dbg-duration').textContent = duration + ' ms';
+                document.getElementById('dbg-intensity').textContent = intensity.toFixed(1);
+                document.getElementById('dbg-sfx').textContent = sfx ? sfx.split('/').pop() : 'None';
+
+                // Update wait tag
+                const waitTag = document.getElementById('dbg-wait');
+                if (waitTag) {
+                    waitTag.style.background = '';
+                    waitTag.style.color = '';
+                    if (shouldBlock) {
+                        waitTag.className = 'debug-tag tag-active';
+                        waitTag.textContent = 'ON';
+                    } else {
+                        waitTag.className = 'debug-tag tag-inactive';
+                        waitTag.textContent = 'OFF';
+                    }
+                }
+
+                // === DURATION PROGRESS BAR ===
+                const durationBar = document.getElementById('dbg-duration-bar');
+                const durationText = document.getElementById('dbg-duration');
+                if (durationBar && duration > 0) {
+                    // Reset progress bar dulu
+                    durationBar.style.transition = 'none';
+                    durationBar.style.width = '0%';
+
+                    // Force reflow biar transisi bisa jalan dari 0%
+                    void durationBar.offsetWidth;
+
+                    // Mulai animasi progress bar smooth dari 0% ke 100%
+                    durationBar.style.transition = `width ${duration}ms linear`;
+                    durationBar.style.width = '100%';
+
+                    // Update teks countdown
+                    let elapsed = 0;
+                    const updateInterval = 100;
+                    if (hud.durationCountdownInterval) {
+                        clearInterval(hud.durationCountdownInterval);
+                    }
+                    const countdownInterval = setInterval(() => {
+                        elapsed += updateInterval;
+                        const remaining = Math.max(0, duration - elapsed);
+                        durationText.textContent = `${remaining} ms`;
+
+                        if (elapsed >= duration) {
+                            clearInterval(countdownInterval);
+                            durationText.textContent = '0 ms ✓';
+                            // Update badge ke DONE
+                            if (eventBadge) {
+                                eventBadge.textContent = 'DONE';
+                            }
+                        }
+                    }, updateInterval);
+
+                    hud.durationCountdownInterval = countdownInterval;
+                }
+            }
+
+            // Play SFX if provided
+            if (sfx) playSFX(sfx);
+
+            const gameContainer = document.getElementById('game-container');
+            // Ensure transition is reset so effects apply instantly
+            gameContainer.style.transition = 'none';
+
+            if (eventType === 'shake_window') {
+                const startTime = Date.now();
+                const shakeInterval = setInterval(() => {
+                    const elapsed = Date.now() - startTime;
+                    if (elapsed >= duration) {
+                        clearInterval(shakeInterval);
+                        gameContainer.style.transform = 'none';
+                        return;
+                    }
+                    const dx = (Math.random() - 0.5) * 20 * intensity;
+                    const dy = (Math.random() - 0.5) * 20 * intensity;
+                    gameContainer.style.transform = `translate(${dx}px, ${dy}px)`;
+                }, 50);
+
+            } else if (eventType === 'glitch_screen') {
+                gameContainer.style.filter = `hue-rotate(90deg) invert(1) blur(${2 * intensity}px)`;
+                const glitchInterval = setInterval(() => {
+                    if (Math.random() > 0.5) {
+                        gameContainer.style.filter = `hue-rotate(${Math.random() * 360}deg) invert(${Math.random()}) blur(${2 * intensity}px)`;
+                    }
+                }, 100);
+
+                setTimeout(() => {
+                    clearInterval(glitchInterval);
+                    gameContainer.style.filter = 'none';
+                }, duration);
+            } else if (eventType === 'fake_bsod') {
+                const bsod = document.createElement('div');
+                // Beri ID agar bisa ditembak oleh CSS internal
+                bsod.id = 'fake-bsod-screen';
+
+                // Styling container utama
+                bsod.style.cssText = `
+                    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+                    background-color: #0078d7; color: white; z-index: 99999;
+                    padding-top: 10vh; padding-left: 12vw; padding-right: 12vw;
+                    box-sizing: border-box; display: flex; flex-direction: column;
+                    align-items: flex-start; justify-content: flex-start;
+                    cursor: none; user-select: none;
+                `;
+
+                // === FUNGSI GENERATE QR CODE DINAMIS ===
+                // Buat QR code pakai canvas - bukan library berat, cuma pattern sederhana yang mirip QR
+                function generateFakeQRCode(size = 100) {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = size;
+                    canvas.height = size;
+                    const ctx = canvas.getContext('2d');
+
+                    // Background putih
+                    ctx.fillStyle = 'white';
+                    ctx.fillRect(0, 0, size, size);
+
+                    const moduleSize = Math.floor(size / 25); // 25x25 grid
+                    const margin = Math.floor((size - (moduleSize * 25)) / 2);
+
+                    ctx.fillStyle = 'black';
+
+                    // Fungsi gambar finder pattern (kotak besar di sudut QR)
+                    function drawFinderPattern(x, y) {
+                        // Outer border 7x7
+                        for (let i = 0; i < 7; i++) {
+                            for (let j = 0; j < 7; j++) {
+                                if (i === 0 || i === 6 || j === 0 || j === 6 ||
+                                    (i >= 2 && i <= 4 && j >= 2 && j <= 4)) {
+                                    ctx.fillRect(
+                                        margin + (x + j) * moduleSize,
+                                        margin + (y + i) * moduleSize,
+                                        moduleSize, moduleSize
+                                    );
+                                }
+                            }
+                        }
+                    }
+
+                    // Gambar 3 finder patterns di sudut
+                    drawFinderPattern(0, 0);     // Kiri atas
+                    drawFinderPattern(18, 0);    // Kanan atas  
+                    drawFinderPattern(0, 18);    // Kiri bawah
+
+                    // Timing patterns (garis putus-putus horizontal dan vertikal)
+                    for (let i = 8; i < 17; i++) {
+                        if (i % 2 === 0) {
+                            ctx.fillRect(margin + i * moduleSize, margin + 6 * moduleSize, moduleSize, moduleSize);
+                            ctx.fillRect(margin + 6 * moduleSize, margin + i * moduleSize, moduleSize, moduleSize);
+                        }
+                    }
+
+                    // Alignment pattern (kotak kecil)
+                    const ax = 18, ay = 18;
+                    for (let i = -2; i <= 2; i++) {
+                        for (let j = -2; j <= 2; j++) {
+                            if (Math.abs(i) === 2 || Math.abs(j) === 2 || (i === 0 && j === 0)) {
+                                ctx.fillRect(
+                                    margin + (ax + j) * moduleSize,
+                                    margin + (ay + i) * moduleSize,
+                                    moduleSize, moduleSize
+                                );
+                            }
+                        }
+                    }
+
+                    // Random data modules (isi QR yang sebenarnya)
+                    // Menggunakan seed dari timestamp biar pattern-nya konsisten per sesi
+                    const seed = Date.now() % 10000;
+                    for (let y = 0; y < 25; y++) {
+                        for (let x = 0; x < 25; x++) {
+                            // Skip area finder patterns dan timing
+                            if ((x < 9 && y < 9) || (x > 15 && y < 9) || (x < 9 && y > 15)) continue;
+                            if (x === 6 || y === 6) continue;
+                            if (x >= 16 && x <= 20 && y >= 16 && y <= 20) continue;
+
+                            // Pseudo-random berdasarkan posisi dan seed
+                            const hash = ((x * 31 + y * 17 + seed) * 13) % 100;
+                            if (hash < 45) { // ~45% hitam
+                                ctx.fillRect(
+                                    margin + x * moduleSize,
+                                    margin + y * moduleSize,
+                                    moduleSize, moduleSize
+                                );
+                            }
+                        }
+                    }
+
+                    return canvas.toDataURL('image/png');
+                }
+
+                const qrCodeDataUrl = generateFakeQRCode(110);
+
+                bsod.innerHTML = `
+                    <style>
+                        #fake-bsod-screen, #fake-bsod-screen * {
+                            font-family: 'Segoe UI', 'Verdana', sans-serif !important;
+                            line-height: normal; /* Reset line-height jika global mengganggu */
+                        }
+                    </style>
+
+                    <div style="font-size: 140px; margin-bottom: 10px; font-weight: 300; line-height: 1;">:(</div>
+                    
+                    <div style="font-size: 26px; margin-bottom: 25px; max-width: 900px; font-weight: 300;">
+                        Your PC ran into a problem and needs to restart. We're just collecting some error info, and then we'll restart for you.
+                    </div>
+                    
+                    <div style="font-size: 26px; margin-bottom: 40px; font-weight: 300;">
+                        <span id="bsod-progress">0%</span> complete
+                    </div>
+
+                    <div style="display: flex; flex-direction: row; align-items: flex-start; margin-top: 10px;">
+                        <img src="${qrCodeDataUrl}" style="width: 110px; height: 110px; margin-right: 20px; image-rendering: pixelated; background: white; padding: 4px;">
+                        
+                        <div style="font-size: 16px; line-height: 1.5; font-weight: 300; display: flex; flex-direction: column; justify-content: space-between; height: 110px;">
+                            <div style="margin-bottom: 10px;">
+                                For more information about this issue and possible fixes, visit https://www.windows.com/stopcode
+                            </div>
+                            <div>
+                                <div style="margin-bottom: 5px;">If you call a support person, give them this info:</div>
+                                <div>Stop code: <span style="font-weight: 500;">CRITICAL_PROCESS_DIED</span></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                document.body.appendChild(bsod);
+
+                // === LOGIKA ANIMASI PERSENTASE YANG LEBIH REALISTIS ===
+                // BSOD asli Windows sering "stuck" di beberapa titik tertentu
+                let progress = 0;
+                const progressElement = document.getElementById('bsod-progress');
+
+                // "Stuck points" - titik dimana progress sering berhenti sebentar di BSOD asli
+                const stuckPoints = [12, 23, 37, 48, 67, 78, 89, 94];
+                let currentStuckIndex = 0;
+                let isStuck = false;
+                let stuckTimer = null;
+
+                // Base interval tapi akan divariasikan
+                const baseInterval = duration / 150; // Base speed
+
+                function updateProgress() {
+                    if (progress >= 100) {
+                        if (progressElement) progressElement.textContent = '100%';
+                        return;
+                    }
+
+                    // Cek apakah kita di stuck point
+                    if (!isStuck && currentStuckIndex < stuckPoints.length && progress >= stuckPoints[currentStuckIndex]) {
+                        isStuck = true;
+                        // Random stuck duration (500ms - 2s, tapi disesuaikan dengan durasi total)
+                        const maxStuckTime = Math.min(duration * 0.08, 2000);
+                        const stuckDuration = Math.random() * maxStuckTime + 300;
+
+                        stuckTimer = setTimeout(() => {
+                            isStuck = false;
+                            currentStuckIndex++;
+                            scheduleNextUpdate();
+                        }, stuckDuration);
+                        return;
+                    }
+
+                    // Increment dengan variasi random
+                    const randomIncrement = Math.random() < 0.7 ? 1 : (Math.random() < 0.5 ? 2 : 0);
+                    progress += randomIncrement;
+
+                    if (progress > 100) progress = 100;
+                    if (progressElement) progressElement.textContent = progress + '%';
+
+                    scheduleNextUpdate();
+                }
+
+                function scheduleNextUpdate() {
+                    if (progress >= 100 || isStuck) return;
+
+                    // Variasi interval: kadang cepat, kadang lambat
+                    const variationFactor = 0.5 + Math.random() * 1.5; // 0.5x - 2x speed
+                    const nextInterval = baseInterval * variationFactor;
+
+                    setTimeout(updateProgress, nextInterval);
+                }
+
+                // Mulai animasi
+                scheduleNextUpdate();
+
+                setTimeout(() => {
+                    if (stuckTimer) clearTimeout(stuckTimer);
+                    bsod.remove(); // Style tag di dalam innerHTML juga akan ikut terhapus otomatis
+                }, duration);
+
+            } else if (eventType === 'crt_shutdown') {
+                const overlay = document.createElement('div');
+                overlay.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background: black; z-index: 10000; transform: scale(1, 0.01);
+                opacity: 0; transition: transform 0.2s ease-in, opacity 0.3s ease-out;
+            `;
+                document.body.appendChild(overlay);
+                requestAnimationFrame(() => {
+                    overlay.style.opacity = '1';
+                    overlay.style.transform = 'scale(1, 0.005)';
+                    setTimeout(() => { overlay.style.transform = 'scale(1, 1)'; }, 100);
+                });
+                setTimeout(() => overlay.remove(), duration);
+
+            } else if (eventType === 'invert_colors') {
+                // Negative effect
+                gameContainer.style.filter = `invert(1)`;
+                setTimeout(() => { gameContainer.style.filter = 'none'; }, duration);
+
+            } else if (eventType === 'heartbeat_zoom') {
+                // Rhythmic Zoom
+                gameContainer.style.transition = 'transform 0.1s ease-in-out';
+                const beatInterval = setInterval(() => {
+                    gameContainer.style.transform = `scale(${1 + (0.05 * intensity)})`;
+                    setTimeout(() => {
+                        gameContainer.style.transform = 'scale(1)';
+                    }, 100); // 100ms beat duration
+                }, 800); // 800ms interval (~75 BPM)
+
+                setTimeout(() => {
+                    clearInterval(beatInterval);
+                    gameContainer.style.transform = 'none';
+                    gameContainer.style.transition = 'none';
+                }, duration);
+
+            } else if (eventType === 'red_overlay') {
+                // Red Pulse
+                const overlay = document.createElement('div');
+                overlay.style.cssText = `
+                    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                    background: red; z-index: 9000; opacity: 0; pointer-events: none;
+                    mix-blend-mode: multiply; transition: opacity 0.5s ease-in-out;
+                `;
+                document.body.appendChild(overlay);
+
+                let fadeIn = true;
+                const pulse = setInterval(() => {
+                    overlay.style.opacity = fadeIn ? (0.3 * intensity) : '0';
+                    fadeIn = !fadeIn;
+                }, 500);
+
+                setTimeout(() => {
+                    clearInterval(pulse);
+                    overlay.remove();
+                }, duration);
+
+            } else if (eventType === 'flash_white') {
+                // Flashbang
+                const overlay = document.createElement('div');
+                overlay.style.cssText = `
+                    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                    background: white; z-index: 20000; opacity: 1; pointer-events: none;
+                    transition: opacity ${duration}ms ease-out;
+                `;
+                document.body.appendChild(overlay);
+
+                // Force reflow
+                overlay.offsetHeight;
+                overlay.style.opacity = '0';
+
+                setTimeout(() => overlay.remove(), duration);
+
+            } else if (eventType === 'cinematic_bars') {
+                // Letterbox
+                const barStyles = `
+                    position: fixed; left: 0; width: 100%; height: 0;
+                    background: black; z-index: 15000; transition: height 0.5s ease;
+                `;
+                const topBar = document.createElement('div');
+                topBar.style.cssText = barStyles + 'top: 0;';
+                const bottomBar = document.createElement('div');
+                bottomBar.style.cssText = barStyles + 'bottom: 0;';
+
+                document.body.appendChild(topBar);
+                document.body.appendChild(bottomBar);
+
+                // Animate in
+                requestAnimationFrame(() => {
+                    const height = (10 * intensity) + '%';
+                    topBar.style.height = height;
+                    bottomBar.style.height = height;
+                });
+
+                setTimeout(() => {
+                    // Animate out
+                    topBar.style.height = '0';
+                    bottomBar.style.height = '0';
+                    setTimeout(() => {
+                        topBar.remove();
+                        bottomBar.remove();
+                    }, 500);
+                }, duration);
+
+            } else if (eventType === 'sepia_tone') {
+                gameContainer.style.filter = `sepia(${0.5 + (0.1 * intensity)}) contrast(1.2)`;
+                setTimeout(() => { gameContainer.style.filter = 'none'; }, duration);
+
+            } else if (eventType === 'blur_vision') {
+                gameContainer.style.filter = `blur(${2 * intensity}px)`;
+                setTimeout(() => { gameContainer.style.filter = 'none'; }, duration);
+            }
+
+            // Cleanup & Auto Continue (ONLY for Legacy Blocking Mode)
+            setTimeout(() => {
+                gameContainer.style.filter = 'none';
+                gameContainer.style.transform = 'none';
+
+                if (shouldBlock) {
+                    console.log('[Special Event] Input Unblocked.');
+                    isEventBlocking = false;
+                }
+
+                if (autoContinue !== false && typeof autoContinue === 'boolean') { // Explicit check for legacy flag
+                    console.log('[Special Event] Auto-continuing (legacy blocked flow).');
+                    ipcRenderer.send('vn-engine:request-next-line');
+                }
+            }, duration);
+        }
+
+        /** Menampilkan teks dialog dengan efek ketik. */
+        function typeWriter(text, element) {
+            clearTimeout(typewriterTimeout); // kosongkan dulu biar teks ngga nyampur
+            let i = 0;
+            isTyping = true;
+            currentFullText = text || "";
+            element.textContent = ''; // Kosongkan setelah timeout dibersihkan
+            element.classList.add('typing');
+            const type = () => {
+                // Cek isTyping di sini juga
+                if (i < currentFullText.length && isTyping) {
+                    element.textContent += currentFullText.charAt(i);
+                    i++;
+                    typewriterTimeout = setTimeout(type, TYPE_SPEED);
+                } else {
+                    // Hanya panggil finishTyping jika memang sedang mengetik
+                    if (isTyping) {
+                        finishTyping();
+                    }
+                }
+            }
+            type();
+        }
+
+        /** Menyelesaikan efek ketik dan menjadwalkan kelanjutan jika auto mode aktif. */
+        function finishTyping() {
+            clearTimeout(typewriterTimeout);
+            isTyping = false;
+            dialogueTextElement.textContent = currentFullText;
+            dialogueTextElement.classList.remove('typing');
+            if (isAutoMode) {
+                if (!makeChoiceContainer.classList.contains('visible')) {
+                    autoModeTimeout = setTimeout(() => {
+                        ipcRenderer.send('vn-engine:request-next-line');
+                    }, 2000);
+                }
+            }
+        }
+
+        /** Menampilkan tombol-tombol pilihan jawaban. */
+        function displayChoices(choices) {
+            gameContainer.removeEventListener('click', handleGameContainerClick);
+            makeChoiceContainer.innerHTML = "";
+            choices.forEach((choice) => {
+                const button = document.createElement("button");
+                button.className = "choice";
+                button.textContent = choice.text;
+                button.onclick = (event) => {
+                    event.stopPropagation();
+                    // Gunakan channel yang sesuai berdasarkan mode preview
+                    if (isLabelPreviewMode) {
+                        ipcRenderer.send('vn-engine:preview-label-choice-made', choice);
+                    } else {
+                        ipcRenderer.send('vn-engine:choice-made', choice);
+                    }
+                    makeChoiceContainer.classList.remove('visible');
+                    gameContainer.addEventListener('click', handleGameContainerClick);
+                };
+                makeChoiceContainer.appendChild(button);
+            });
+            makeChoiceContainer.classList.add('visible');
+        }
+
+        /** Menangani semua input klik dari pemain. */
+        function handleGameContainerClick() {
+            ensureAudioContext();
+
+            // [Check Block] Jika sedang blocking (Special Event wait=true), abaikan klik
+            if (isEventBlocking) {
+                console.log('[Player Input] Click blocked by active Special Event.');
+                return;
+            }
+
+            clearTimeout(autoModeTimeout);
+
+            // --- Cek Transisi Keluar ---
+            if (pendingExitTransition) {
+                console.log(`%c[Player LOG] Klik terdeteksi. Memproses pendingExitTransition:`, 'color: orange; font-weight: bold;', JSON.parse(JSON.stringify(pendingExitTransition)));
+                const exitTransition = { ...pendingExitTransition };
+                pendingExitTransition = null;
+
+                const renderNextSceneCallback = () => {
+                    console.log(`%c[Player LOG] renderNextSceneCallback dipanggil (meminta baris berikutnya).`, 'color: orange;');
+                    ipcRenderer.send('vn-engine:request-next-line');
+                };
+
+                // Cek apakah ini transisi gabungan
+                if (exitTransition.nextEffect &&
+                    exitTransition.effect.startsWith('fade_') &&
+                    exitTransition.nextEffect.startsWith('fade_')) {
+                    const outColor = exitTransition.effect.split('_')[1];
+                    const inColor = exitTransition.nextEffect.split('_')[1];
+                    console.log(`%c[Player LOG] -> Terdeteksi sebagai transisi GABUNGAN (${outColor}-ke-${inColor}). Memanggil handler gabungan...`, 'color: orange;');
+                    transitionHandlers.combined_fade_white_to_fade_black(
+                        renderNextSceneCallback,
+                        exitTransition.sfx,
+                        exitTransition.volume
+                    );
+                } else {
+                    // Transisi keluar normal
+                    const handler = transitionHandlers[exitTransition.effect] || transitionHandlers.cut;
+                    console.log(`%c[Player LOG] -> Terdeteksi sebagai transisi KELUAR STANDAR (${exitTransition.effect}). Memanggil handler standar...`, 'color: orange;');
+                    // TIDAK perlu log currentData lagi di sini
+
+                    // Panggil handler standar TANPA meneruskan 'currentData'
+                    // Cukup teruskan null atau objek kosong sebagai argumen data ke-4
+                    handler(renderNextSceneCallback, exitTransition.sfx, exitTransition.volume, exitTransition.delay, exitTransition.pan, null);
+                }
+
+                return;
+            }
+
+            if (textScreenOverlay.style.display === 'flex') {
+                textScreenOverlay.style.display = 'none';
+                // Gunakan channel yang sesuai berdasarkan mode preview
+                if (isLabelPreviewMode) {
+                    ipcRenderer.send('vn-engine:preview-label-next');
+                } else {
+                    ipcRenderer.send('vn-engine:request-next-line');
+                }
+                return;
+            }
+
+            if (isTyping) {
+                finishTyping();
+                return;
+            }
+
+            // Aksi klik standar jika tidak ada transisi keluar
+            // Gunakan channel yang sesuai berdasarkan mode preview label
+            if (isLabelPreviewMode) {
+                ipcRenderer.send('vn-engine:preview-label-next');
+            } else {
+                ipcRenderer.send('vn-engine:request-next-line');
+            }
+        }
+
+        /** Menampilkan background gambar dan menyembunyikan video. */
+        function playBackgroundImage(imageSrc, withFade = true, mode = 'cover') {
+            if (!imageSrc) return;
+
+            // pastiin VIDEO SELALU DISEMBUNYIKAN SAAT GAMBAR DITAMPILKAN
+            if (backgroundVideo.style.opacity !== '0' || !backgroundVideo.paused) {
+                console.log('%c[playBackgroundImage] Menyembunyikan & pause video.', 'color: #ADD8E6;');
+                backgroundVideo.style.opacity = 0;
+                if (!backgroundVideo.paused) { backgroundVideo.pause(); }
+            }
+            // Pastikan juga background gambar terlihat jika sebelumnya disembunyikan
+            if (backgroundElement.style.opacity !== '1') {
+                backgroundElement.style.opacity = 1;
+            }
+
+            changeBackground(imageSrc, withFade, mode); // Fungsi changeBackground akan menangani penggantian gambar
+        }
+
+        /** Memutar background video dan menyembunyikan gambar. */
+        function playBackgroundVideo(videoSrc, shouldMute = true) {
+            if (!videoSrc) return;
+            // Log yang lebih jelas
+            console.log(`[Player] playBackgroundVideo dipanggil. Argument shouldMute: ${shouldMute}`);
+            backgroundElement.style.opacity = 0;
+            backgroundNextElement.classList.remove('visible');
+
+            backgroundVideo.src = videoSrc;
+            backgroundVideo.muted = shouldMute; // Atur status mute aktual
+            // Log nilai aktual SETELAH diatur
+            console.log(`[Player] -> backgroundVideo.muted ACTUAL value set to: ${backgroundVideo.muted}`);
+            backgroundVideo.style.opacity = 1;
+            backgroundVideo.play().catch(e => console.error("Gagal memutar video:", e));
+        }
+
+        /** Menampilkan scene tipe layar teks. */
+        function showTextScreen(text, duration) {
+            textScreenOverlay.querySelector('p').textContent = text || '';
+            textScreenOverlay.style.display = 'flex';
+
+            if (isAutoMode) {
+                autoModeTimeout = setTimeout(() => {
+                    textScreenOverlay.style.display = 'none';
+                    ipcRenderer.send('vn-engine:request-next-line');
+                }, parseInt(duration) || 3000);
+            }
+        }
+
+        // ==================================================================
+        // FUNGSI UPDATE DEBUG HUD - Universal Entry Debugger
+        // ==================================================================
+        /** 
+         * Mengupdate seluruh Debug HUD dengan data entri yang sedang di-preview.
+         * Menampilkan konteks entri (tipe, speaker, teks, sprites) dan 
+         * section special event jika ada.
+         */
+        function updateDebugHUD(data) {
+            const hud = document.getElementById('debug-hud');
+            if (!hud || !isPreviewMode) return;
+
+            // Tampilkan HUD
+            hud.style.display = 'block';
+
+            // === UPDATE ENTRY CONTEXT SECTION ===
+            const entryType = data.type || 'dialogue';
+            const entryTypeEl = document.getElementById('dbg-entry-type');
+            const speakerEl = document.getElementById('dbg-speaker');
+            const textPreviewEl = document.getElementById('dbg-text-preview');
+            const eventBadge = document.getElementById('dbg-event-badge');
+
+            // Update entry type badge
+            if (entryTypeEl) {
+                entryTypeEl.className = `debug-entry-type type-${entryType}`;
+                let icon = '💬';
+                let typeLabel = 'DIALOGUE';
+
+                if (entryType === 'choice') {
+                    icon = '🔀';
+                    typeLabel = 'CHOICE';
+                } else if (entryType === 'scene') {
+                    icon = '🖼️';
+                    typeLabel = 'SCENE';
+                }
+
+                entryTypeEl.innerHTML = `<span>${icon}</span> ${typeLabel}`;
+            }
+
+            // Update speaker
+            if (speakerEl) {
+                speakerEl.textContent = data.speaker || '(Narrator)';
+            }
+
+            // Update text preview
+            if (textPreviewEl) {
+                const text = data.text || '';
+                textPreviewEl.textContent = text.length > 0 ? text : 'Tidak ada teks dialog...';
+            }
+
+            // Update sprite indicators
+            const spriteLeftEl = document.getElementById('dbg-sprite-left');
+            const spriteCenterEl = document.getElementById('dbg-sprite-center');
+            const spriteRightEl = document.getElementById('dbg-sprite-right');
+
+            if (spriteLeftEl) {
+                spriteLeftEl.classList.toggle('active', !!data.sprite2);
+            }
+            if (spriteCenterEl) {
+                spriteCenterEl.classList.toggle('active', !!data.spriteCenter);
+            }
+            if (spriteRightEl) {
+                spriteRightEl.classList.toggle('active', !!data.sprite);
+            }
+
+            // === UPDATE SPECIAL EVENT SECTION ===
+            const specialEventSection = document.getElementById('dbg-special-event-section');
+            const hasSpecialEvent = data.specialEvent && data.specialEvent.type;
+
+            // Update event badge di header
+            if (eventBadge) {
+                if (hasSpecialEvent) {
+                    eventBadge.classList.add('has-event');
+                    eventBadge.textContent = 'HAS EVENT';
+                } else {
+                    eventBadge.classList.remove('has-event');
+                    eventBadge.textContent = 'NO EVENT';
+                }
+            }
+
+            // Show/hide special event section
+            if (specialEventSection) {
+                if (hasSpecialEvent) {
+                    specialEventSection.classList.remove('hidden');
+
+                    // Update special event details
+                    const se = data.specialEvent;
+                    document.getElementById('dbg-type').textContent = se.type.toUpperCase().replace(/_/g, ' ');
+                    document.getElementById('dbg-duration').textContent = se.duration + ' ms';
+                    document.getElementById('dbg-intensity').textContent = parseFloat(se.intensity || 1).toFixed(1);
+                    document.getElementById('dbg-sfx').textContent = se.sfx ? se.sfx.split('/').pop() : 'None';
+
+                    // Update wait/blocking tag
+                    const waitTag = document.getElementById('dbg-wait');
+                    if (waitTag) {
+                        if (se.wait) {
+                            waitTag.className = 'debug-tag tag-active';
+                            waitTag.textContent = 'ON';
+                        } else {
+                            waitTag.className = 'debug-tag tag-inactive';
+                            waitTag.textContent = 'OFF';
+                        }
+                    }
+
+                    // Reset duration progress bar
+                    const durationBar = document.getElementById('dbg-duration-bar');
+                    if (durationBar) {
+                        durationBar.style.transition = 'none';
+                        durationBar.style.width = '0%';
+                    }
+                } else {
+                    specialEventSection.classList.add('hidden');
+                }
+            }
+        }
+
+        // ==================================================================
+        // BAGIAN 4: LISTENER UTAMA DARI ENGINE
+        // ==================================================================
+        // Titik masuk utama untuk semua pembaruan visual dari main process.
+        ipcRenderer.on('vn-engine:update-display', (event, data) => {
+            console.log('%c[Pemain] Menerima data payload baru:', 'color: lightblue; font-weight: bold;', data);
+
+            // Deteksi apakah ini mode preview (dari preview window di editor)
+            if (data.isPreview) {
+                isPreviewMode = true;
+                console.log('%c[Player] MODE PREVIEW AKTIF', 'color: #FF69B4; font-weight: bold;');
+
+                // === DETEKSI MODE PREVIEW LABEL (MULTI-ENTRI) ===
+                if (data.isLabelPreview && data.labelPreviewInfo) {
+                    isLabelPreviewMode = true;
+                    labelPreviewInfo = data.labelPreviewInfo;
+                    console.log(`%c[Player] MODE PREVIEW LABEL AKTIF: ${labelPreviewInfo.labelName} [${labelPreviewInfo.currentIndex + 1}/${labelPreviewInfo.totalEntries}]`, 'color: #f1c40f; font-weight: bold;');
+
+                    // Update judul window untuk menampilkan progress
+                    document.title = `Preview Label: ${labelPreviewInfo.labelName} [${labelPreviewInfo.currentIndex + 1}/${labelPreviewInfo.totalEntries}]`;
+                }
+
+                // === FITUR: Terapkan konteks visual dari editor (fase, label, atau scene sebelumnya) ===
+                // Jika entri tidak punya background sendiri tapi ada konteks, gunakan konteks
+                if (data._contextBackground && !data.background) {
+                    data.background = data._contextBackground;
+                    data.backgroundMode = data._contextBackgroundMode || 'cover';
+                    console.log('%c[Player Preview] Menggunakan background dari konteks:', 'color: #9b59b6;', data.background);
+                }
+                if (data._contextVideo && !data.video) {
+                    data.video = data._contextVideo;
+                    console.log('%c[Player Preview] Menggunakan video dari konteks:', 'color: #9b59b6;', data.video);
+                }
+                if (data._contextBgm && !data.bgm) {
+                    data.bgm = data._contextBgm;
+                    console.log('%c[Player Preview] Menggunakan BGM dari konteks:', 'color: #9b59b6;', data.bgm);
+                }
+
+                // Update Debug HUD dengan data entri lengkap
+                updateDebugHUD(data);
+            }
+
+            if (isPhaseBgmCurrentlyMuted) {
+                console.log(`%c[AUDIO LOG] Keluar dari scene mute BGM. Me-restore volume BGM ke: ${originalPhaseBgmVolume}`, 'color: #FF8C00; font-weight:bold;');
+                bgmAudio.volume = originalPhaseBgmVolume;
+                isPhaseBgmCurrentlyMuted = false; // Reset flag
+            }
+            pendingExitTransition = null; // Selalu reset status transisi keluar
+
+            if (voiceAudio && !voiceAudio.paused) {
+                voiceAudio.pause();
+                voiceAudio.currentTime = 0;
+            }
+
+            endScreen.classList.remove('visible');
+            gameContainer.addEventListener('click', handleGameContainerClick);
+
+            currentData = data;
+            clearTimeout(autoModeTimeout);
+            makeChoiceContainer.classList.remove('visible');
+
+            const renderContent = (isHardTransition = false) => {
+                // Reset text screen overlay visibility
+                textScreenOverlay.style.display = 'none';
+
+                // Ganti background secara instan HANYA jika layar tertutup oleh transisi
+                if (isHardTransition && data.background) {
+                    playBackgroundImage(data.background, false, data.backgroundMode);
+                }
+                // Ganti background dengan fade jika ini dialog biasa
+                else if (!isHardTransition && data.background) {
+                    playBackgroundImage(data.background, true, data.backgroundMode);
+                }
+                // Jika ada video (dari konteks atau langsung) tapi bukan scene video
+                // Ini untuk dialogue/choice yang berlangsung di depan video looping
+                else if (data.video && data.type !== 'scene') {
+                    playBackgroundVideo(data.video, true); // Video konteks selalu mute
+                }
+
+                // === CHARACTER SPRITES SYSTEM ===
+                // Gunakan processCharSprites() yang mendukung format baru (charSprites array)
+                // sekaligus tetap backward compatible dengan format lama (sprite, sprite2, spriteCenter)
+                processCharSprites(data);
+
+                // Mainkan SFX umum (bukan sfx transisi) hanya jika bukan scene
+                if (data.type !== 'scene') {
+                    // Teruskan delay dan pan
+                    playSFX(data.sfx, data.sfxVolume, data.sfxDelay, data.sfxPan);
+                }
+
+                console.log(`%c[Mute Check] mutePhaseBgm=${data.mutePhaseBgm}, bgmVolume=${bgmAudio.volume}, !bgmPaused=${!bgmAudio.paused}`, 'color: #DA70D6;'); // Log disesuaikan
+                // Cek apakah scene ini meminta BGM fase untuk dimute
+                // DAN BGM saat ini sedang berbunyi
+                if (data.mutePhaseBgm === true && bgmAudio.volume > 0 && !bgmAudio.paused) { // <-- Hapus '!data.bgm &&'
+                    if (!isPhaseBgmCurrentlyMuted) { // Hanya mute jika belum dimute
+                        console.log(`%c[AUDIO LOG] Scene meminta mute BGM Fase. Menyimpan volume asli (${bgmAudio.volume}) dan mute.`, 'color: #FF8C00; font-weight:bold;');
+                        originalPhaseBgmVolume = bgmAudio.volume; // Simpan volume saat ini
+                        bgmAudio.volume = 0;
+                        isPhaseBgmCurrentlyMuted = true; // Set flag
+                        console.log(`%c[Mute Check] -> MUTE APPLIED. isPhaseBgmCurrentlyMuted = ${isPhaseBgmCurrentlyMuted}, bgmAudio.volume = ${bgmAudio.volume}`, 'color: #DA70D6;');
+                    } else {
+                        console.log(`%c[Mute Check] -> Already muted by scene. No action needed.`, 'color: #DA70D6;');
+                    }
+                } else {
+                    console.log(`%c[Mute Check] -> Conditions NOT MET or BGM already silent/paused. Mute logic skipped.`, 'color: #DA70D6;'); // Log disesuaikan
+                }
+
+                // Mainkan BGM SPESIFIK untuk scene ini (jika ada) atau biarkan BGM fase
+                // Teruskan delay dan pan
+                playBGM(data.bgm, data.bgmVolume, data.bgmDelay, data.bgmPan);
+                // Teruskan pan
+                playVoice(data.voice, data.voiceVolume, data.voiceDelay, data.voicePan);
+
+                handleEffect(data.effect);
+
+                // --- Trigger Special Event (Extension) ---
+                if (data.specialEvent) {
+                    executeSpecialEvent(data.specialEvent);
+                }
+
+                if (data.type === 'dialogue' || data.type === 'choice') {
+                    dialogueBox.classList.add('visible');
+                    characterNameElement.textContent = data.speaker || "";
+                    typeWriter(data.text, dialogueTextElement);
+                } else {
+                    dialogueBox.classList.remove('visible');
+                }
+
+                if (data.type === 'choice' && data.choices) {
+                    displayChoices(data.choices);
+                }
+
+                if (data.type === 'scene') {
+                    switch (data.sceneType) {
+                        case 'video':
+                            // Jika videoMuted null/undefined, default ke true (mute)
+                            playBackgroundVideo(data.video, data.videoMuted ?? true);
+                            break;
+                        case 'text_screen':
+                            // Panggil showTextScreen TAPI jangan langsung return
+                            showTextScreen(data.text, data.duration);
+                            // Jangan return di sini agar timeout Auto Mode di bawah bisa dieksekusi
+                            break;
+                        // Tipe 'image' ditangani oleh logika background di atas
+                    }
+
+                    // Setelah scene ditampilkan, cek apakah perlu setup transisi keluar
+                    // Izinkan transisi keluar jika persistBackground FALSE atau UNDEFINED (seperti text_screen)
+                    if (data.transitionOut && data.persistBackground !== true) {
+                        console.log(`%c[Player] Transisi keluar disiapkan: ${data.transitionOut} (Scene Type: ${data.sceneType})`, 'color: orange');
+
+                        // Cek apakah engine mengirim info transisi GABUNGAN
+                        if (data.nextTransition) {
+                            console.log(`%c[Player] -> Transisi GABUNGAN terdeteksi. Berikutnya: ${data.nextTransition}`, 'color: orange');
+                        }
+
+                        pendingExitTransition = {
+                            effect: data.transitionOut,
+                            sfx: data.sfxOut,
+                            volume: data.sfxOutVolume,  // <-- Gunakan sfxOutVolume
+                            delay: data.sfxOutDelay,    // <-- Simpan delay
+                            pan: data.sfxOutPan,        // <-- Simpan pan
+                            nextEffect: data.nextTransition || null // Simpan transisi berikutnya
+                        };
+                    }
+                }
+                if (isAutoMode && data.duration && data.sceneType !== 'text_screen' && !makeChoiceContainer.classList.contains('visible')) {
+                    const autoDuration = parseInt(data.duration, 10); // Ambil durasi dari data (sudah dalam ms)
+                    console.log(`[Player] Auto Mode: Menjadwalkan lanjut setelah ${autoDuration}ms untuk scene ${data.sceneType || data.type}`);
+                    clearTimeout(autoModeTimeout); // Hapus timeout sebelumnya jika ada
+                    autoModeTimeout = setTimeout(() => {
+                        // Cek lagi jika masih auto mode saat timeout selesai
+                        if (isAutoMode) {
+                            console.log('[Player] Auto Mode: Timeout selesai, meminta baris berikutnya.');
+                            ipcRenderer.send('vn-engine:request-next-line');
+                        }
+                    }, autoDuration);
+                }
+            };
+
+            const transitionType = data.transition || 'cut';
+            const handler = transitionHandlers[transitionType] || transitionHandlers.cut;
+
+            // Panggil handler dengan sfxIn yang sesuai DAN seluruh objek data
+            // Gunakan sfxInVolume, sfxInDelay, dan sfxInPan
+            handler(renderContent, data.sfxIn, data.sfxInVolume, data.sfxInDelay, data.sfxInPan, data);
+        });
+
+        // LISTENER UNTUK TRANSISI INDEPENDEN
+        ipcRenderer.on('vn-engine:execute-transition', (event, data) => {
+            console.log('%c[Pemain] Menerima perintah transisi independen:', 'color: yellow; font-weight: bold;', data);
+            const { effect, payload } = data;
+            const handler = transitionHandlers[effect] || transitionHandlers.cut;
+
+            // === FIX TIMING: Sembunyikan UI sebelum transisi dimulai ===
+            // Ini mencegah teks dari entri sebelumnya terlihat selama animasi transisi
+            dialogueBox.classList.remove('visible');
+            makeChoiceContainer.classList.remove('visible');
+            makeChoiceContainer.innerHTML = ''; // Hapus tombol pilihan
+
+            // Sembunyikan sprite karakter juga
+            const allSpriteImgs = charSpritesLayer.querySelectorAll('.char-sprite-img');
+            allSpriteImgs.forEach(img => { img.style.opacity = '0'; });
+            clearDynamicCharSprites();
+
+            // Fungsi render sederhana untuk di dalam transisi
+            const renderAssets = (useFadeForBackground) => {
+                if (payload.background) {
+                    playBackgroundImage(payload.background, false, payload.backgroundMode);
+                } else if (payload.video) {
+                    playBackgroundVideo(payload.video);
+                }
+                playBGM(payload.bgm);
+            };
+
+            if (effect === 'cut') {
+                // Jika transisinya 'cut', panggil render tanpa fade
+                renderAssets(false);
+                // Langsung minta baris berikutnya tanpa delay
+                ipcRenderer.send('vn-engine:request-next-line');
+            } else {
+                // Untuk transisi fade_black/white, gunakan handler yang ada
+                handler(() => {
+                    // Render aset di belakang layar (bisa instan karena layar tertutup)
+                    renderAssets(false);
+                    // Minta baris berikutnya setelah animasi selesai
+                    setTimeout(() => {
+                        ipcRenderer.send('vn-engine:request-next-line');
+                    }, transitionDuration * 2); // Tunggu fade-in dan fade-out selesai
+                }, payload);
+            }
+        });
+
+        // ==================================================================
+        // BAGIAN 5: SISA EVENT LISTENERS
+        // ==================================================================
+
+        // == Listener untuk perubahan Volume Global ==
+        ipcRenderer.on('global-volume-changed', (event, newGlobalVolume) => {
+            console.log(`[Player] Menerima update Volume Global: ${newGlobalVolume}`);
+            globalVolume = newGlobalVolume;
+            // Terapkan volume baru ke audio yang sedang berjalan (jika ada)
+            // Kita perlu menghitung ulang volume elemen berdasarkan originalPhaseBgmVolume
+            if (!bgmAudio.paused && !isPhaseBgmCurrentlyMuted) {
+                bgmAudio.volume = originalPhaseBgmVolume * globalVolume;
+            }
+            // Untuk SFX dan Voice, kita tidak menyimpan volume 'asli'
+            // jadi kita biarkan saja, volume baru akan diterapkan saat play berikutnya.
+        });
+
+        // Menangani interaksi UI lainnya seperti tombol kembali, auto mode, riwayat, dll.
+        backToHubButtonIcon.addEventListener('click', (event) => {
+            event.stopPropagation();
+            // Penanganan khusus untuk mode preview - tutup window alih-alih navigasi
+            if (isPreviewMode) {
+                console.log('[Player] Mode Preview: Menutup window preview...');
+                // Kirim IPC ke main untuk menutup window ini
+                ipcRenderer.send('vn-engine:close-preview-window');
+            } else {
+                window.location.href = '../index.html';
+            }
+        });
+
+        ipcRenderer.on('vn-engine:end-of-chapter', (event, data) => {
+            gameContainer.removeEventListener('click', handleGameContainerClick);
+            dialogueBox.classList.add('visible');
+            characterNameElement.textContent = "";
+            dialogueTextElement.textContent = "Chapter telah berakhir.";
+            nextChapterBtn.style.display = data.hasNextChapter ? 'block' : 'none';
+            if (data.hasNextChapter) {
+                nextChapterBtn.onclick = () => {
+                    ipcRenderer.send('vn-engine:request-next-line');
+                };
+            }
+            replayChapterBtn.onclick = () => ipcRenderer.send('vn-engine:replay-chapter');
+            backToHubBtn.onclick = () => window.location.href = '../index.html';
+            endScreen.classList.add('visible');
+        });
+
+        // Handler ketika preview label selesai (semua entri telah diputar)
+        ipcRenderer.on('vn-engine:preview-label-finished', (event, data) => {
+            console.log(`%c[Player] Preview Label "${data.labelName}" selesai!`, 'color: #f1c40f; font-weight: bold;');
+
+            // Tentukan pesan berdasarkan alasan selesainya preview
+            let finishMessage = `Label "${data.labelName}" telah selesai di-preview.`;
+
+            if (data.finishedBy === 'jump') {
+                // Selesai karena jump ke target khusus
+                if (data.jumpTarget === '##FINISH_PARENT##') {
+                    finishMessage = `Label "${data.labelName}" selesai. (Jump ke parent label)`;
+                } else if (data.jumpTarget === '##SKIP_ALL_LABEL##') {
+                    finishMessage = `Label "${data.labelName}" selesai. (Skip semua label)`;
+                } else if (data.jumpTarget.startsWith('fase:') || data.jumpTarget.startsWith('phase:')) {
+                    const phaseName = data.jumpTarget.replace(/^(fase:|phase:)/, '');
+                    finishMessage = `Label "${data.labelName}" selesai. (Menuju fase: ${phaseName})`;
+                } else {
+                    finishMessage = `Label "${data.labelName}" selesai. (Jump: ${data.jumpTarget})`;
+                }
+            } else if (data.finishedBy === 'jump-external') {
+                finishMessage = `Label "${data.labelName}" selesai. (Jump ke label eksternal: ${data.jumpTarget})`;
+            } else if (data.finishedBy === 'phase') {
+                finishMessage = `Label "${data.labelName}" selesai. (Menuju fase: ${data.phaseName})`;
+            }
+
+            // Tampilkan layar akhir preview dengan opsi replay atau tutup
+            gameContainer.removeEventListener('click', handleGameContainerClick);
+            dialogueBox.classList.add('visible');
+            characterNameElement.textContent = "Preview Selesai";
+            dialogueTextElement.textContent = finishMessage;
+
+            // Sembunyikan tombol next chapter karena ini preview
+            nextChapterBtn.style.display = 'none';
+
+            // Tombol replay untuk mengulang preview label
+            replayChapterBtn.textContent = "Ulang Preview";
+            replayChapterBtn.onclick = () => {
+                endScreen.classList.remove('visible');
+                ipcRenderer.send('vn-engine:preview-label-reset');
+                gameContainer.addEventListener('click', handleGameContainerClick);
+            };
+
+            // Tombol kembali untuk menutup window preview
+            backToHubBtn.textContent = "Tutup Preview";
+            backToHubBtn.onclick = () => ipcRenderer.send('vn-engine:close-preview-window');
+
+            endScreen.classList.add('visible');
+        });
+
+        autoModeButton.addEventListener('click', (event) => {
+            event.stopPropagation();
+            isAutoMode = !isAutoMode;
+            autoModeButton.classList.toggle('active', isAutoMode);
+            if (isAutoMode) {
+                if (!isTyping && !makeChoiceContainer.classList.contains('visible')) {
+                    finishTyping();
+                }
+            } else {
+                clearTimeout(autoModeTimeout);
+            }
+        });
+
+        historyButton.addEventListener('click', async (event) => {
+            event.stopPropagation();
+            const history = await ipcRenderer.invoke('vn-engine:get-history');
+            backlogContent.innerHTML = history.map(e => `<p><strong>${e.speaker}:</strong> ${e.text}</p>`).join('');
+            backlogOverlay.style.display = 'flex';
+            backlogContent.scrollTop = backlogContent.scrollHeight;
+        });
+
+        closeBacklogButton.addEventListener('click', (event) => {
+            event.stopPropagation();
+            backlogOverlay.style.display = 'none';
+        });
+
+        // Mencegah klik pada overlay backlog menembus ke game container
+        backlogOverlay.addEventListener('click', (event) => {
+            event.stopPropagation();
+        });
+
+        // --- SAVE/LOAD SLOT LOGIC ---
+        const saveLoadModal = document.getElementById('save-load-modal');
+
+        // Mencegah klik pada modal save/load menembus ke game container
+        saveLoadModal.addEventListener('click', (event) => {
+            event.stopPropagation();
+        });
+
+        const slotsContainer = document.getElementById('slots-container');
+        const saveLoadTitle = document.getElementById('save-load-title');
+        const closeSaveLoadModal = document.getElementById('close-save-load-modal');
+        let currentModalMode = 'save'; // 'save' or 'load'
+
+        async function openSaveLoadModal(mode) {
+            currentModalMode = mode;
+            saveLoadTitle.textContent = mode === 'save' ? 'Save Game' : 'Load Game';
+            saveLoadModal.style.display = 'flex';
+            slotsContainer.innerHTML = 'Loading slots...';
+
+            const slots = await ipcRenderer.invoke('vn-engine:get-save-slots');
+            renderSlots(slots);
+        }
+
+        function renderSlots(slots) {
+            slotsContainer.innerHTML = '';
+            // Create 6 slots (or more)
+            for (let i = 1; i <= 6; i++) {
+                const slotData = slots.find(s => s.slotId === i);
+                const slotEl = document.createElement('div');
+                slotEl.className = 'save-slot';
+                slotEl.style.cssText = `
+                background: #333; 
+                border: 2px solid #555; 
+                border-radius: 8px; 
+                overflow: hidden; 
+                cursor: pointer; 
+                position: relative;
+                height: 200px;
+                display: flex;
+                flex-direction: column;
+                transition: transform 0.2s;
+            `;
+
+                if (slotData) {
+                    // Slot with data
+                    const bgPath = slotData.previewImage ? `../${slotData.chapter}/${slotData.previewImage}` : '';
+                    const date = new Date(slotData.timestamp).toLocaleString();
+
+                    let mediaContent = '';
+                    if (slotData.previewType === 'video' && bgPath) {
+                        mediaContent = `<video src="${bgPath}" autoplay muted loop style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0;"></video>`;
+                    } else {
+                        mediaContent = `<div style="width: 100%; height: 100%; background-image: url('${bgPath}'); background-size: cover; background-position: center; position: absolute; top: 0; left: 0;"></div>`;
+                    }
+
+                    slotEl.innerHTML = `
+                    <div style="flex: 1; position: relative; background: #000;">
+                        ${mediaContent}
+                        <div style="position: absolute; bottom: 0; left: 0; width: 100%; background: rgba(0,0,0,0.7); padding: 5px;">
+                            <div style="font-weight: bold; font-size: 1.1em;">${slotData.chapter}</div>
+                            <div style="font-size: 0.8em; color: #aaa;">${date}</div>
+                        </div>
+                    </div>
+                    <div style="padding: 10px; text-align: center; background: #222;">
+                        Slot ${i}
+                    </div>
+                `;
+                } else {
+                    // Empty slot
+                    slotEl.innerHTML = `
+                    <div style="flex: 1; display: flex; align-items: center; justify-content: center; background: #222; color: #555;">
+                        Empty
+                    </div>
+                    <div style="padding: 10px; text-align: center; background: #1a1a1a;">
+                        Slot ${i}
+                    </div>
+                `;
+                }
+
+                slotEl.onmouseenter = () => slotEl.style.transform = 'scale(1.05)';
+                slotEl.onmouseleave = () => slotEl.style.transform = 'scale(1)';
+
+                slotEl.onclick = () => {
+                    if (currentModalMode === 'save') {
+                        if (slotData && !confirm(`Overwrite Slot ${i}?`)) return;
+
+                        let previewType = 'image';
+                        let previewImage = '';
+
+                        if (backgroundVideo && backgroundVideo.style.opacity === '1') {
+                            previewType = 'video';
+                            const src = backgroundVideo.getAttribute('src');
+                            if (src) previewImage = src.split('/').pop();
+                        } else {
+                            const bgStyle = backgroundElement.style.backgroundImage;
+                            if (bgStyle) {
+                                const match = bgStyle.match(/url\\(['"]?(.*?)['"]?\\)/);
+                                if (match && match[1]) previewImage = match[1].split('/').pop();
+                            }
+                        }
+
+                        ipcRenderer.send('vn-engine:save-game', { slotId: i, previewType, previewImage });
+                        saveLoadModal.style.display = 'none';
+                        backlogOverlay.style.display = 'none';
+                    } else {
+                        if (!slotData) return;
+                        if (confirm(`Load Slot ${i}? Unsaved progress will be lost.`)) {
+                            ipcRenderer.send('vn-engine:load-game', { slotId: i });
+                            saveLoadModal.style.display = 'none';
+                            backlogOverlay.style.display = 'none';
+                        }
+                    }
+                };
+
+                slotsContainer.appendChild(slotEl);
+            }
+        }
+
+        closeSaveLoadModal.onclick = () => {
+            saveLoadModal.style.display = 'none';
+        };
+
+        saveButton.addEventListener('click', () => {
+            openSaveLoadModal('save');
+        });
+
+        loadButton.addEventListener('click', () => {
+            openSaveLoadModal('load');
+        });
+
+        settingButton.addEventListener('click', () => {
+            openSettingsModal();
+        });
+
+        // === SETTINGS MODAL LOGIC ===
+        const settingsModal = document.getElementById('settings-modal');
+        const settingBgmVolume = document.getElementById('setting-bgm-volume');
+        const settingVoiceVolume = document.getElementById('setting-voice-volume');
+        const settingSfxVolume = document.getElementById('setting-sfx-volume');
+        const bgmVolumeDisplay = document.getElementById('bgm-volume-display');
+        const voiceVolumeDisplay = document.getElementById('voice-volume-display');
+        const sfxVolumeDisplay = document.getElementById('sfx-volume-display');
+        const closeSettingsBtn = document.getElementById('close-settings-modal');
+        const saveSettingsBtn = document.getElementById('save-settings-btn');
+        const fullscreenToggle = document.getElementById('setting-fullscreen-toggle');
+
+        // Volume multipliers (akan diterapkan ke audio elements)
+        let bgmVolumeMultiplier = 0.8;
+        let voiceVolumeMultiplier = 0.8;
+        let sfxVolumeMultiplier = 0.8;
+
+        // Muat settings dari localStorage
+        function loadVolumeSettings() {
+            try {
+                const saved = localStorage.getItem('vn-player-volume-settings');
+                if (saved) {
+                    const settings = JSON.parse(saved);
+                    bgmVolumeMultiplier = settings.bgm ?? 0.8;
+                    voiceVolumeMultiplier = settings.voice ?? 0.8;
+                    sfxVolumeMultiplier = settings.sfx ?? 0.8;
+                    console.log('[Settings] Volume settings dimuat:', settings);
+                }
+            } catch (e) {
+                console.error('[Settings] Gagal memuat settings:', e);
+            }
+        }
+
+        // Simpan settings ke localStorage
+        function saveVolumeSettings() {
+            const settings = {
+                bgm: bgmVolumeMultiplier,
+                voice: voiceVolumeMultiplier,
+                sfx: sfxVolumeMultiplier
+            };
+            localStorage.setItem('vn-player-volume-settings', JSON.stringify(settings));
+            console.log('[Settings] Volume settings disimpan:', settings);
+        }
+
+        // Terapkan volume ke audio elements
+        function applyVolumeSettings() {
+            // BGM volume dikontrol melalui multiplier saat playBGM dipanggil
+            // Untuk real-time update, kita perlu langsung ubah volume element
+            if (bgmAudio && !bgmAudio.paused) {
+                // Simpan proporsi volume asli dan terapkan multiplier
+                const baseVolume = bgmAudio.dataset.baseVolume || 1;
+                bgmAudio.volume = Math.min(1, parseFloat(baseVolume) * bgmVolumeMultiplier * globalVolume);
+            }
+            if (voiceAudio && !voiceAudio.paused) {
+                const baseVolume = voiceAudio.dataset.baseVolume || 1;
+                voiceAudio.volume = Math.min(1, parseFloat(baseVolume) * voiceVolumeMultiplier * globalVolume);
+            }
+            // SFX biasanya one-shot, jadi tidak perlu update real-time
+        }
+
+        async function openSettingsModal() {
+            // Set slider values dari current multipliers
+            settingBgmVolume.value = Math.round(bgmVolumeMultiplier * 100);
+            settingVoiceVolume.value = Math.round(voiceVolumeMultiplier * 100);
+            settingSfxVolume.value = Math.round(sfxVolumeMultiplier * 100);
+
+            // Update displays
+            bgmVolumeDisplay.textContent = `${Math.round(bgmVolumeMultiplier * 100)}%`;
+            voiceVolumeDisplay.textContent = `${Math.round(voiceVolumeMultiplier * 100)}%`;
+            sfxVolumeDisplay.textContent = `${Math.round(sfxVolumeMultiplier * 100)}%`;
+
+            // Sync fullscreen toggle dengan status aktual
+            try {
+                const isFullscreen = await ipcRenderer.invoke('window:is-fullscreen');
+                fullscreenToggle.checked = isFullscreen;
+            } catch (e) {
+                console.log('[Settings] Tidak bisa mengecek status fullscreen:', e);
+            }
+
+            settingsModal.style.display = 'flex';
+        }
+
+        function closeSettingsModal() {
+            settingsModal.style.display = 'none';
+        }
+
+        // Slider event listeners untuk real-time update
+        settingBgmVolume.addEventListener('input', () => {
+            const value = parseInt(settingBgmVolume.value);
+            bgmVolumeDisplay.textContent = `${value}%`;
+            bgmVolumeMultiplier = value / 100;
+            applyVolumeSettings();
+        });
+
+        settingVoiceVolume.addEventListener('input', () => {
+            const value = parseInt(settingVoiceVolume.value);
+            voiceVolumeDisplay.textContent = `${value}%`;
+            voiceVolumeMultiplier = value / 100;
+            applyVolumeSettings();
+        });
+
+        settingSfxVolume.addEventListener('input', () => {
+            const value = parseInt(settingSfxVolume.value);
+            sfxVolumeDisplay.textContent = `${value}%`;
+            sfxVolumeMultiplier = value / 100;
+        });
+
+        // Fullscreen toggle listener
+        fullscreenToggle.addEventListener('change', () => {
+            ipcRenderer.send('window:toggle-fullscreen', fullscreenToggle.checked);
+        });
+
+        closeSettingsBtn.addEventListener('click', closeSettingsModal);
+
+        saveSettingsBtn.addEventListener('click', () => {
+            saveVolumeSettings();
+            closeSettingsModal();
+        });
+
+        // Prevent clicks on modal from propagating to game container
+        settingsModal.addEventListener('click', (e) => {
+            if (e.target === settingsModal) {
+                closeSettingsModal();
+            }
+            e.stopPropagation();
+        });
+
+        // Muat settings saat startup
+        loadVolumeSettings();
+
+
+
+        ipcRenderer.on('vn-engine:save-success', (event, slotId) => {
+            alert(`Game saved to Slot ${slotId}!`);
+        });
+
+        // Separate listener for PREVIEW / Direct Trigger from Editor
+        ipcRenderer.on('vn-engine:special-event', (event, data) => {
+            console.log('[Player] Received direct special event trigger:', data);
+            executeSpecialEvent(data);
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Memberi tahu main process bahwa player siap menerima data pertama.
+            ipcRenderer.send('vn-engine:ready');
+
+            // Update Discord RPC status
+            if (typeof ipcRenderer !== 'undefined') {
+                const titleParts = document.title.split(' | ');
+                const novelTitle = titleParts[0] || 'Visual Novel';
+                const chapterName = titleParts[1] || 'Chapter'; // Fallback
+
+                // Hindari update jika title masih placeholder (saat belum diganti)
+                if (novelTitle !== '{NOVEL_TITLE}') {
+                    ipcRenderer.send('update-rpc-activity', {
+                        details: `Membaca: ${novelTitle}`,
+                        state: chapterName,
+                        largeImageKey: 'vn_icon',
+                        smallImageKey: 'main_icon',
+                        smallImageText: 'Sedang Membaca'
+                    });
+                }
+            }
+
+            // Memasang listener klik utama.
+            gameContainer.addEventListener('click', handleGameContainerClick);
+        });
+    </script>
+</body>
+
+</html>

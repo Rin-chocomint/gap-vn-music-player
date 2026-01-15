@@ -1,0 +1,66 @@
+{
+    "novelTitle": {
+        "mainKanji": "judul kanji",
+        "main": "judul panjang novel",
+        "subtitle": "sub judul novel",
+        "pressStart": "Press Enter"
+    },
+    "profile": {
+        "name": "nama karakter",
+        "description": "deskripsi karakter",
+        "level": "Level: 30"
+    },
+    "characters": [
+        {
+            "name": "char0",
+            "type": "image",
+            "source": "./aset/konten/char.png",
+            "alt": "alt gambar",
+            "descValues": {
+                "description": "deskripsi..."
+            }
+        },
+        {
+            "name": "char1",
+            "type": "image",
+            "source": "./aset/konten/char.png",
+            "descValues": {
+                "summary": "deskripsi...",
+                "extended": "deskripsi lebih..."
+            }
+        },
+        {
+            "name": "char2",
+            "type": "image",
+            "source": "./aset/konten/char.png",
+            "descValues": {
+                "description": "deskripsi..."
+            }
+        },
+        {
+            "name": "char3",
+            "type": "image",
+            "source": "./aset/konten/char.png",
+            "descValues": {
+                "summary": "deskripsi...",
+                "extended": "deskripsi lebih..."
+            }
+        },
+        {
+            "name": "char4",
+            "type": "image",
+            "source": "./aset/konten/char.png",
+            "descValues": {
+                "summary": "deskripsi..."
+            }
+        },
+        {
+            "name": "char5",
+            "type": "image",
+            "source": "./aset/konten/char.png",
+            "descValues": {
+                "description": "........."
+            }
+        }
+    ]
+}

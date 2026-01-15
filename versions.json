@@ -1,0 +1,35 @@
+{
+    "app": {
+        "version": "0.0.0.8",
+        "stage": "alpha"
+    },
+    "components": {
+        "vnManager": {
+            "version": "0.0.3",
+            "file": "aset/game/vnManager.html",
+            "hash": "a3eb675cf0d424c172b69bbe0e7cfb4c7b300e4b09b48340e9393c0d010738f2"
+        },
+        "vnPlayer": {
+            "version": "0.0.5",
+            "file": "vn_player_template.html",
+            "hash": "f9f8d7363d1dd2c95874da157effc18b63ac160a0bfc35cbda536c506b701b97"
+        },
+        "vnHub": {
+            "version": "0.0.2",
+            "file": "hub_template.html",
+            "hash": "42c53d30d83cb7b07993bc5db7b2830f065c6de5a7095781e4df90ae2cb18b49"
+        }
+    },
+    "scriptSchema": {
+        "version": "0.1.2",
+        "minCompatible": "0.1.2"
+    },
+    "security": {
+        "trustedDomains": [
+            "youtube.com",
+            "music.youtube.com",
+            "i.ytimg.com",
+            "yt3.ggpht.com"
+        ]
+    }
+}

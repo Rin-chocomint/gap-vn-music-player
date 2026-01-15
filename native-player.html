@@ -1,0 +1,3018 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GAP YTMusic Enhanced Plus >///</title>
+    <style>
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 300;
+            src: url('./aset/fonts/lexend-v26-latin-300.woff2') format('woff2');
+        }
+
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 400;
+            src: url('./aset/fonts/lexend-v26-latin-regular.woff2') format('woff2');
+        }
+
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 700;
+            src: url('./aset/fonts/lexend-v26-latin-700.woff2') format('woff2');
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #121212;
+            color: white;
+            font-family: 'Lexend', sans-serif;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        .ui-element {
+            -webkit-user-select: none;
+            /* Standar untuk Chrome/Electron */
+            user-select: none;
+        }
+
+
+        /* Title Bar */
+        #title-bar {
+            height: 32px;
+            background: #3d3a3a;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            -webkit-app-region: drag;
+            border-bottom: 1px solid #333;
+            flex-shrink: 0;
+        }
+
+        #title-bar .title {
+            margin-left: 15px;
+            font-size: 12px;
+            font-weight: 500;
+            opacity: 0.8;
+            pointer-events: none;
+            user-select: none;
+        }
+
+        #title-bar .controls {
+            display: flex;
+            -webkit-app-region: no-drag;
+            height: 100%;
+        }
+
+        .control-btn {
+            width: 46px;
+            height: 100%;
+            border: none;
+            background: transparent;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .control-btn.close:hover {
+            background: #e81123;
+        }
+
+        /* Settings Panel */
+        #settings-panel {
+            position: absolute;
+            top: 32px;
+            right: 0;
+            width: 360px;
+            max-height: calc(100vh - 50px);
+            overflow-y: auto;
+            background: #1f1f1f;
+            border-left: 1px solid #333;
+            border-bottom: 1px solid #333;
+            z-index: 1000;
+            padding: 15px;
+            display: none;
+            box-shadow: -5px 5px 15px rgba(0, 0, 0, 0.5);
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        #remember-settings-toggle {
+            width: 100%;
+            padding: 8px 10px;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            color: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            opacity: 0.65;
+            transition: all 0.2s ease;
+        }
+
+        #remember-settings-toggle:hover {
+            opacity: 0.95;
+        }
+
+        #remember-settings-toggle.is-enabled {
+            opacity: 0.95;
+            color: #8bc34a;
+        }
+
+        #clear-remembered-settings {
+            width: 100%;
+            margin-top: 8px;
+            padding: 8px 10px;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            color: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            opacity: 0.65;
+        }
+
+        #clear-remembered-settings:hover {
+            opacity: 0.95;
+        }
+
+        #settings-panel.visible {
+            display: block;
+        }
+
+        .setting-item {
+            margin-bottom: 15px;
+        }
+
+        .setting-item label {
+            display: flex;
+            align-items: center;
+            font-size: 13px;
+            cursor: pointer;
+            color: #eee;
+        }
+
+        .setting-item input {
+            margin-right: 10px;
+        }
+
+        .sub-setting {
+            margin-left: 25px;
+            margin-top: 5px;
+            opacity: 0.8;
+        }
+
+        .sub-setting select {
+            width: 100%;
+            margin-top: 6px;
+        }
+
+        /* GIF Overlay Input Styling */
+        .gif-input-container {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 8px;
+            /* Spacing antar input */
+        }
+
+        .gif-input-container input[type="text"] {
+            flex: 1;
+            padding: 6px 10px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background: #2a2a2a;
+            color: #eee;
+            font-size: 11px;
+            outline: none;
+        }
+
+        .gif-input-container input[type="text"]:focus {
+            border-color: #666;
+        }
+
+        .gif-browse-btn {
+            padding: 6px 12px;
+            background: #3a3a3a;
+            border: 1px solid #555;
+            border-radius: 4px;
+            color: #ddd;
+            font-size: 11px;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s;
+        }
+
+        .gif-browse-btn:hover {
+            background: #4a4a4a;
+            border-color: #666;
+        }
+
+        .gif-clear-btn {
+            padding: 6px 8px;
+            background: transparent;
+            border: 1px solid #555;
+            border-radius: 4px;
+            color: #e74c3c;
+            font-size: 11px;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s;
+        }
+
+        .gif-clear-btn:hover {
+            background: rgba(231, 76, 60, 0.15);
+            border-color: #e74c3c;
+        }
+
+        /* GIF Settings Button Styling */
+        .gif-settings-btn {
+            padding: 6px 8px;
+            background: transparent;
+            border: 1px solid #555;
+            border-radius: 4px;
+            color: #aaa;
+            font-size: 11px;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s, color 0.2s;
+        }
+
+        .gif-settings-btn:hover {
+            background: rgba(100, 200, 255, 0.15);
+            border-color: #64c8ff;
+            color: #64c8ff;
+        }
+
+        .gif-settings-btn.has-condition {
+            color: #4caf50;
+            border-color: #4caf50;
+        }
+
+        /* Per-GIF Settings Modal */
+        #gif-settings-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 10002;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        #gif-settings-modal.visible {
+            display: flex;
+        }
+
+        #gif-settings-modal #no-music-warning {
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .gif-settings-box {
+            background: #2a2a2a;
+            border-radius: 10px;
+            padding: 16px;
+            width: 600px;
+            max-width: 90%;
+            border: 1px solid #444;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        .gif-settings-box h3 {
+            margin: 0 0 12px 0;
+            font-size: 14px;
+            color: #eee;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .gif-settings-box .setting-row {
+            margin-bottom: 12px;
+        }
+
+        .gif-settings-box .setting-row label {
+            display: block;
+            font-size: 11px;
+            color: #aaa;
+            margin-bottom: 4px;
+        }
+
+        .gif-settings-box select,
+        .gif-settings-box input[type="text"] {
+            width: 100%;
+            padding: 8px 10px;
+            background: #1a1a1a;
+            border: 1px solid #444;
+            border-radius: 6px;
+            color: #eee;
+            font-size: 12px;
+            font-family: inherit;
+        }
+
+        .gif-settings-box select:focus,
+        .gif-settings-box input[type="text"]:focus {
+            outline: none;
+            border-color: #64c8ff;
+        }
+
+        .gif-settings-box select option:disabled {
+            color: #666;
+            font-style: italic;
+        }
+
+        .gif-settings-box .btn-row {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 1px solid #444;
+        }
+
+        .gif-settings-box button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .gif-settings-box .btn-cancel {
+            background: #444;
+            color: #ddd;
+        }
+
+        .gif-settings-box .btn-cancel:hover {
+            background: #555;
+        }
+
+        .gif-settings-box .btn-save {
+            background: #4caf50;
+            color: white;
+        }
+
+        .gif-settings-box .btn-save:hover {
+            background: #5cbf60;
+        }
+
+        /* Tooltip Tips Styling */
+        .tips-trigger {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            color: #6bb5ff;
+            font-size: 11px;
+            cursor: help;
+            margin-top: 8px;
+            position: relative;
+            transition: color 0.2s;
+        }
+
+        .tips-trigger:hover {
+            color: #8ac7ff;
+        }
+
+        .tips-trigger .tips-icon {
+            font-size: 12px;
+        }
+
+        .tips-tooltip {
+            display: none;
+            /* Sembunyikan default, akan diclone oleh JS */
+        }
+
+        /* Class untuk tooltip yang sudah dipindah ke body */
+        .portal-tips-tooltip {
+            position: fixed;
+            width: 300px;
+            max-width: 90vw;
+            /* Responsive width */
+            /* Sedikit lebih lebar */
+            padding: 16px 18px;
+            background: rgba(26, 26, 26, 0.95);
+            /* Sedikit transparan untuk efek blur */
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+            opacity: 0;
+            transform: translateX(10px);
+            transition: opacity 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+            z-index: 99999;
+            pointer-events: none;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            text-align: left;
+        }
+
+        .portal-tips-tooltip.visible {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        /* Dynamic Arrow Placement */
+        .portal-tips-tooltip::after {
+            content: '';
+            position: absolute;
+            border: 6px solid transparent;
+            z-index: 2;
+
+            /* Default: Left Placement (Panah di Kanan) */
+            top: 50%;
+            right: -6px;
+            transform: translateY(-50%);
+            border-left-color: #444;
+        }
+
+        /* Right Placement (Panah di Kiri) */
+        .portal-tips-tooltip[data-placement="right"]::after {
+            right: auto;
+            left: -6px;
+            border-left-color: transparent;
+            border-right-color: #444;
+        }
+
+        /* Bottom Placement (Panah di Atas) */
+        .portal-tips-tooltip[data-placement="bottom"]::after {
+            top: -6px;
+            left: 50%;
+            right: auto;
+            transform: translateX(-50%);
+            border-left-color: transparent;
+            border-bottom-color: #444;
+        }
+
+        .tips-tooltip-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 8px;
+        }
+
+        .tips-tooltip ol {
+            margin: 0;
+            padding-left: 20px;
+            color: #d0d0d0;
+            /* Warna teks tidak terlalu kontras */
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .tips-tooltip li {
+            margin-bottom: 8px;
+        }
+
+        .tips-tooltip li::marker {
+            color: #6bb5ff;
+            /* Warna nomor list */
+            font-weight: bold;
+        }
+
+        /* Toggle Switch Styling */
+        .interaction-switch-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: auto;
+            /* Push ke kanan */
+            font-size: 11px;
+            color: #ccc;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 30px;
+            height: 16px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #555;
+            transition: .4s;
+            border-radius: 16px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 12px;
+            width: 12px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked+.slider {
+            background-color: #e74c3c;
+            /* Merah untuk indikasi 'Larang' / Locked */
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(14px);
+        }
+
+        /* Add GIF Button Styling */
+        .add-gif-btn {
+            width: 100%;
+            padding: 6px;
+            margin-top: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px dashed #555;
+            border-radius: 4px;
+            color: #aaa;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .add-gif-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: #777;
+            color: #fff;
+        }
+
+
+        .tips-tooltip li:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Webview Container */
+        #webview-container {
+            flex-grow: 1;
+            position: relative;
+        }
+
+        webview {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        /* Disable Dragging Class */
+        body.no-drag #title-bar {
+            -webkit-app-region: no-drag !important;
+        }
+
+        /* Overlay Mode Styles */
+        body.overlay-mode {
+            /* Only allow resize from left edge */
+            resize: none !important;
+        }
+
+        /* Close Confirmation Modal */
+        #close-confirm-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+
+        #close-confirm-modal.visible {
+            display: flex;
+        }
+
+        .close-confirm-box {
+            background: #2a2a2a;
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 350px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            border: 1px solid #444;
+        }
+
+        .close-confirm-box h3 {
+            margin: 0 0 12px 0;
+            font-size: 16px;
+            color: #fff;
+        }
+
+        .close-confirm-box p {
+            margin: 0 0 20px 0;
+            font-size: 13px;
+            color: #aaa;
+        }
+
+        .close-confirm-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .close-confirm-buttons button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        .close-confirm-buttons button:active {
+            transform: scale(0.95);
+        }
+
+        .confirm-btn-cancel {
+            background: #444;
+            color: #fff;
+        }
+
+        .confirm-btn-cancel:hover {
+            background: #555;
+        }
+
+        .confirm-btn-hide {
+            background: #3498db;
+            color: #fff;
+        }
+
+        .confirm-btn-hide:hover {
+            background: #2980b9;
+        }
+
+        .confirm-btn-close {
+            background: #e74c3c;
+            color: #fff;
+        }
+
+        .confirm-btn-close:hover {
+            background: #c0392b;
+        }
+
+        /* Side Loading UI */
+        #side-loading-ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Lexend', sans-serif;
+            flex-direction: column;
+        }
+
+        .loading-content {
+            text-align: center;
+            width: 80%;
+            max-width: 600px;
+        }
+
+        .loading-text {
+            font-size: 24px;
+            font-weight: 500;
+            margin-bottom: 40px;
+            color: white;
+            letter-spacing: 0.5px;
+        }
+
+        .loading-subtext {
+            font-size: 14px;
+            color: #888;
+            margin-bottom: 10px;
+            height: 20px;
+            /* Keep space */
+        }
+
+        .progress-container {
+            width: 100%;
+            height: 2px;
+            background-color: #333;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            width: 0%;
+            height: 100%;
+            background-color: #ff0000;
+            box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+            transition: width 0.1s linear;
+        }
+
+        /* Process Indicator Hint - Toast kecil di pojok kiri bawah */
+        #process-indicator-hint {
+            position: fixed;
+            bottom: 80px;
+            left: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 16px;
+            background-color: rgba(50, 50, 50, 0.9);
+            border-radius: 8px;
+            font-family: 'Lexend', sans-serif;
+            font-size: 13px;
+            color: #e0e0e0;
+            z-index: 9998;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            opacity: 0;
+            pointer-events: none;
+            visibility: hidden;
+            /* Hanya fade saja, tanpa gerakan */
+            transition: opacity 1.6s ease-out, visibility 3.2s ease-out;
+        }
+
+        #process-indicator-hint.visible {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+        }
+
+        /* State untuk animasi keluar */
+        #process-indicator-hint.hiding {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        #process-indicator-hint .hint-text {
+            white-space: nowrap;
+        }
+
+        /* Radial Line Spinner kayak Mac */
+        #process-indicator-hint .hint-spinner {
+            position: relative;
+            width: 18px;
+            height: 18px;
+            animation: radial-spin 1s steps(12) infinite;
+        }
+
+        #process-indicator-hint .hint-spinner .spinner-line {
+            position: absolute;
+            left: 50%;
+            top: 0;
+            width: 2px;
+            height: 5px;
+            margin-left: -1px;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 2px;
+            transform-origin: center 9px;
+            /* Setengah dari tinggi spinner */
+        }
+
+        /* 12 garis dengan rotasi berbeda */
+        #process-indicator-hint .hint-spinner .spinner-line:nth-child(1) {
+            transform: rotate(0deg);
+        }
+
+        #process-indicator-hint .hint-spinner .spinner-line:nth-child(2) {
+            transform: rotate(30deg);
+        }
+
+        #process-indicator-hint .hint-spinner .spinner-line:nth-child(3) {
+            transform: rotate(60deg);
+        }
+
+        #process-indicator-hint .hint-spinner .spinner-line:nth-child(4) {
+            transform: rotate(90deg);
+        }
+
+        #process-indicator-hint .hint-spinner .spinner-line:nth-child(5) {
+            transform: rotate(120deg);
+        }
+
+        #process-indicator-hint .hint-spinner .spinner-line:nth-child(6) {
+            transform: rotate(150deg);
+        }
+
+        #process-indicator-hint .hint-spinner .spinner-line:nth-child(7) {
+            transform: rotate(180deg);
+        }
+
+        #process-indicator-hint .hint-spinner .spinner-line:nth-child(8) {
+            transform: rotate(210deg);
+        }
+
+        #process-indicator-hint .hint-spinner .spinner-line:nth-child(9) {
+            transform: rotate(240deg);
+        }
+
+        #process-indicator-hint .hint-spinner .spinner-line:nth-child(10) {
+            transform: rotate(270deg);
+        }
+
+        #process-indicator-hint .hint-spinner .spinner-line:nth-child(11) {
+            transform: rotate(300deg);
+        }
+
+        #process-indicator-hint .hint-spinner .spinner-line:nth-child(12) {
+            transform: rotate(330deg);
+        }
+
+        /* Opacity gradient untuk efek fade - lebih tebal */
+        #process-indicator-hint .hint-spinner .spinner-line:nth-child(1) {
+            opacity: 1;
+        }
+
+        #process-indicator-hint .hint-spinner .spinner-line:nth-child(2) {
+            opacity: 0.9;
+        }
+
+        #process-indicator-hint .hint-spinner .spinner-line:nth-child(3) {
+            opacity: 0.8;
+        }
+
+        #process-indicator-hint .hint-spinner .spinner-line:nth-child(4) {
+            opacity: 0.7;
+        }
+
+        #process-indicator-hint .hint-spinner .spinner-line:nth-child(5) {
+            opacity: 0.6;
+        }
+
+        #process-indicator-hint .hint-spinner .spinner-line:nth-child(6) {
+            opacity: 0.5;
+        }
+
+        #process-indicator-hint .hint-spinner .spinner-line:nth-child(7) {
+            opacity: 0.4;
+        }
+
+        #process-indicator-hint .hint-spinner .spinner-line:nth-child(8) {
+            opacity: 0.35;
+        }
+
+        #process-indicator-hint .hint-spinner .spinner-line:nth-child(9) {
+            opacity: 0.3;
+        }
+
+        #process-indicator-hint .hint-spinner .spinner-line:nth-child(10) {
+            opacity: 0.25;
+        }
+
+        #process-indicator-hint .hint-spinner .spinner-line:nth-child(11) {
+            opacity: 0.2;
+        }
+
+        #process-indicator-hint .hint-spinner .spinner-line:nth-child(12) {
+            opacity: 0.15;
+        }
+
+        @keyframes radial-spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="title-bar">
+        <div class="title"><img src="aset/ytmusic.png" alt="ytmusic"
+                style="height: 20px; margin-right: 8px; vertical-align: middle;"> GAP YTMusic Enhanced Plus >///</div>
+        <div class="controls">
+            <button class="control-btn" id="btn-settings" title="Settings">⚙️</button>
+            <button class="control-btn" id="btn-min" title="Minimize">─</button>
+            <button class="control-btn" id="btn-max" title="Maximize">□</button>
+            <button class="control-btn close" id="btn-close" title="Close">✕</button>
+        </div>
+    </div>
+
+    <div id="settings-panel">
+        <div class="setting-item">
+            <label><input type="checkbox" id="opt-adskipper"> Enable Ad Skipper</label>
+            <div class="sub-setting">
+                <label><input type="checkbox" id="opt-automute"> Auto Mute Ads</label>
+            </div>
+            <div class="sub-setting">
+                <label><input type="checkbox" id="opt-autoskip"> Auto Click Skip</label>
+            </div>
+        </div>
+        <div class="setting-item">
+            <label><input type="checkbox" id="opt-overlay"> Overlay Mode (Alt+S)</label>
+        </div>
+        <div class="setting-item">
+            <label><input type="checkbox" id="opt-miniplayer"> Enable Mini Player</label>
+            <div class="sub-setting" id="opt-miniplayer-sub" style="display:none;">
+                <label><input type="checkbox" id="opt-miniplayer-hide-on-cursor"> Hide when cursor approaches</label>
+            </div>
+        </div>
+        <div class="setting-item">
+            <label><input type="checkbox" id="opt-rpc"> Enable Discord RPC</label>
+        </div>
+        <div class="setting-item">
+            <label><input type="checkbox" id="opt-dynamic-theme"> Enable Dynamic ytMusic Styling</label>
+            <div class="sub-setting" id="opt-dynamic-theme-sub" style="display:none;">
+                <label style="margin-bottom: 4px;">Mode</label>
+                <select id="opt-dynamic-theme-mode">
+                    <option value="default">Default</option>
+                    <option value="default-optimized">Default Optimized</option>
+                    <option value="seamless">Seamless (Full Transparency)</option>
+                    <option value="overlay">Overlay (Seamless)</option>
+                    <option value="harmony">Harmony (Cohesive)</option>
+                </select>
+            </div>
+        </div>
+        <div class="setting-item">
+            <label><input type="checkbox" id="opt-process-hints"> Show process indicator hints</label>
+        </div>
+        <div class="setting-item">
+            <label style="display:flex; align-items:center; gap: 8px;">
+                <input type="checkbox" id="opt-gif-overlay">
+                Free GIF image Overlay
+                <span class="tips-trigger unique-decoration"
+                    style="font-size: 10px; color: palevioletred; cursor: help; letter-spacing: 1px;">
+                    >//
+                    <div class="tips-tooltip">
+                        <div class="tips-tooltip-title">Apa ini?</div>
+                        <div style="color: #e0e0e0; font-size: 12px; line-height: 1.4;">Fitur menampilkan GIF ke-manapun
+                            dan dimana-pun, ini gratis untuk kamu bisa menghemat uang >///</div>
+                    </div>
+                </span>
+            </label>
+            <div class="sub-setting" id="opt-gif-overlay-sub" style="display:none;">
+                <!-- Dropdown Preset Profile -->
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                    <select id="gif-preset-select"
+                        style="flex: 1; padding: 6px 8px; background: #1e1e1e; border: 1px solid #444; border-radius: 4px; color: #fff; font-size: 11px;">
+                        <option value="">-- Pilih Preset --</option>
+                    </select>
+                </div>
+
+                <div id="gif-list-container">
+                    <div class="gif-input-container" data-overlay-id="">
+                        <input type="text" class="gif-file-name" placeholder="Pilih file GIF..." readonly>
+                        <button class="gif-settings-btn" title="Pengaturan GIF">⚙️</button>
+                        <button class="gif-browse-btn" title="Pilih File">Browse</button>
+                        <button class="gif-clear-btn" title="Hapus Overlay">✕</button>
+                    </div>
+                </div>
+                <button class="add-gif-btn" id="add-gif-btn" title="Tambah GIF Baru">+</button>
+
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px;">
+                    <div class="tips-trigger">
+                        <span class="tips-icon">💡</span>
+                        <span>tips</span>
+                        <div class="tips-tooltip">
+                            <div class="tips-tooltip-title">Cara mendapatkan hasil terbaik:</div>
+                            <ol>
+                                <li>Cari gambar GIF apapun kesukaan kamu, misal gambar karakter, elemen unik, dll.</li>
+                                <li>Agar hasilnya keren, hilangkan background-nya. Caranya bisa dengan mencari website
+                                    "GIF
+                                    Background Remover".</li>
+                                <li>Jika gambar GIF sudah bersih dari background, input file GIF tersebut ke sini.</li>
+                            </ol>
+                        </div>
+                    </div>
+
+                    <div class="interaction-switch-container">
+                        <span>Larang interaksi dengan kursor?</span>
+                        <label class="toggle-switch"
+                            title="Aktifkan untuk mengunci posisi GIF dan mengabaikan klik mouse">
+                            <input type="checkbox" id="gif-interaction-lock">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button id="remember-settings-toggle" type="button" aria-pressed="false">Remember this setting?</button>
+        <button id="clear-remembered-settings" type="button">Clear saved settings</button>
+        <button id="open-webview-devtools" type="button" style="margin-top: 8px; background: #2a5298; width: 100%;">
+            Open Webview DevTools</button>
+    </div>
+
+    <div id="webview-container">
+        <webview id="music-view" src="https://music.youtube.com" preload="./webview-preload.js"></webview>
+
+        <!-- Side Loading UI -->
+        <div id="side-loading-ui">
+            <div class="loading-content">
+                <div id="loading-text" class="loading-text">Connecting ytMusic</div>
+                <div id="loading-subtext" class="loading-subtext"></div>
+                <div class="progress-container">
+                    <div id="loading-progress-bar" class="progress-bar"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Process Indicator Hint -->
+    <div id="process-indicator-hint">
+        <span class="hint-text">Preparing content</span>
+        <div class="hint-spinner">
+            <div class="spinner-line"></div>
+            <div class="spinner-line"></div>
+            <div class="spinner-line"></div>
+            <div class="spinner-line"></div>
+            <div class="spinner-line"></div>
+            <div class="spinner-line"></div>
+            <div class="spinner-line"></div>
+            <div class="spinner-line"></div>
+            <div class="spinner-line"></div>
+            <div class="spinner-line"></div>
+            <div class="spinner-line"></div>
+            <div class="spinner-line"></div>
+        </div>
+    </div>
+
+    <!-- Close Confirmation Modal for Overlay Mode -->
+    <div id="close-confirm-modal">
+        <div class="close-confirm-box">
+            <h3>Close Application?</h3>
+            <p>Kamu sedang berada di mode overlay, kamu ingin menyembunyikan overlay atau menutup aplikasi?</p>
+            <p>You're in Overlay Mode. Did you mean to hide the overlay (Alt+S) or close the app entirely?</p>
+            <div class="close-confirm-buttons">
+                <button class="confirm-btn-cancel" id="confirm-cancel">Cancel</button>
+                <button class="confirm-btn-hide" id="confirm-hide">Hide (Alt+S)</button>
+                <button class="confirm-btn-close" id="confirm-close">Close App</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Per-GIF Settings Modal -->
+    <div id="gif-settings-modal">
+        <!-- Warning di luar box -->
+        <div id="no-music-warning"
+            style="background: rgba(255, 200, 100, 0.15); border: 1px solid rgba(255, 200, 100, 0.3); border-radius: 8px; padding: 12px 16px; font-size: 12px; color: #ffc864; margin-bottom: 12px; max-width: 320px; text-align: center;">
+            ⚠️ Patikan kamu sudah Putar musik terlebih dahulu agar opsi judul/artis bisa digunakan.
+        </div>
+
+        <div class="gif-settings-box">
+            <h3>⚙️ Pengaturan GIF</h3>
+
+            <div class="setting-row">
+                <label for="gif-condition-type">GIF ini HANYA akan tampil JIKA?? .... :</label>
+                <select id="gif-condition-type">
+                    <option value="always">Selalu tampilkan dalam kondisi apapun</option>
+                    <option value="music-playing">Hanya saat musik diputar</option>
+                    <option value="music-paused">Hanya saat musik di-pause</option>
+                    <option value="ad-playing">Hanya saat ada iklan</option>
+                    <option value="music-title" data-default-text="Saat judul musik mengandung...">Saat judul musik
+                        mengandung...</option>
+                    <option value="music-artist" data-default-text="Saat artis musik mengandung...">Saat artis musik
+                        mengandung...</option>
+                </select>
+            </div>
+
+            <div class="setting-row">
+                <label for="gif-opacity">Opacity:</label>
+                <input type="range" id="gif-opacity" min="0.1" max="1" step="0.1" value="1"
+                    style="width: 100%; accent-color: #64c8ff;">
+                <div
+                    style="display: flex; justify-content: space-between; font-size: 10px; color: #666; margin-top: 2px;">
+                    <span>10%</span>
+                    <span id="gif-opacity-value">100%</span>
+                    <span>100%</span>
+                </div>
+            </div>
+
+            <div class="setting-row"
+                style="display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.1); margin-top: 8px;">
+                <div style="flex: 1;">
+                    <label for="gif-hide-on-cursor" style="font-size: 13px; color: #ccc; cursor: pointer;">Menghilang
+                        sementara jika didekati kursor</label>
+                    <div style="font-size: 11px; color: #666; margin-top: 2px;">Hanya bekerja jika "Larang interaksi
+                        dengan kursor" aktif</div>
+                </div>
+                <label class="toggle-switch" style="margin-left: 8px;">
+                    <input type="checkbox" id="gif-hide-on-cursor">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="setting-row">
+                <label for="gif-rotation">Rotation:</label>
+                <input type="range" id="gif-rotation" min="0" max="360" step="15" value="0"
+                    style="width: 100%; accent-color: #ff64c8;">
+                <div
+                    style="display: flex; justify-content: space-between; font-size: 10px; color: #666; margin-top: 2px;">
+                    <span>0°</span>
+                    <span id="gif-rotation-value">0°</span>
+                    <span>360°</span>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <label for="gif-animation-type">Animasi Gerakan:</label>
+                <select id="gif-animation-type">
+                    <option value="none">Tidak Ada</option>
+                    <option value="dvd">DVD Bouncing</option>
+                    <option value="linear">Linear (Wrap Around)</option>
+                    <option value="circular">Melingkar (Orbit)</option>
+                    <option value="random">Random Walk</option>
+                    <option value="patrol">Patroli (Flip)</option>
+                    <option value="patrol-wave">Patroli Bergelombang (Flip)</option>
+                    <option value="patrol-vertical">Patroli Vertikal (Flip)</option>
+                    <option value="patrol-wave-vertical">Patroli Vertikal Bergelombang (Flip)</option>
+                </select>
+            </div>
+
+            <div class="setting-row" id="gif-animation-speed-container" style="display: none;">
+                <label for="gif-animation-speed">Kecepatan Animasi:</label>
+                <input type="range" id="gif-animation-speed" min="1" max="10" step="1" value="2"
+                    style="width: 100%; accent-color: #64c8ff;">
+                <div
+                    style="display: flex; justify-content: space-between; font-size: 10px; color: #666; margin-top: 2px;">
+                    <span>1</span>
+                    <span id="gif-animation-speed-value">2</span>
+                    <span>10</span>
+                </div>
+            </div>
+
+            <div class="btn-row">
+                <button class="btn-cancel" id="gif-settings-cancel">Batal</button>
+                <button class="btn-save" id="gif-settings-save">Apply</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+        const fs = require('fs');
+        const path = require('path');
+        const webview = document.getElementById('music-view');
+
+        // Visualizer State
+        let previousVisualizerValues = [];
+
+        // --- Kontrol Jendela ---
+        document.getElementById('btn-min').onclick = () => ipcRenderer.send('native-window-control', 'minimize');
+        document.getElementById('btn-max').onclick = () => ipcRenderer.send('native-window-control', 'maximize');
+
+        // Tombol tutup dengan konfirmasi untuk mode overlay
+        const closeConfirmModal = document.getElementById('close-confirm-modal');
+        const confirmCancel = document.getElementById('confirm-cancel');
+        const confirmHide = document.getElementById('confirm-hide');
+        const confirmClose = document.getElementById('confirm-close');
+        let isOverlayModeActive = false;
+
+        document.getElementById('btn-close').onclick = () => {
+            if (isOverlayModeActive) {
+                // Tampilkan modal konfirmasi di mode overlay
+                closeConfirmModal.classList.add('visible');
+            } else {
+                // Mode normal - tutup langsung
+                ipcRenderer.send('native-window-control', 'close');
+            }
+        };
+
+        confirmCancel.onclick = () => {
+            closeConfirmModal.classList.remove('visible');
+        };
+
+        confirmHide.onclick = () => {
+            closeConfirmModal.classList.remove('visible');
+            // Picu aksi Alt+S untuk menyembunyikan overlay
+            ipcRenderer.send('native-overlay-hide');
+        };
+
+        confirmClose.onclick = () => {
+            closeConfirmModal.classList.remove('visible');
+            ipcRenderer.send('native-window-control', 'close');
+        };
+
+        // Tutup modal dengan tombol Escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && closeConfirmModal.classList.contains('visible')) {
+                closeConfirmModal.classList.remove('visible');
+            }
+        });
+
+        // --- Toggle Panel Pengaturan (Klik Di Luar / Kehilangan Fokus) ---
+        const settingsBtn = document.getElementById('btn-settings');
+        const settingsPanel = document.getElementById('settings-panel');
+
+        settingsBtn.onclick = (e) => {
+            e.stopPropagation(); // Mencegah klik dokumen menutupnya segera
+            settingsPanel.classList.toggle('visible');
+        };
+
+        // Tutup panel saat mengklik di luar (di UI host)
+        document.addEventListener('click', (e) => {
+            if (settingsPanel.classList.contains('visible') &&
+                !settingsPanel.contains(e.target) &&
+                e.target !== settingsBtn) {
+                settingsPanel.classList.remove('visible');
+            }
+        });
+
+        // Tutup panel saat berinteraksi dengan Webview (mengambil fokus)
+        webview.addEventListener('focus', () => {
+            if (settingsPanel.classList.contains('visible')) {
+                settingsPanel.classList.remove('visible');
+            }
+        });
+
+        // --- Logika Pengaturan ---
+        const optAdSkipper = document.getElementById('opt-adskipper');
+        const optAutoMute = document.getElementById('opt-automute');
+        const optAutoSkip = document.getElementById('opt-autoskip');
+        const optOverlay = document.getElementById('opt-overlay');
+        const optMiniPlayer = document.getElementById('opt-miniplayer');
+        const optMiniPlayerHideOnCursor = document.getElementById('opt-miniplayer-hide-on-cursor');
+        const optRpc = document.getElementById('opt-rpc');
+        const optDynamicTheme = document.getElementById('opt-dynamic-theme');
+        const optDynamicThemeSub = document.getElementById('opt-dynamic-theme-sub');
+        const optDynamicThemeMode = document.getElementById('opt-dynamic-theme-mode');
+        const optProcessHints = document.getElementById('opt-process-hints');
+
+        // Process Indicator Hint Elements
+        const processIndicatorHint = document.getElementById('process-indicator-hint');
+        const processHintText = processIndicatorHint?.querySelector('.hint-text');
+
+        const rememberSettingsToggleBtn = document.getElementById('remember-settings-toggle');
+        const clearRememberedSettingsBtn = document.getElementById('clear-remembered-settings');
+        let rememberedSettingsSaved = false;
+        function updateRememberSettingsButton(saved) {
+            rememberedSettingsSaved = saved === true;
+            if (!rememberSettingsToggleBtn) return;
+            rememberSettingsToggleBtn.classList.toggle('is-enabled', rememberedSettingsSaved);
+            rememberSettingsToggleBtn.setAttribute('aria-pressed', rememberedSettingsSaved ? 'true' : 'false');
+            rememberSettingsToggleBtn.title = rememberedSettingsSaved ? 'Setting telah disimpan' : 'Klik untuk menyimpan setting';
+
+            // UI Feedback - perubahan teks yang subtle saat setting disimpan
+            if (rememberedSettingsSaved) {
+                rememberSettingsToggleBtn.textContent = "Setting diingat!";
+            } else {
+                rememberSettingsToggleBtn.textContent = "Remember this setting?";
+            }
+        }
+
+        async function rememberSettingsSaveSnapshotFromNativeUI() {
+            // Tangkap status sebelum simpan untuk cek apakah ini 're-save'
+            const wasAlreadySaved = rememberedSettingsSaved;
+
+            const partial = {
+                adSkipperEnabled: optAdSkipper.checked,
+                autoMuteAds: optAutoMute.checked,
+                autoSkipAds: optAutoSkip.checked,
+                miniPlayerFeatureEnabled: optMiniPlayer.checked,
+                miniPlayerHideOnCursor: optMiniPlayerHideOnCursor ? optMiniPlayerHideOnCursor.checked : false,
+                rpcEnabled: optRpc ? optRpc.checked : false,
+                overlayModeEnabled: optOverlay.checked,
+                dynamicThemeEnabled: optDynamicTheme.checked,
+                dynamicThemeMode: optDynamicThemeMode ? optDynamicThemeMode.value : 'default',
+                gifOverlayEnabled: optGifOverlay ? optGifOverlay.checked : false,
+                gifOverlayLocked: gifInteractionLock ? gifInteractionLock.checked : false
+            };
+
+            ipcRenderer.send('save-settings', partial);
+            const result = await ipcRenderer.invoke('remember-settings-save', partial);
+            const isSaved = result && result.saved === true;
+            updateRememberSettingsButton(isSaved);
+
+            // UX Improvement: Beri feedback visual jika user menyimpan ulang setting yang sudah ada
+            if (wasAlreadySaved && isSaved) {
+                if (rememberSettingsToggleBtn) {
+                    rememberSettingsToggleBtn.textContent = "Setting diperbarui!";
+                    setTimeout(() => {
+                        // Hanya kembalikan teks jika statusnya masih 'saved'
+                        if (rememberedSettingsSaved) {
+                            rememberSettingsToggleBtn.textContent = "Setting diingat!";
+                        }
+                    }, 1200);
+                }
+            }
+        }
+
+        if (rememberSettingsToggleBtn) {
+            rememberSettingsToggleBtn.addEventListener('click', async () => {
+                console.log('[Native Host] Tombol Remember Settings diklik...');
+                try {
+                    await rememberSettingsSaveSnapshotFromNativeUI();
+                    console.log('[Native Host] Snapshot settings berhasil disimpan.');
+                } catch (e) {
+                    console.warn('[Native Host] Failed to save settings snapshot:', e);
+                }
+            });
+        }
+
+        if (clearRememberedSettingsBtn) {
+            clearRememberedSettingsBtn.addEventListener('click', async () => {
+                try {
+                    const result = await ipcRenderer.invoke('remember-settings-clear');
+                    updateRememberSettingsButton(result && result.saved === true);
+                } catch (e) {
+                    console.warn('[Native Host] Failed to clear saved settings snapshot:', e);
+                }
+            });
+        }
+
+        ipcRenderer.on('remember-settings-status-changed', (_event, saved) => {
+            updateRememberSettingsButton(saved);
+        });
+
+        // --- Webview DevTools Button ---
+        const openWebviewDevtoolsBtn = document.getElementById('open-webview-devtools');
+        if (openWebviewDevtoolsBtn) {
+            openWebviewDevtoolsBtn.addEventListener('click', () => {
+                try {
+                    if (webview && webview.openDevTools) {
+                        webview.openDevTools();
+                        console.log('[Native Host] Webview DevTools dibuka');
+                    } else {
+                        console.warn('[Native Host] Webview belum siap atau openDevTools tidak tersedia');
+                    }
+                } catch (e) {
+                    console.error('[Native Host] Gagal membuka DevTools:', e);
+                }
+            });
+        }
+
+        // --- Side Loading Logic (Pemuatan Samping) ---
+        const sideLoadingUi = document.getElementById('side-loading-ui');
+        const loadingText = document.getElementById('loading-text');
+        const loadingSubtext = document.getElementById('loading-subtext');
+        const loadingProgressBar = document.getElementById('loading-progress-bar');
+
+        function updateLoadingProgress(text, subtext, percent) {
+            if (loadingText) loadingText.textContent = text;
+            if (loadingSubtext) loadingSubtext.textContent = subtext;
+            if (loadingProgressBar) loadingProgressBar.style.width = `${percent}%`;
+        }
+
+        function finishSideLoading() {
+            if (!sideLoadingUi) return;
+            sideLoadingUi.style.transition = 'opacity 0.5s ease';
+            sideLoadingUi.style.opacity = '0';
+            setTimeout(() => {
+                sideLoadingUi.style.display = 'none';
+            }, 500);
+        }
+
+        // === HYBRID LOADING PROGRESS SYSTEM ===
+        // Sistem progress loading berbasis milestone dengan 2 fase terpisah:
+        // Fase A (Connection): Progress 0% -> 100%
+        // Fase B (Loading): Reset ke 0%, lalu 0% -> 100%
+
+        let loadingPhase = 0; // 0: Connecting, 1: Connected, 2: DOM Ready, 3: Player Ready
+        let loadingComplete = false;
+        let loadingStartTime = null;
+        const MAX_LOADING_DURATION = 15000; // Fallback timeout 15 detik
+
+        // Milestone progress mapping dengan 2 progress bar cycle
+        // Fase 0-1 = "Connection" cycle (0% -> 100%)
+        // Fase 2-3 = "Loading" cycle (reset ke 0%, lalu 0% -> 100%)
+        const phaseProgress = {
+            // === FASE A: CONNECTION ===
+            0: { title: 'Connecting ytMusic', percent: 0, text: 'Waiting for connection...', cycle: 'connection' },
+            1: { title: 'Connecting ytMusic', percent: 100, text: 'Connection established!', cycle: 'connection' },
+            // === FASE B: LOADING (progress bar reset) ===
+            2: { title: 'Loading website', percent: 50, text: 'Initializing player...', cycle: 'loading' },
+            3: { title: 'Loading website', percent: 100, text: 'Player ready!', cycle: 'loading' }
+        };
+
+        // Minimum display time untuk setiap cycle (ms)
+        // Ini memastikan user bisa melihat progress bar terisi penuh sebelum pindah cycle
+        const CYCLE_MIN_DISPLAY_TIME = 800;
+        let connectionCycleCompleteTime = null;
+        let pendingPhaseUpdate = null;
+
+        function advanceLoadingPhase(newPhase) {
+            // Jangan mundur ke fase sebelumnya atau jika sudah selesai
+            if (newPhase <= loadingPhase || loadingComplete) return;
+
+            const phaseData = phaseProgress[newPhase];
+            const prevCycle = phaseProgress[loadingPhase]?.cycle;
+            const newCycle = phaseData.cycle;
+
+            // Cek apakah ini transisi dari cycle "connection" ke "loading"
+            if (prevCycle === 'connection' && newCycle === 'loading') {
+                // Pastikan fase connection (fase 1) sudah tercapai dulu
+                if (loadingPhase < 1) {
+                    // Fase 1 belum tercapai, paksa update ke fase 1 dulu
+                    loadingPhase = 1;
+                    const phase1Data = phaseProgress[1];
+                    updateLoadingProgress(phase1Data.title, phase1Data.text, phase1Data.percent);
+                    connectionCycleCompleteTime = Date.now();
+                    console.log(`[Native Host] Forcing fase 1 completion before transition`);
+                }
+
+                // Hitung berapa lama cycle connection sudah ditampilkan
+                const elapsedTime = connectionCycleCompleteTime ? (Date.now() - connectionCycleCompleteTime) : 0;
+                const remainingTime = Math.max(0, CYCLE_MIN_DISPLAY_TIME - elapsedTime);
+
+                console.log(`[Native Host] Transition to loading cycle, waiting ${remainingTime}ms...`);
+
+                // Simpan pending phase update dan delay transisi jika perlu
+                pendingPhaseUpdate = newPhase;
+
+                setTimeout(() => {
+                    if (loadingComplete) return; // Sudah selesai, skip
+
+                    const targetPhase = pendingPhaseUpdate || newPhase;
+                    const targetPhaseData = phaseProgress[targetPhase];
+
+                    loadingPhase = targetPhase;
+                    pendingPhaseUpdate = null;
+
+                    console.log(`[Native Host] Loading fase ${targetPhase}: ${targetPhaseData.text}`);
+                    console.log('[Native Host] Transitioning from Connection to Loading cycle, resetting progress bar...');
+
+                    // Langkah 1: Reset progress bar ke 0 dengan cepat (tanpa animasi)
+                    if (loadingProgressBar) {
+                        loadingProgressBar.style.transition = 'none';
+                        loadingProgressBar.style.width = '0%';
+                    }
+
+                    // Langkah 2: Update teks ke fase baru
+                    if (loadingText) loadingText.textContent = targetPhaseData.title;
+                    if (loadingSubtext) loadingSubtext.textContent = 'Starting new phase...';
+
+                    // Langkah 3: Kembalikan animasi dan update ke persentase fase baru
+                    setTimeout(() => {
+                        if (loadingProgressBar) {
+                            loadingProgressBar.style.transition = 'width 0.4s ease';
+                        }
+                        updateLoadingProgress(targetPhaseData.title, targetPhaseData.text, targetPhaseData.percent);
+
+                        // Jika ada pending fase 3, langsung proses
+                        if (targetPhase >= 3) {
+                            loadingComplete = true;
+                            setTimeout(finishSideLoading, 400);
+                        }
+                    }, 100);
+                }, remainingTime);
+
+            } else {
+                // Sama cycle, update biasa
+                const previousPhase = loadingPhase;
+                loadingPhase = newPhase;
+
+                console.log(`[Native Host] Loading fase ${newPhase}: ${phaseData.text}`);
+                updateLoadingProgress(phaseData.title, phaseData.text, phaseData.percent);
+
+                // Jika fase 1 selesai, catat waktunya
+                if (newPhase === 1) {
+                    connectionCycleCompleteTime = Date.now();
+                }
+
+                // Fase 3 = Selesai, loading bisa ditutup
+                if (newPhase >= 3) {
+                    loadingComplete = true;
+                    setTimeout(finishSideLoading, 400);
+                }
+            }
+        }
+
+        function startHybridLoadingTracking() {
+            loadingStartTime = Date.now();
+            loadingPhase = 0;
+            loadingComplete = false;
+
+            updateLoadingProgress(phaseProgress[0].title, phaseProgress[0].text, 0);
+
+            // Fallback timeout: Jika loading terlalu lama, selesaikan secara paksa
+            const fallbackTimer = setTimeout(() => {
+                if (!loadingComplete) {
+                    console.warn('[Native Host] Loading timeout tercapai, menyelesaikan loading secara paksa.');
+                    loadingComplete = true;
+                    updateLoadingProgress('Loading', 'Loading complete (timeout)', 100);
+                    setTimeout(finishSideLoading, 300);
+                }
+            }, MAX_LOADING_DURATION);
+
+            // Simpan timer ID agar bisa dibersihkan jika loading selesai lebih awal
+            return fallbackTimer;
+        }
+
+        let loadingFallbackTimer = null;
+
+        // === EVENT LISTENERS UNTUK MILESTONE ===
+
+        // Milestone 1: Halaman selesai load (did-finish-load)
+        webview.addEventListener('did-finish-load', () => {
+            advanceLoadingPhase(1);
+        });
+
+        // Milestone 2: DOM siap (sudah ada di dom-ready handler lama, kita pindahkan triggernya)
+
+        // Status Default
+        let adSkipperEnabled = false;
+        let autoMuteEnabled = false;
+        let autoSkipEnabled = false;
+        let miniPlayerEnabled = false;
+        let rpcEnabled = false;
+        let dynamicThemeEnabled = false;
+        let dynamicThemeMode = 'default';
+        let processHintsEnabled = true;
+
+        // === PROCESS INDICATOR HINT FUNCTIONS ===
+        // minimum display time agar tidak hilang terlalu cepat
+        let processHintTimeout = null;
+        let processHintHideTimeout = null;
+        let processHintShowTime = 0; // Track kapan hint mulai ditampilkan
+        const MINIMUM_HINT_DISPLAY_TIME = 1800; // Minimum 1.8 detik tampil sebelum bisa hilang
+
+        function showProcessHint(text, duration = 0) {
+            // Hanya tampilkan jika setting aktif
+            if (!processHintsEnabled || !processIndicatorHint) return;
+
+            // Batalkan hiding jika sedang dalam proses hide
+            clearTimeout(processHintHideTimeout);
+            processIndicatorHint.classList.remove('hiding');
+
+            // Update teks
+            if (processHintText) processHintText.textContent = text;
+
+            // Tampilkan dengan animasi (jika belum visible)
+            if (!processIndicatorHint.classList.contains('visible')) {
+                processIndicatorHint.classList.add('visible');
+                processHintShowTime = Date.now();
+            }
+
+            // Jika duration > 0, auto-hide setelah durasi tersebut
+            if (duration > 0) {
+                clearTimeout(processHintTimeout);
+                processHintTimeout = setTimeout(() => {
+                    hideProcessHint();
+                }, duration);
+            }
+        }
+
+        function hideProcessHint() {
+            if (!processIndicatorHint) return;
+
+            // Hitung berapa lama hint sudah tampil
+            const displayedDuration = Date.now() - processHintShowTime;
+            const remainingMinTime = MINIMUM_HINT_DISPLAY_TIME - displayedDuration;
+
+            // Jika belum cukup lama, tunda hide
+            if (remainingMinTime > 0 && processIndicatorHint.classList.contains('visible')) {
+                clearTimeout(processHintHideTimeout);
+                processHintHideTimeout = setTimeout(() => {
+                    actuallyHideHint();
+                }, remainingMinTime);
+                return;
+            }
+
+            actuallyHideHint();
+        }
+
+        function actuallyHideHint() {
+            if (!processIndicatorHint) return;
+            clearTimeout(processHintTimeout);
+            clearTimeout(processHintHideTimeout);
+
+            // Tambahkan class hiding untuk animasi keluar
+            processIndicatorHint.classList.add('hiding');
+            processIndicatorHint.classList.remove('visible');
+
+            // Reset state setelah animasi selesai
+            setTimeout(() => {
+                processIndicatorHint.classList.remove('hiding');
+            }, 400); // Sama dengan durasi transisi CSS
+        }
+
+        // Atur status awal kotak centang
+        optAdSkipper.checked = adSkipperEnabled;
+        optAutoMute.checked = autoMuteEnabled;
+        optAutoSkip.checked = autoSkipEnabled;
+        optOverlay.checked = false; // Default ke false
+        optMiniPlayer.checked = miniPlayerEnabled;
+        if (optRpc) optRpc.checked = rpcEnabled;
+        optDynamicTheme.checked = dynamicThemeEnabled;
+        if (optDynamicThemeMode) optDynamicThemeMode.value = dynamicThemeMode;
+        if (optProcessHints) optProcessHints.checked = processHintsEnabled;
+
+        function toggleDynamicThemeSubOptions() {
+            if (!optDynamicThemeSub) return;
+            optDynamicThemeSub.style.display = optDynamicTheme.checked ? 'block' : 'none';
+        }
+
+        function injectDynamicTheme(webview, themeMode = 'default') {
+            try {
+                if (themeMode === 'unified') themeMode = 'overlay';
+
+                const vibrantPath = path.join(__dirname, 'aset/js/vibrant.min.js');
+                const stylingPath = path.join(__dirname, 'aset/js/dynamic-ytm-styling.js');
+
+                if (!fs.existsSync(vibrantPath) || !fs.existsSync(stylingPath)) {
+                    console.warn('[Native Host] Dynamic Theme files not found');
+                    return;
+                }
+
+                const vibrantCode = fs.readFileSync(vibrantPath, 'utf-8');
+                const stylingCode = fs.readFileSync(stylingPath, 'utf-8');
+                const wrappedStylingCode = `
+                    window.DYNAMIC_THEME_MODE = '${themeMode}';
+                    try {
+                        ${stylingCode}
+                    } catch (e) {
+                        console.error('[DynamicTheme Internal Error]', e);
+                        throw e;
+                    }
+                `;
+
+                // Jika sudah diinjeksi, jangan injeksi lagi (mencegah toggle yang tidak stabil).
+                webview.executeJavaScript(`
+                    (function(){
+                        try {
+                            const already = (window.__gapDynamicThemeLoaded === true) ||
+                                (typeof window.enableDynamicTheme === 'function') ||
+                                (typeof window.updateThemeMode === 'function') ||
+                                (document.getElementById('ts-base-styles') != null);
+                            return already;
+                        } catch (e) {
+                            return false;
+                        }
+                    })();
+                `).then((alreadyInjected) => {
+                    if (alreadyInjected) {
+                        console.log('[Native Host] Dynamic Theme already injected; skipping script injection.');
+                        return webview.executeJavaScript(`
+                            try {
+                                if (typeof window.enableDynamicTheme === 'function') {
+                                    window.enableDynamicTheme('${themeMode}');
+                                } else if (typeof window.updateThemeMode === 'function') {
+                                    window.updateThemeMode('${themeMode}');
+                                }
+                                true;
+                            } catch (e) {
+                                console.error('[Native Host] Failed to apply mode after skip:', e);
+                                false;
+                            }
+                        `);
+                    }
+
+                    return webview.executeJavaScript(vibrantCode)
+                        .then(() => webview.executeJavaScript(wrappedStylingCode))
+                        .then(() => console.log('[Native Host] Dynamic Theme Injected'));
+                }).catch(err => console.error('[Native Host] Failed to inject Dynamic Theme:', err));
+            } catch (e) {
+                console.error('[Native Host] Error reading Dynamic Theme files:', e);
+            }
+        }
+
+        function applyDynamicThemeState() {
+            toggleDynamicThemeSubOptions();
+
+            dynamicThemeEnabled = optDynamicTheme.checked;
+            dynamicThemeMode = optDynamicThemeMode ? optDynamicThemeMode.value : 'default';
+            if (dynamicThemeMode === 'unified') dynamicThemeMode = 'overlay';
+
+            // Simpan pengaturan
+            ipcRenderer.send('save-settings', {
+                dynamicThemeEnabled: dynamicThemeEnabled,
+                dynamicThemeMode: dynamicThemeMode
+            });
+
+            if (!webview) return;
+
+            const runWhenReady = (fn) => {
+                try {
+                    if (webview.isLoading && webview.isLoading()) {
+                        webview.addEventListener('did-finish-load', () => fn(), { once: true });
+                        return;
+                    }
+                } catch (_) { }
+                fn();
+            };
+
+            if (!dynamicThemeEnabled) {
+                runWhenReady(() => {
+                    webview.executeJavaScript(`
+                        try {
+                            if (typeof window.disableDynamicTheme === 'function') {
+                                window.disableDynamicTheme();
+                                console.log('[Native Host] Dynamic Theme disabled (cleanup complete)');
+                            } else {
+                                console.warn('[Native Host] disableDynamicTheme() not found (maybe never injected)');
+                            }
+                        } catch (e) {
+                            console.error('[Native Host] disableDynamicTheme() failed:', e);
+                        }
+                    `).catch(err => console.error('[Native Host] Failed to disable Dynamic Theme:', err));
+                });
+                return;
+            }
+
+            // Enabled
+            runWhenReady(() => {
+                webview.executeJavaScript(`
+                    try {
+                        // mengaktifkan harus memanggil enableDynamicTheme() (ini membersihkan status nonaktif internal).
+                        // updateThemeMode() hanya mengganti mode dan tidak akan mengaktifkan kembali setelah disableDynamicTheme().
+                        if (typeof window.enableDynamicTheme === 'function') {
+                            window.enableDynamicTheme('${dynamicThemeMode}');
+                            console.log('[Native Host] Dynamic Theme enabled via enableDynamicTheme()');
+                            true;
+                        } else if (typeof window.updateThemeMode === 'function') {
+                            window.updateThemeMode('${dynamicThemeMode}');
+                            console.log('[Native Host] Dynamic Theme mode updated via updateThemeMode()');
+                            true;
+                        } else {
+                            false;
+                        }
+                    } catch (e) {
+                        console.error('[Native Host] Dynamic Theme apply failed:', e);
+                        false;
+                    }
+                `).then((handled) => {
+                    if (!handled) injectDynamicTheme(webview, dynamicThemeMode);
+                }).catch(() => {
+                    injectDynamicTheme(webview, dynamicThemeMode);
+                });
+            });
+        }
+
+        function updateSettings() {
+            adSkipperEnabled = optAdSkipper.checked;
+            autoMuteEnabled = optAutoMute.checked;
+            autoSkipEnabled = optAutoSkip.checked;
+            dynamicThemeEnabled = optDynamicTheme.checked;
+            dynamicThemeMode = optDynamicThemeMode ? optDynamicThemeMode.value : 'default';
+
+            optAutoMute.disabled = !adSkipperEnabled;
+            optAutoSkip.disabled = !adSkipperEnabled;
+
+            // Kirim ke Webview
+            if (webview.isLoading()) {
+                webview.addEventListener('did-finish-load', sendSettingsToWebview, { once: true });
+            } else {
+                sendSettingsToWebview();
+            }
+
+            // Toggle Jendela Ad Skipper (Popup)
+            ipcRenderer.send('toggle-ad-skipper-window', adSkipperEnabled);
+
+            // Sinkronisasi Pengaturan dengan Proses Utama (Krusial untuk UI Ad Skipper)
+            ipcRenderer.send('save-settings', {
+                adSkipperEnabled: adSkipperEnabled,
+                autoMuteAds: autoMuteEnabled,
+                autoSkipAds: autoSkipEnabled,
+                dynamicThemeEnabled: dynamicThemeEnabled,
+                dynamicThemeMode: dynamicThemeMode
+            });
+        }
+
+        function sendSettingsToWebview() {
+            webview.send('setting-update', {
+                adSkipperEnabled,
+                autoMuteAds: autoMuteEnabled,
+                autoSkipAds: autoSkipEnabled
+            });
+        }
+
+        optAdSkipper.onchange = updateSettings;
+        optAutoMute.onchange = updateSettings;
+        optAutoSkip.onchange = updateSettings;
+        optDynamicTheme.onchange = () => {
+            updateSettings();
+            applyDynamicThemeState();
+        };
+
+        if (optDynamicThemeMode) {
+            optDynamicThemeMode.onchange = () => {
+                updateSettings();
+                applyDynamicThemeState();
+            };
+        }
+
+        optOverlay.onchange = () => {
+            const isOverlay = optOverlay.checked;
+            isOverlayModeActive = isOverlay; // Update status mode overlay
+            ipcRenderer.send('native-overlay-toggle', isOverlay);
+
+            // Toggle Penyeretan & Kontrol Jendela & Perilaku Ubah Ukuran
+            if (isOverlay) {
+                document.body.classList.add('no-drag');
+                document.body.classList.add('overlay-mode');
+                document.getElementById('btn-min').style.display = 'none';
+                document.getElementById('btn-max').style.display = 'none';
+            } else {
+                document.body.classList.remove('no-drag');
+                document.body.classList.remove('overlay-mode');
+                document.getElementById('btn-min').style.display = 'flex';
+                document.getElementById('btn-max').style.display = 'flex';
+            }
+
+            // Paksa trigger resize event di dalam webview agar layout responsif YTM
+            // segera menyesuaikan (mengatasi masalah cover art terpotong saat switch ke overlay)
+            if (webview) {
+                // Trigger resize beberapa kali untuk memastikan transisi animasi dicover
+                // 1. Trigger cepat untuk inisialisasi
+                setTimeout(() => {
+                    try {
+                        webview.executeJavaScript(`window.dispatchEvent(new Event('resize'));`);
+                    } catch (e) { }
+                }, 300);
+
+                // 2. Trigger setelah animasi slide selesai (biasanya ~400ms di main.js)
+                setTimeout(() => {
+                    try {
+                        webview.executeJavaScript(`window.dispatchEvent(new Event('resize'));`);
+                    } catch (e) { }
+                }, 800);
+            }
+        };
+
+        const optMiniPlayerSub = document.getElementById('opt-miniplayer-sub');
+
+        optMiniPlayer.onchange = () => {
+            miniPlayerEnabled = optMiniPlayer.checked;
+            if (optMiniPlayerSub) {
+                optMiniPlayerSub.style.display = miniPlayerEnabled ? 'block' : 'none';
+            }
+            ipcRenderer.send('toggle-mini-player', miniPlayerEnabled);
+        };
+
+        if (optMiniPlayerHideOnCursor) {
+            optMiniPlayerHideOnCursor.onchange = () => {
+                const hidden = optMiniPlayerHideOnCursor.checked;
+                ipcRenderer.send('mini-player-settings-update', { hideOnCursor: hidden });
+                ipcRenderer.send('save-settings', { miniPlayerHideOnCursor: hidden });
+            };
+        }
+
+        if (optRpc) {
+            optRpc.onchange = () => {
+                rpcEnabled = optRpc.checked;
+                ipcRenderer.send('set-rpc-enabled', rpcEnabled);
+                ipcRenderer.send('save-settings', { rpcEnabled: rpcEnabled });
+            };
+        }
+
+        if (optProcessHints) {
+            optProcessHints.onchange = () => {
+                processHintsEnabled = optProcessHints.checked;
+                ipcRenderer.send('save-settings', { processHintsEnabled: processHintsEnabled });
+
+                // Jika dimatikan, sembunyikan hint yang sedang tampil
+                if (!processHintsEnabled) {
+                    hideProcessHint();
+                }
+            };
+        }
+
+        // --- Muat pengaturan awal dari Proses Utama ---
+        let pendingGifSettings = null; // Untuk menyimpan settings GIF sementara sampai UI siap
+
+        (async () => {
+            try {
+                const settings = await ipcRenderer.invoke('load-settings');
+                if (!settings || typeof settings !== 'object') return;
+
+                optAdSkipper.checked = settings.adSkipperEnabled === true;
+                optAutoMute.checked = settings.autoMuteAds === true;
+                optAutoSkip.checked = settings.autoSkipAds === true;
+                optMiniPlayer.checked = settings.miniPlayerFeatureEnabled === true;
+                if (optMiniPlayerSub) {
+                    optMiniPlayerSub.style.display = optMiniPlayer.checked ? 'block' : 'none';
+                }
+                const optMiniPlayerHideOnCursor = document.getElementById('opt-miniplayer-hide-on-cursor');
+                if (optMiniPlayerHideOnCursor) {
+                    optMiniPlayerHideOnCursor.checked = settings.miniPlayerHideOnCursor === true;
+                    optMiniPlayerHideOnCursor.onchange = () => {
+                        ipcRenderer.send('mini-player-settings-update', { hideOnCursor: optMiniPlayerHideOnCursor.checked });
+                        ipcRenderer.send('save-settings', { miniPlayerHideOnCursor: optMiniPlayerHideOnCursor.checked });
+                    };
+                }
+                if (optRpc) optRpc.checked = settings.rpcEnabled === true;
+                optOverlay.checked = settings.overlayModeEnabled === true;
+                optDynamicTheme.checked = settings.dynamicThemeEnabled === true;
+                if (optDynamicThemeMode) {
+                    optDynamicThemeMode.value = settings.dynamicThemeMode || 'default';
+                }
+                if (optProcessHints) {
+                    optProcessHints.checked = settings.processHintsEnabled === true;
+                    processHintsEnabled = settings.processHintsEnabled === true;
+                }
+
+                // Simpan GIF settings untuk diproses nanti setelah GIF UI siap
+                pendingGifSettings = {
+                    gifOverlayEnabled: settings.gifOverlayEnabled,
+                    gifOverlayLocked: settings.gifOverlayLocked,
+                    gifOverlays: settings.gifOverlays,
+                    activePresetId: settings.activePresetId  // Tambahkan preset aktif
+                };
+                console.log('[Native Host] Pending GIF settings saved:', pendingGifSettings);
+
+                // Set flag bahwa settings sudah ready
+                window._gifSettingsLoaded = true;
+
+                updateRememberSettingsButton(settings.rememberedSettingsSaved === true);
+
+                // Terapkan efek samping untuk mencocokkan status UI yang dimuat
+                updateSettings();
+                applyDynamicThemeState();
+                optOverlay.onchange();
+                optMiniPlayer.onchange();
+                if (optRpc) optRpc.onchange();
+            } catch (e) {
+                console.warn('[Native Host] Failed to load settings:', e);
+            }
+        })();
+
+        // --- Event Listener Webview ---
+        webview.addEventListener('dom-ready', () => {
+            // Suntikkan CSS untuk menyembunyikan scrollbar di dalam webview jika diperlukan
+            // webview.insertCSS('::-webkit-scrollbar { display: none; }');
+            webview.send('set-native-mode', true); // Aktifkan mode native di preload
+            sendSettingsToWebview();
+
+            // Terapkan status tema dinamis setelah webview siap
+            applyDynamicThemeState();
+
+            // === Milestone 2: DOM Ready ===
+            advanceLoadingPhase(2);
+        });
+
+        webview.addEventListener('did-start-loading', () => {
+            // Mulai hybrid loading tracking saat halaman mulai dimuat
+            if (!loadingComplete && sideLoadingUi) {
+                sideLoadingUi.style.display = 'flex';
+                sideLoadingUi.style.opacity = '1';
+                loadingFallbackTimer = startHybridLoadingTracking();
+            }
+        });
+
+        webview.addEventListener('did-fail-load', (e) => {
+            console.warn('[Native Host] Gagal memuat:', e);
+            // Opsional: Tampilkan pesan error di loading UI
+        });
+
+        webview.addEventListener('ipc-message', (event) => {
+            const channel = event.channel;
+            const data = event.args[0];
+
+            // Teruskan pesan spesifik ke Proses Utama
+            if (channel === 'playback-update') {
+                ipcRenderer.send('playback-update', data);
+
+                // Update currentMusicInfo untuk modal per-GIF settings
+                if (data) {
+                    currentMusicInfo.title = data.title || '';
+                    currentMusicInfo.artist = data.artist || '';
+                    currentMusicInfo.isPlaying = data.isPlaying || false;
+
+                    // Update teks dropdown jika modal sedang terbuka
+                    if (gifSettingsModal && gifSettingsModal.classList.contains('visible')) {
+                        updateDropdownOptionsText();
+                    }
+                }
+
+                // === Milestone 3: Player Ready ===
+                // Jika playback-update mengirim data valid (bukan loading), player sudah siap
+                if (data && data.title && data.title !== 'Loading...' && !loadingComplete) {
+                    advanceLoadingPhase(3);
+                    // Bersihkan fallback timer karena loading sudah selesai
+                    if (loadingFallbackTimer) {
+                        clearTimeout(loadingFallbackTimer);
+                        loadingFallbackTimer = null;
+                    }
+                }
+            } else if (channel === 'analyser-data') {
+                // --- Pemrosesan Visualizer (Diporting dari Mode Game) ---
+                const rawData = data.data || [];
+                const isPlaying = data.isPlaying;
+
+                // 1. Potong menjadi 32 bin (cocok dengan Mode Game)
+                const relevantDataSlice = rawData.slice(0, Math.min(32, rawData.length));
+                const processedData = [];
+
+                // 2. Terapkan Smoothing & Normalisasi
+                for (let i = 0; i < relevantDataSlice.length; i++) {
+                    const rawValue = relevantDataSlice[i] || 0;
+
+                    const maxScaleMain = 55;
+                    const baseScaleMain = 1;
+                    const newCalculatedScaleMain = baseScaleMain + (rawValue / 255) * maxScaleMain;
+
+                    let currentAppliedScaleMain = previousVisualizerValues[i] || baseScaleMain;
+
+                    let finalDisplayScaleMain;
+                    if (newCalculatedScaleMain > currentAppliedScaleMain) {
+                        finalDisplayScaleMain = newCalculatedScaleMain;
+                    } else {
+                        finalDisplayScaleMain = currentAppliedScaleMain * 0.85; // Faktor peluruhan (0.85)
+                    }
+                    finalDisplayScaleMain = Math.max(baseScaleMain, finalDisplayScaleMain);
+                    previousVisualizerValues[i] = finalDisplayScaleMain;
+
+                    let normalizedFactor = (finalDisplayScaleMain - baseScaleMain) / maxScaleMain;
+                    processedData.push(Math.max(0, Math.min(1, normalizedFactor)));
+                }
+
+                // 3. Kirim Data Ternormalisasi (0.0 - 1.0)
+                ipcRenderer.send('analyser-data', { data: processedData, isPlaying: isPlaying });
+
+            } else if (channel === 'ad-status-update') {
+                // Buat data untuk main.js guna menangani koordinat klik
+                const payload = {
+                    state: data.state,
+                    details: data.details,
+                    targetBounds: data.bounds, // Petakan batas ke targetBounds
+                    webviewBounds: { x: 0, y: 32, width: window.innerWidth, height: window.innerHeight - 32 } // Perkiraan batas webview
+                };
+                ipcRenderer.send('ad-status-update', payload);
+
+            } else if (channel === 'request-auto-skip-instant') {
+                // Tangani Klik Otomatis
+                const { x, y } = data;
+
+                // Terapkan Perbaikan Faktor Zoom (Krusial untuk Jendela Diubah Ukuran/Overlay)
+                const zoomFactor = webview.getZoomFactor();
+                const scaledX = Math.round(x * zoomFactor);
+                const scaledY = Math.round(y * zoomFactor);
+
+                webview.sendInputEvent({ type: 'mouseDown', x: scaledX, y: scaledY, button: 'left', clickCount: 1 });
+                setTimeout(() => {
+                    webview.sendInputEvent({ type: 'mouseUp', x: scaledX, y: scaledY, button: 'left', clickCount: 1 });
+                }, 50);
+                console.log('[Native Host] Auto-clicked skip button at', scaledX, scaledY, 'Zoom:', zoomFactor);
+            } else if (channel === 'buffer-status-update') {
+                // === HANDLER UNTUK PROCESS INDICATOR HINT ===
+                // Menampilkan "Preparing content" secara universal untuk semua proses penerimaan data dari server
+                if (!data) return;
+
+                // Kategori untuk eksperimen
+                const category = data.category || 'user-facing';
+                const isPrefetchOrPreload = category === 'prefetch' || category === 'preload';
+
+                // Universal hint text - satu teks untuk semua jenis buffering
+                const universalHintText = 'Preparing content';
+
+                if (data.buffering === true) {
+                    // Proses loading - tampilkan hint tanpa auto-hide
+                    showProcessHint(universalHintText);
+
+                    // Log dengan highlight untuk eksperimen
+                    if (isPrefetchOrPreload) {
+                        console.log(`%c[Native Host] [${category.toUpperCase()}] Buffering: ${data.reason}`, 'color: orange; font-weight: bold;');
+                    } else {
+                        console.log(`%c[Native Host] [${category.toUpperCase()}] Buffering: ${data.reason}`, 'color: green;');
+                    }
+                } else {
+                    // Proses selesai - sembunyikan hint
+                    hideProcessHint();
+
+                    if (isPrefetchOrPreload) {
+                        console.log(`%c[Native Host] [${category.toUpperCase()}] Complete: ${data.reason}`, 'color: orange;');
+                    } else {
+                        console.log(`%c[Native Host] [${category.toUpperCase()}] Complete: ${data.reason}`, 'color: green;');
+                    }
+                }
+            }
+        });
+
+        // --- Dengarkan Pesan Proses Utama ---
+        ipcRenderer.on('execute-internal-webview-click', (event, { x, y }) => {
+            // Proses utama mengirim koordinat relatif terhadap webview
+            webview.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: 1 });
+            webview.sendInputEvent({ type: 'mouseUp', x, y, button: 'left', clickCount: 1 });
+            console.log('[Native Host] Executed internal click at', x, y);
+        });
+
+        // === GIF OVERLAY FEATURE (MULTI-INSTANCE) ===
+        const optGifOverlay = document.getElementById('opt-gif-overlay');
+        const optGifOverlaySub = document.getElementById('opt-gif-overlay-sub');
+        const gifListContainer = document.getElementById('gif-list-container');
+        const addGifBtn = document.getElementById('add-gif-btn');
+        const gifInteractionLock = document.getElementById('gif-interaction-lock');
+        let gifInteractionLocked = false;
+        let isGifUIRestored = false;
+
+        // === Preset GIF Elements ===
+        const gifPresetSelect = document.getElementById('gif-preset-select');
+        let nativePresetsList = []; // Daftar preset untuk native player
+
+        // === Per-GIF Settings Modal ===
+        const gifSettingsModal = document.getElementById('gif-settings-modal');
+        const gifConditionType = document.getElementById('gif-condition-type');
+        const gifOpacity = document.getElementById('gif-opacity');
+        const gifOpacityValue = document.getElementById('gif-opacity-value');
+        const gifRotation = document.getElementById('gif-rotation');
+        const gifRotationValue = document.getElementById('gif-rotation-value');
+        const gifHideOnCursor = document.getElementById('gif-hide-on-cursor');
+        const gifSettingsCancel = document.getElementById('gif-settings-cancel');
+        const gifSettingsSave = document.getElementById('gif-settings-save');
+        // Animation Elements
+        const gifAnimationType = document.getElementById('gif-animation-type');
+        const gifAnimationSpeedContainer = document.getElementById('gif-animation-speed-container');
+        const gifAnimationSpeed = document.getElementById('gif-animation-speed');
+        const gifAnimationSpeedValue = document.getElementById('gif-animation-speed-value');
+
+        const noMusicWarningEl = document.getElementById('no-music-warning');
+        let currentEditingGifRow = null; // Row yang sedang di-edit
+        let isGifConditionDirty = false; // Melacak apakah user mengubah tipe kondisi secara manual
+
+        if (gifConditionType) {
+            gifConditionType.addEventListener('change', () => {
+                isGifConditionDirty = true;
+            });
+        }
+
+        // State per-GIF settings (Map: overlayId -> { condition, value, opacity, rotation })
+        let gifSettingsMap = new Map();
+
+        function toggleGifOverlaySubOptions() {
+            if (optGifOverlay && optGifOverlaySub) {
+                optGifOverlaySub.style.display = optGifOverlay.checked ? 'block' : 'none';
+
+                // Sinkron ke main
+                ipcRenderer.send('set-gif-overlay-enabled', optGifOverlay.checked);
+
+                // Sinkron lock state jika enabled
+                if (optGifOverlay.checked) {
+                    ipcRenderer.send('set-gif-overlay-locked', gifInteractionLocked);
+                }
+            }
+        }
+
+        // === Fungsi Preset GIF untuk Native Player ===
+
+        // Muat daftar preset dari main process
+        async function loadNativePresetsList() {
+            try {
+                nativePresetsList = await ipcRenderer.invoke('gif-preset-list');
+                console.log(`[Native Host] Memuat ${nativePresetsList.length} preset GIF`);
+                renderNativePresetDropdown();
+                // Sync dropdown dengan preset aktif setelah render
+                await updateNativeActivePresetDropdown();
+            } catch (e) {
+                console.error('[Native Host] Gagal memuat daftar preset:', e);
+            }
+        }
+
+        // Render dropdown preset
+        function renderNativePresetDropdown() {
+            if (!gifPresetSelect) return;
+            gifPresetSelect.innerHTML = '<option value="">-- Pilih Preset --</option>';
+
+            nativePresetsList.forEach(preset => {
+                const option = document.createElement('option');
+                option.value = preset.presetId;
+                option.textContent = `${preset.name} (${preset.overlays.length} GIF)`;
+                gifPresetSelect.appendChild(option);
+            });
+        }
+
+        // Sync dropdown dengan preset aktif dari main process
+        async function updateNativeActivePresetDropdown() {
+            try {
+                const activeId = await ipcRenderer.invoke('gif-preset-get-active');
+                if (gifPresetSelect) {
+                    gifPresetSelect.value = activeId || "";
+                    console.log(`[Native Host] Preset dropdown synced to: ${activeId || 'None'}`);
+                }
+            } catch (e) {
+                console.warn('[Native Host] Failed to sync active preset:', e);
+            }
+        }
+
+        // Terapkan preset yang dipilih
+        async function applyNativeSelectedPreset() {
+            const selectedId = gifPresetSelect.value;
+            // if (!selectedId) return; // Allow empty ID to unapply/clear preset
+
+            const result = await ipcRenderer.invoke('gif-preset-apply', selectedId);
+            if (result.success) {
+                console.log('[Native Host] Preset berhasil diterapkan:', selectedId);
+
+                // Reset flag agar UI bisa di-restore ulang
+                isGifUIRestored = false;
+
+                // Clear state lama
+                gifListContainer.innerHTML = '';
+                gifSettingsMap.clear();
+
+                // Muat settings baru dari main process
+                const settings = await ipcRenderer.invoke('gif-settings-load');
+                if (settings.gifOverlays && Array.isArray(settings.gifOverlays)) {
+                    settings.gifOverlays.forEach(overlay => {
+                        createGifInputRow(overlay.id, overlay.path, overlay.settings);
+                    });
+                    console.log(`[Native Host] Loaded ${settings.gifOverlays.length} GIF overlays from preset`);
+                }
+
+                // Tandai UI sudah di-restore
+                isGifUIRestored = true;
+
+                // Reload preset list untuk update count di dropdown
+                await loadNativePresetsList();
+
+                // Sync dropdown dengan preset yang baru diterapkan
+                if (gifPresetSelect) {
+                    gifPresetSelect.value = selectedId;
+                }
+
+                if (result.missingFiles && result.missingFiles.length > 0) {
+                    alert(`Peringatan: ${result.missingFiles.length} file GIF tidak ditemukan dan dilewati.`);
+                }
+            } else {
+                alert(`Gagal menerapkan preset: ${result.error}`);
+            }
+        }
+
+        // Event listener untuk preset
+        if (gifPresetSelect) {
+            gifPresetSelect.addEventListener('change', applyNativeSelectedPreset);
+        }
+
+        // Fungsi create row baru (dinamis)
+        function createGifInputRow(id = '', path = '', settings = null) {
+            const newRow = document.createElement('div');
+            newRow.className = 'gif-input-container';
+            newRow.dataset.overlayId = id.toString(); // Pastikan string
+
+            const fileName = path ? path.split(/[\\/]/).pop() : '';
+
+            // Cek apakah ada kondisi yang sudah di-set (bukan 'always')
+            const hasCondition = settings && settings.condition && settings.condition !== 'always';
+
+            newRow.innerHTML = `
+                <input type="text" class="gif-file-name" placeholder="Pilih file GIF..." readonly value="${fileName}">
+                <button class="gif-settings-btn${hasCondition ? ' has-condition' : ''}" title="Pengaturan GIF">⚙️</button>
+                <button class="gif-browse-btn" title="Pilih File">Browse</button>
+                <button class="gif-clear-btn" title="Hapus Overlay">✕</button>
+            `;
+
+            // Simpan settings ke map jika ada - gunakan string key secara konsisten
+            const keyId = id.toString();
+            if (keyId && settings) {
+                gifSettingsMap.set(keyId, settings);
+                console.log(`[Native Host] Stored settings for overlay #${keyId}:`, settings);
+            }
+
+            gifListContainer.appendChild(newRow);
+            setupGifRowListeners(newRow);
+            return newRow;
+        }
+
+        // Fungsi Helper: Pasang listener untuk satu baris input
+        function setupGifRowListeners(row) {
+            const settingsBtn = row.querySelector('.gif-settings-btn');
+            const browseBtn = row.querySelector('.gif-browse-btn');
+            const clearBtn = row.querySelector('.gif-clear-btn');
+            const input = row.querySelector('.gif-file-name');
+
+            // Settings Button Logic - Buka modal per-GIF settings
+            if (settingsBtn) {
+                settingsBtn.addEventListener('click', () => {
+                    openGifSettingsModal(row);
+                });
+            }
+
+            // Browse Logic - dengan copy ke folder internal
+            browseBtn.addEventListener('click', async () => {
+                try {
+                    const result = await ipcRenderer.invoke('gif-overlay-browse-file');
+                    if (result && result.filePath) {
+                        // Copy file ke folder internal aplikasi
+                        const importResult = await ipcRenderer.invoke('gif-overlay-import-file', result.filePath);
+
+                        if (!importResult.success) {
+                            console.error('[Native Host] Gagal mengimport file:', importResult.error);
+                            alert(`Gagal mengimport file: ${importResult.error}`);
+                            return;
+                        }
+
+                        // Tampilkan peringatan jika file besar (hanya log, tidak memblokir)
+                        if (importResult.warning) {
+                            console.warn(`[Native Host] ${importResult.warning}`);
+                        }
+
+                        const internalPath = importResult.internalPath;
+                        const existingId = row.dataset.overlayId;
+                        const fileName = internalPath.split(/[\\/]/).pop();
+
+                        if (existingId) {
+                            // Update overlay existing
+                            ipcRenderer.send('set-gif-overlay-image-by-id', {
+                                id: parseInt(existingId),
+                                path: internalPath
+                            });
+                            input.value = fileName;
+                        } else {
+                            // Create new overlay
+                            const newId = await ipcRenderer.invoke('create-new-gif-overlay', internalPath);
+                            row.dataset.overlayId = newId;
+                            input.value = fileName;
+                        }
+                    }
+                } catch (e) {
+                    console.error('[Native Host] GIF Browse Error:', e);
+                }
+            });
+
+            // Clear/Remove Logic
+            clearBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const existingId = row.dataset.overlayId;
+
+                // Jika overlay sudah ada, tutup window-nya DAN hapus file dari disk
+                if (existingId) {
+                    console.log(`[Native Host] Menghapus GIF overlay ID: ${existingId}`);
+                    ipcRenderer.send('close-gif-overlay-by-id', {
+                        id: parseInt(existingId),
+                        deleteFile: true  // Hapus file dari gif-storage
+                    });
+                }
+
+                // Hapus elemen input UI (jika lebih dari 1)
+                if (gifListContainer.children.length > 1) {
+                    row.remove();
+                } else {
+                    // Jika satu-satunya, reset saja tanpa hapus elemen
+                    input.value = '';
+                    row.dataset.overlayId = '';
+                }
+            });
+        }
+
+        // === Per-GIF Settings Modal Functions ===
+
+        // State untuk menyimpan info musik saat ini dari webview
+        let currentMusicInfo = {
+            title: '',
+            artist: '',
+            isPlaying: false
+        };
+
+        // Fungsi untuk update teks opsi dropdown berdasarkan musik yang sedang diputar dan/atau settings tersimpan
+        function updateDropdownOptionsText(savedSettings = null) {
+            const titleOption = gifConditionType.querySelector('option[value="music-title"]');
+            const artistOption = gifConditionType.querySelector('option[value="music-artist"]');
+
+            const hasTitle = currentMusicInfo.title && currentMusicInfo.title.trim() !== '';
+            const hasArtist = currentMusicInfo.artist && currentMusicInfo.artist.trim() !== '';
+
+            // Cek apakah ada saved value yang berbeda dari musik saat ini
+            const savedCondition = savedSettings?.condition;
+            const savedValue = savedSettings?.value;
+
+            // Update teks opsi judul
+            if (titleOption) {
+                // Jika settings tersimpan adalah music-title dengan value berbeda dari musik saat ini
+                if (savedCondition === 'music-title' && savedValue && savedValue !== currentMusicInfo.title) {
+                    const truncatedSavedTitle = savedValue.length > 20
+                        ? savedValue.substring(0, 20) + '...'
+                        : savedValue;
+                    titleOption.textContent = `✓ Tersimpan: "${truncatedSavedTitle}"`;
+                    titleOption.disabled = false;
+                } else if (hasTitle) {
+                    // Potong judul jika terlalu panjang
+                    const truncatedTitle = currentMusicInfo.title.length > 25
+                        ? currentMusicInfo.title.substring(0, 25) + '...'
+                        : currentMusicInfo.title;
+                    titleOption.textContent = `Saat judul musik "${truncatedTitle}"`;
+                    titleOption.disabled = false;
+                } else {
+                    titleOption.textContent = titleOption.dataset.defaultText || 'Saat judul musik mengandung...';
+                    titleOption.disabled = savedCondition !== 'music-title'; // Disable hanya jika bukan saved condition
+                }
+            }
+
+            // Update teks opsi artis
+            if (artistOption) {
+                // Jika settings tersimpan adalah music-artist dengan value berbeda dari musik saat ini
+                if (savedCondition === 'music-artist' && savedValue && savedValue !== currentMusicInfo.artist) {
+                    const truncatedSavedArtist = savedValue.length > 20
+                        ? savedValue.substring(0, 20) + '...'
+                        : savedValue;
+                    artistOption.textContent = `✓ Tersimpan: "${truncatedSavedArtist}"`;
+                    artistOption.disabled = false;
+                } else if (hasArtist) {
+                    // Potong artis jika terlalu panjang
+                    const truncatedArtist = currentMusicInfo.artist.length > 25
+                        ? currentMusicInfo.artist.substring(0, 25) + '...'
+                        : currentMusicInfo.artist;
+                    artistOption.textContent = `Saat artis musik "${truncatedArtist}"`;
+                    artistOption.disabled = false;
+                } else {
+                    artistOption.textContent = artistOption.dataset.defaultText || 'Saat artis musik mengandung...';
+                    artistOption.disabled = savedCondition !== 'music-artist'; // Disable hanya jika bukan saved condition
+                }
+            }
+
+            // Tampilkan/sembunyikan warning
+            // [UX] Warning dibiarkan selalu tampil agar infonya jelas
+            // const hasMusic = hasTitle || hasArtist || (savedCondition && savedValue);
+            // if (noMusicWarningEl) {
+            //    noMusicWarningEl.style.display = hasMusic ? 'none' : 'block';
+            // }
+        }
+
+        // Buka modal pengaturan GIF
+        function openGifSettingsModal(row) {
+            currentEditingGifRow = row;
+            isGifConditionDirty = false; // Reset tracking flag
+            const overlayId = row.dataset.overlayId;
+
+            // Load settings yang sudah ada (coba dengan string dan number key)
+            let existingSettings = gifSettingsMap.get(overlayId) || gifSettingsMap.get(overlayId.toString());
+            if (!existingSettings && overlayId) {
+                existingSettings = gifSettingsMap.get(parseInt(overlayId));
+            }
+
+            // Fallback ke default jika tidak ada
+            existingSettings = existingSettings || {
+                condition: 'always',
+                value: '',
+                opacity: 1,
+                rotation: 0,
+                hideOnCursor: false
+            };
+
+            console.log(`[Native Host] Opening settings for overlay #${overlayId}:`, existingSettings);
+            console.log('[Native Host] Current gifSettingsMap:', [...gifSettingsMap.entries()]);
+
+            // Update teks dropdown berdasarkan musik saat ini DAN settings tersimpan
+            updateDropdownOptionsText(existingSettings);
+
+            // Populate form dengan settings yang ada
+            gifConditionType.value = existingSettings.condition || 'always';
+            gifOpacity.value = existingSettings.opacity !== undefined ? existingSettings.opacity : 1;
+            gifOpacityValue.textContent = `${Math.round((existingSettings.opacity || 1) * 100)}%`;
+
+            // Rotation
+            const rotationVal = existingSettings.rotation !== undefined ? existingSettings.rotation : 0;
+            gifRotation.value = rotationVal;
+            gifRotationValue.textContent = `${rotationVal}°`;
+
+            // sembunyikan kursor
+            if (gifHideOnCursor) {
+                gifHideOnCursor.checked = existingSettings.hideOnCursor === true;
+            }
+
+            // Animation settings
+            const animSettings = existingSettings.animation || { type: 'none', speed: 2, enabled: true };
+            if (gifAnimationType) {
+                gifAnimationType.value = animSettings.type || 'none';
+
+                // Trigger visibility update
+                if (gifAnimationSpeedContainer) {
+                    gifAnimationSpeedContainer.style.display = (animSettings.type && animSettings.type !== 'none') ? 'block' : 'none';
+                }
+            }
+
+            if (gifAnimationSpeed) {
+                const speedVal = animSettings.speed || 2;
+                gifAnimationSpeed.value = speedVal;
+                if (gifAnimationSpeedValue) gifAnimationSpeedValue.textContent = speedVal;
+            }
+
+            // Tampilkan modal
+            gifSettingsModal.classList.add('visible');
+        }
+
+        // Tutup modal
+        function closeGifSettingsModal() {
+            gifSettingsModal.classList.remove('visible');
+            currentEditingGifRow = null;
+        }
+
+        // Simpan settings per-GIF
+        function saveGifSettings() {
+            if (!currentEditingGifRow) return;
+
+            const overlayId = currentEditingGifRow.dataset.overlayId;
+            const settingsBtn = currentEditingGifRow.querySelector('.gif-settings-btn');
+            const conditionType = gifConditionType.value;
+
+            // Load saved settings untuk perbandingan dan retensi value
+            let savedSettings = gifSettingsMap.get(overlayId) || gifSettingsMap.get(overlayId.toString()) || {};
+
+            // 1. Tentukan Value Kondisi (Prioritaskan yang tersimpan kecuali user mengubahnya)
+            let conditionValue = savedSettings.value || '';
+
+            const conditionChanged = (savedSettings.condition !== conditionType);
+            const valueNeeded = (conditionType === 'music-title' || conditionType === 'music-artist');
+
+            // Update value ke 'Musik Saat Ini' HANYA jika:
+            // - User mengubah dropdown (dirty flag)
+            // - Tipe kondisi berubah
+            // - Value dibutuhkan tapi kosong
+            if (isGifConditionDirty || conditionChanged || (valueNeeded && !conditionValue)) {
+                if (conditionType === 'music-title') {
+                    conditionValue = currentMusicInfo.title || '';
+                } else if (conditionType === 'music-artist') {
+                    conditionValue = currentMusicInfo.artist || '';
+                } else {
+                    conditionValue = '';
+                }
+                console.log(`[Native Host] Updating condition value to current music: "${conditionValue}"`);
+            } else {
+                console.log(`[Native Host] Retaining saved condition value: "${conditionValue}"`);
+            }
+
+            const settings = {
+                condition: conditionType,
+                value: conditionValue,
+                opacity: parseFloat(gifOpacity.value),
+                rotation: parseInt(gifRotation.value) || 0,
+                hideOnCursor: gifHideOnCursor ? gifHideOnCursor.checked : false,
+                animation: {
+                    type: gifAnimationType ? gifAnimationType.value : 'none',
+                    speed: gifAnimationSpeed ? parseInt(gifAnimationSpeed.value) : 2,
+                    enabled: true
+                }
+            };
+
+            // Simpan ke map
+            gifSettingsMap.set(overlayId, settings);
+
+            // Update visual indicator pada button
+            if (settings.condition !== 'always') {
+                settingsBtn.classList.add('has-condition');
+            } else {
+                settingsBtn.classList.remove('has-condition');
+            }
+
+            // Kirim ke main process untuk disimpan dan diterapkan
+            ipcRenderer.send('update-gif-overlay-settings', {
+                id: parseInt(overlayId),
+                settings: settings
+            });
+
+            console.log(`[Native Host][GIF] Settings disimpan untuk overlay ${overlayId}: kondisi=${settings.condition}, value="${settings.value || ''}", opacity=${settings.opacity}, rotation=${settings.rotation}°`);
+
+            closeGifSettingsModal();
+        }
+
+        // Event Listeners untuk modal
+        if (gifSettingsCancel) gifSettingsCancel.addEventListener('click', closeGifSettingsModal);
+        if (gifSettingsSave) gifSettingsSave.addEventListener('click', saveGifSettings);
+
+        // Animation UI Control
+        if (gifAnimationType) {
+            gifAnimationType.addEventListener('change', () => {
+                if (gifAnimationSpeedContainer) {
+                    gifAnimationSpeedContainer.style.display = (gifAnimationType.value !== 'none') ? 'block' : 'none';
+                }
+            });
+        }
+
+        if (gifAnimationSpeed) {
+            gifAnimationSpeed.addEventListener('input', () => {
+                if (gifAnimationSpeedValue) {
+                    gifAnimationSpeedValue.textContent = gifAnimationSpeed.value;
+                }
+            });
+        }
+        if (gifOpacity) {
+            gifOpacity.addEventListener('input', () => {
+                gifOpacityValue.textContent = `${Math.round(gifOpacity.value * 100)}%`;
+            });
+        }
+
+        if (gifRotation) {
+            gifRotation.addEventListener('input', () => {
+                gifRotationValue.textContent = `${gifRotation.value}°`;
+            });
+        }
+
+        if (gifSettingsCancel) {
+            gifSettingsCancel.addEventListener('click', closeGifSettingsModal);
+        }
+
+        if (gifSettingsSave) {
+            gifSettingsSave.addEventListener('click', saveGifSettings);
+        }
+
+        // Tutup modal dengan klik di luar atau Escape
+        if (gifSettingsModal) {
+            gifSettingsModal.addEventListener('click', (e) => {
+                if (e.target === gifSettingsModal) {
+                    closeGifSettingsModal();
+                }
+            });
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && gifSettingsModal.classList.contains('visible')) {
+                closeGifSettingsModal();
+            }
+        });
+
+        // === End Per-GIF Settings Modal ===
+
+        // Tombol Tambah Input Baru (+)
+        if (addGifBtn) {
+            addGifBtn.addEventListener('click', () => {
+                createGifInputRow();
+            });
+        }
+
+        // Lock Toggle Listener
+        if (gifInteractionLock) {
+            gifInteractionLock.addEventListener('change', () => {
+                gifInteractionLocked = gifInteractionLock.checked;
+                ipcRenderer.send('set-gif-overlay-locked', gifInteractionLocked);
+            });
+        }
+
+        // Master Toggle Listener
+        if (optGifOverlay) {
+            optGifOverlay.addEventListener('change', () => {
+                toggleGifOverlaySubOptions();
+            });
+        }
+
+        // Init listener untuk row default (jika ada) saat pertama load
+        const firstRow = document.querySelector('.gif-input-container');
+        if (firstRow) setupGifRowListeners(firstRow);
+
+        // Muat daftar preset saat startup
+        loadNativePresetsList();
+
+        // === Apply Pending GIF Settings (dari load-settings awal) ===
+        function applyPendingGifSettings() {
+            if (!pendingGifSettings) return;
+
+            console.log('[Native Host] Applying pending GIF settings:', pendingGifSettings);
+
+            // 1. Restore Lock state
+            if (pendingGifSettings.gifOverlayLocked !== undefined && gifInteractionLock) {
+                gifInteractionLock.checked = pendingGifSettings.gifOverlayLocked === true;
+                gifInteractionLocked = pendingGifSettings.gifOverlayLocked === true;
+            }
+
+            // 2. Restore Enabled state dan toggle sub-options
+            if (pendingGifSettings.gifOverlayEnabled !== undefined && optGifOverlay) {
+                optGifOverlay.checked = pendingGifSettings.gifOverlayEnabled === true;
+                toggleGifOverlaySubOptions();
+            }
+
+            // 3. Restore UI List dengan settings per-GIF
+            // Hanya restore jika ada preset aktif
+            const hasActivePreset = pendingGifSettings.activePresetId != null;
+
+            if (!isGifUIRestored) {
+                const container = document.getElementById('gif-list-container');
+
+                // Bersihkan UI lama (termasuk row default dari HTML)
+                if (container) {
+                    container.innerHTML = '';
+                }
+
+                // Clear settings map lama untuk mencegah konflik
+                gifSettingsMap.clear();
+
+                // Hanya muat overlay jika ada preset aktif
+                if (hasActivePreset && pendingGifSettings.gifOverlays && Array.isArray(pendingGifSettings.gifOverlays) && pendingGifSettings.gifOverlays.length > 0) {
+                    pendingGifSettings.gifOverlays.forEach(item => {
+                        // DEBUG: Log data yang akan di-pass
+                        console.log(`[Native Host] Creating GIF row for #${item.id}:`, {
+                            path: item.path,
+                            settings: item.settings
+                        });
+
+                        // Teruskan settings ke createGifInputRow agar indicator kondisi tampil
+                        createGifInputRow(item.id, item.path, item.settings);
+                    });
+
+                    console.log(`[Native Host] Restored ${pendingGifSettings.gifOverlays.length} GIF overlay UI items`);
+                    console.log('[Native Host] gifSettingsMap after restore:', [...gifSettingsMap.entries()]);
+                } else {
+                    // Jika tidak ada preset aktif atau tidak ada overlay, buat satu row kosong sebagai placeholder
+                    createGifInputRow();
+                    console.log('[Native Host] No active preset or no saved GIF overlays, created empty placeholder row');
+                }
+
+                isGifUIRestored = true;
+            }
+
+            // Clear pending setelah di-apply
+            pendingGifSettings = null;
+            window._gifSettingsLoaded = false; // Reset flag
+        }
+
+        // Polling untuk menunggu sampai settings selesai di-load dari async IIFE
+        const gifSettingsCheckInterval = setInterval(() => {
+            if (window._gifSettingsLoaded && pendingGifSettings) {
+                console.log('[Native Host] Settings loaded, applying GIF settings now...');
+                clearInterval(gifSettingsCheckInterval);
+                applyPendingGifSettings();
+            }
+        }, 50); // Cek setiap 50ms
+
+        // Fallback: hapus interval setelah 5 detik jika tidak pernah trigger
+        setTimeout(() => {
+            clearInterval(gifSettingsCheckInterval);
+        }, 5000);
+
+        // Restore UI dari Settings
+        ipcRenderer.on('setting-update', (event, settings) => {
+            // === GIF Overlay Restore Logic ===
+            // 1. Sync Lock state first (so toggle sends correct state)
+            if (settings.gifOverlayLocked !== undefined && gifInteractionLock) {
+                gifInteractionLock.checked = settings.gifOverlayLocked;
+                gifInteractionLocked = settings.gifOverlayLocked;
+            }
+
+            // 2. Sync Enabled & Trigger Main Restore
+            if (settings.gifOverlayEnabled !== undefined && optGifOverlay) {
+                optGifOverlay.checked = settings.gifOverlayEnabled;
+                toggleGifOverlaySubOptions();
+            }
+
+            // 3. Restore UI List teruskan item.settings
+            if (!isGifUIRestored && settings.gifOverlays && Array.isArray(settings.gifOverlays)) {
+                const container = document.getElementById('gif-list-container');
+
+                // Bersihkan UI lama (termasuk row default dari HTML)
+                if (container) {
+                    container.innerHTML = '';
+                }
+
+                // Clear settings map lama untuk mencegah konflik
+                gifSettingsMap.clear();
+
+                if (settings.gifOverlays.length > 0) {
+                    settings.gifOverlays.forEach(item => {
+                        console.log(`[Native Host] [setting-update] Creating GIF row for #${item.id}:`, item.settings);
+                        createGifInputRow(item.id, item.path, item.settings);
+                    });
+                    console.log('[Native Host] [setting-update] gifSettingsMap after restore:', [...gifSettingsMap.entries()]);
+                } else {
+                    // Jika tidak ada overlay, buat satu row kosong sebagai placeholder
+                    createGifInputRow();
+                    console.log('[Native Host] [setting-update] No saved GIF overlays, created empty placeholder row');
+                }
+
+                isGifUIRestored = true;
+            }
+            // =================================
+
+            // Sync UI with settings from Main (e.g. from Popup)
+            if (settings.adSkipperEnabled !== undefined) {
+                optAdSkipper.checked = settings.adSkipperEnabled;
+                optAutoMute.checked = settings.autoMuteAds;
+                optAutoSkip.checked = settings.autoSkipAds;
+                updateSettings();
+            }
+
+            if (settings.rpcEnabled !== undefined && optRpc) {
+                optRpc.checked = settings.rpcEnabled;
+                rpcEnabled = settings.rpcEnabled;
+            }
+
+            if (settings.dynamicThemeEnabled !== undefined) {
+                optDynamicTheme.checked = settings.dynamicThemeEnabled;
+                dynamicThemeEnabled = settings.dynamicThemeEnabled;
+                toggleDynamicThemeSubOptions();
+                // Apply immediately if webview is ready
+                applyDynamicThemeState();
+            }
+
+            if (settings.dynamicThemeMode !== undefined && optDynamicThemeMode) {
+                const mode = (settings.dynamicThemeMode === 'unified') ? 'overlay' : settings.dynamicThemeMode;
+                optDynamicThemeMode.value = mode;
+                dynamicThemeMode = mode;
+                toggleDynamicThemeSubOptions();
+                applyDynamicThemeState();
+            }
+
+            if (settings.overlayModeEnabled !== undefined) {
+                optOverlay.checked = settings.overlayModeEnabled;
+                isOverlayModeActive = settings.overlayModeEnabled; // Sync state for close confirmation
+                if (settings.overlayModeEnabled) {
+                    document.body.classList.add('no-drag');
+                    document.body.classList.add('overlay-mode');
+                    document.getElementById('btn-min').style.display = 'none';
+                    document.getElementById('btn-max').style.display = 'none';
+                } else {
+                    document.body.classList.remove('no-drag');
+                    document.body.classList.remove('overlay-mode');
+                    document.getElementById('btn-min').style.display = 'flex';
+                    document.getElementById('btn-max').style.display = 'flex';
+                }
+            }
+
+            if (settings.miniPlayerEnabled !== undefined) {
+                optMiniPlayer.checked = settings.miniPlayerEnabled;
+                miniPlayerEnabled = settings.miniPlayerEnabled;
+            }
+
+            // GIF Overlay settings
+            if (settings.gifOverlayEnabled !== undefined && optGifOverlay) {
+                optGifOverlay.checked = settings.gifOverlayEnabled;
+                gifOverlayEnabled = settings.gifOverlayEnabled;
+                toggleGifOverlaySubOptions();
+
+                // Kirim status ke main process
+                ipcRenderer.send('set-gif-overlay-enabled', settings.gifOverlayEnabled);
+
+                // Load locked status
+                if (settings.gifOverlayLocked !== undefined && gifInteractionLock) {
+                    gifInteractionLock.checked = settings.gifOverlayLocked;
+                    gifInteractionLocked = settings.gifOverlayLocked;
+                    // Kirim status locked setelah enabled
+                    if (settings.gifOverlayEnabled) {
+                        ipcRenderer.send('set-gif-overlay-locked', settings.gifOverlayLocked);
+                    }
+                }
+
+                // Jika ada path yang tersimpan, load juga
+                if (settings.gifOverlayPath) {
+                    updateGifFileName(settings.gifOverlayPath);
+                    if (settings.gifOverlayEnabled) {
+                        ipcRenderer.send('set-gif-overlay-image', settings.gifOverlayPath);
+                    }
+                }
+
+            }
+        });
+
+        // === TOOLTIP PORTAL LOGIC ===
+        // Memindahkan tooltip ke body saat hover agar tidak terpotong overflow
+        // Menggunakan querySelectorAll agar mendukung banyak trigger
+        const tipsTriggers = document.querySelectorAll('.tips-trigger');
+        let portalTooltip = null;
+
+        // Inisialisasi ulang listener saat dibutuhkan (misal dynamic injection), tapi untuk sekarang statis oke
+        function initTooltipListeners() {
+            const triggers = document.querySelectorAll('.tips-trigger');
+            triggers.forEach(trigger => {
+                // Hapus listener lama jika perlu (clone node trick) atau biarkan jika simpel
+                // Disini kita asumsikan init sekali di awal
+
+                trigger.addEventListener('mouseenter', () => {
+                    const originalTooltip = trigger.querySelector('.tips-tooltip');
+                    if (!originalTooltip) return;
+
+                    // Hapus tooltip lama jika ada
+                    if (portalTooltip) {
+                        portalTooltip.remove();
+                    }
+
+                    // Clone tooltip dan masukkan ke body
+                    portalTooltip = originalTooltip.cloneNode(true);
+                    portalTooltip.classList.remove('tips-tooltip');
+                    portalTooltip.classList.add('portal-tips-tooltip');
+
+                    document.body.appendChild(portalTooltip);
+
+                    // Hitung posisi dengan Smart Placement
+                    const triggerRect = trigger.getBoundingClientRect();
+                    const tooltipRect = portalTooltip.getBoundingClientRect();
+                    const margin = 10; // Jarak aman dari tepi layar
+                    const spacing = 15; // Jarak dari trigger
+
+                    // Default: Left
+                    let top = triggerRect.top + (triggerRect.height / 2) - (tooltipRect.height / 2);
+                    let left = triggerRect.left - tooltipRect.width - spacing;
+                    let placement = 'left';
+
+                    // 1. Cek tabrakan KIRI
+                    if (left < margin) {
+                        // Coba posisi KANAN
+                        let leftRight = triggerRect.right + spacing;
+                        // Jika posisi KANAN cukup (tidak tabrak kanan)
+                        if (leftRight + tooltipRect.width < window.innerWidth - margin) {
+                            left = leftRight;
+                            placement = 'right';
+                        } else {
+                            // Coba posisi BAWAH (Fallback terakhir)
+                            left = triggerRect.left + (triggerRect.width / 2) - (tooltipRect.width / 2);
+                            top = triggerRect.bottom + spacing;
+                            placement = 'bottom';
+
+                            // Adjust horizontal center collision
+                            if (left < margin) left = margin;
+                            if (left + tooltipRect.width > window.innerWidth - margin) {
+                                left = window.innerWidth - tooltipRect.width - margin;
+                            }
+                        }
+                    } else {
+                        // Posisi KIRI valid, pastikan vertikal aman
+                        if (top < margin) top = margin;
+                        if (top + tooltipRect.height > window.innerHeight - margin) {
+                            top = window.innerHeight - tooltipRect.height - margin;
+                        }
+                    }
+
+                    portalTooltip.style.top = `${top}px`;
+                    portalTooltip.style.left = `${left}px`;
+                    portalTooltip.dataset.placement = placement; // Untuk CSS Arrow
+
+                    // Animasi masuk
+                    requestAnimationFrame(() => {
+                        portalTooltip.classList.add('visible');
+                    });
+                });
+
+                trigger.addEventListener('mouseleave', () => {
+                    if (portalTooltip) {
+                        portalTooltip.remove();
+                        portalTooltip = null;
+                    }
+                });
+            });
+        }
+
+        // Panggil init
+        initTooltipListeners();
+
+        // Inisialisasi
+        updateSettings();
+        toggleDynamicThemeSubOptions();
+        toggleGifOverlaySubOptions();
+
+        // === Apply GIF Settings setelah semua UI siap ===
+        // Gunakan setTimeout untuk memastikan async IIFE load-settings sudah selesai
+        setTimeout(() => {
+            if (pendingGifSettings) {
+                console.log('[Native Host] Applying pending GIF settings from end of script...');
+                applyPendingGifSettings();
+            }
+        }, 200);
+
+        // === Listener untuk sinkronisasi preset dari window lain ===
+        // Menangani kasus ketika preset diubah dari gif-overlay-standalone.html
+        ipcRenderer.on('gif-preset-changed', async (event, data) => {
+            console.log('[Native Host] Preset changed from another window:', data);
+
+            // Reset flag untuk memungkinkan UI di-restore ulang
+            isGifUIRestored = false;
+
+            // Clear state lama
+            const container = document.getElementById('gif-list-container');
+            if (container) {
+                container.innerHTML = '';
+            }
+            gifSettingsMap.clear();
+
+            // Restore UI dengan data baru
+            if (data.overlays && Array.isArray(data.overlays)) {
+                if (data.overlays.length > 0) {
+                    data.overlays.forEach(overlay => {
+                        createGifInputRow(overlay.id, overlay.path, overlay.settings);
+                    });
+                    console.log(`[Native Host] Synced ${data.overlays.length} GIF overlays from preset change`);
+                } else {
+                    createGifInputRow();
+                    console.log('[Native Host] Preset has no overlays, created empty placeholder');
+                }
+            }
+
+            isGifUIRestored = true;
+
+            // Reload preset list dan sync dropdown
+            await loadNativePresetsList();
+            if (gifPresetSelect && data.presetId) {
+                gifPresetSelect.value = data.presetId;
+            }
+        });
+    </script>
+</body>
+
+</html>

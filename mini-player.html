@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Player</title>
+    <style>
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 300;
+            src: url('./aset/fonts/lexend-v26-latin-300.woff2') format('woff2');
+        }
+
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 400;
+            src: url('./aset/fonts/lexend-v26-latin-regular.woff2') format('woff2');
+        }
+
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 700;
+            src: url('./aset/fonts/lexend-v26-latin-700.woff2') format('woff2');
+        }
+
+        body,
+        html {
+            background-color: transparent;
+            font-family: 'Lexend', sans-serif;
+            color: white;
+            overflow: hidden;
+        }
+
+        .overall-container {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            border-radius: 8px;
+            box-sizing: border-box;
+            background-color: rgba(0, 0, 0, 0.01);
+            /* Ensure mouse events are captured */
+        }
+
+        .mini-player-container {
+            display: flex;
+            align-items: center;
+            padding: 7px;
+            width: 100%;
+            box-sizing: border-box;
+            height: 99px;
+        }
+
+        .album-art {
+            width: 88px;
+            /* Menetapkan lebar container gambar */
+            height: 88px;
+            /* Menetapkan tinggi container gambar, membuatnya kotak */
+            background-color: #333;
+            /* Warna placeholder jika gambar tidak ada */
+            background-size: cover;
+            /* Memastikan gambar menutupi area, menjaga aspek rasio, dan memotong jika perlu */
+            background-position: center;
+            /* Memusatkan gambar di dalam container, sehingga pemotongan terjadi secara merata */
+            border-radius: 4px;
+            margin-right: 10px;
+            flex-shrink: 0;
+            /* Mencegah album art menyusut jika ruang terbatas */
+        }
+
+        .info-area {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            /* Mengatur ruang antar elemen di info-area */
+            flex-grow: 1;
+            height: 100%;
+            overflow: hidden;
+            /* Mencegah konten meluber */
+        }
+
+        .song-details {
+            border-radius: 6px;
+            background-color: #171717;
+            padding: 4px;
+            /* Padding vertikal kecil */
+        }
+
+        .title {
+            font-size: 13.5px;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: #FFFFFF;
+            margin: 5px 5px 2px 5px;
+            /* Margin atas, kanan, bawah, kiri */
+            padding: 0;
+            line-height: 1.2;
+        }
+
+        .artist {
+            font-size: 11px;
+            color: #B0B0B0;
+            /* Warna teks artis */
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin: 0px 5px 5px 5px;
+            /* Margin atas, kanan, bawah, kiri */
+            padding: 0px;
+            line-height: 1.1;
+        }
+
+        .progress-visualizer-strip {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: #000000;
+            /* Warna latar progress/visualizer strip */
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+            padding: 0 6px;
+            height: 30px;
+        }
+
+        .time-text {
+            font-size: 12px;
+            color: white;
+            z-index: 2;
+            flex-shrink: 0;
+            /* Mencegah teks waktu menyusut */
+        }
+
+        .mini-visualizer {
+            flex-grow: 1;
+            height: 100%;
+            margin: 0 3px;
+            /* Margin horizontal untuk visualizer */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1;
+            min-width: 70px;
+            /* Lebar minimum untuk visualizer */
+        }
+
+        #mini-visualizer-canvas {
+            display: block;
+            /* Menghilangkan spasi ekstra di bawah canvas */
+        }
+
+        .thin-bottom-progress-container {
+            width: 100%;
+            padding: 0 7px 2px 7px;
+            box-sizing: border-box;
+            margin-top: 2px;
+        }
+
+        .thin-bottom-progress-bar {
+            width: 100%;
+            height: 8px;
+            background-color: #1A1A1A;
+            /* Warna latar progress bar tipis */
+            border-radius: 5px;
+            /* Lebih bulat */
+            overflow: hidden;
+        }
+
+        .thin-bottom-progress-fill {
+            height: 100%;
+            width: 0%;
+            /* Awalnya 0% */
+            background: linear-gradient(90deg, #F95369, #f97b91);
+            /* Gradient dari warna asli */
+            border-radius: 1.5px;
+            /* Sedikit bulat di ujung fill */
+        }
+    </style>
+</head>
+
+<body>
+    <div class="overall-container">
+        <div class="mini-player-container">
+            <div class="album-art" id="mini-album-art"></div>
+            <div class="info-area">
+                <div class="song-details">
+                    <p class="title" id="mini-title">Song Title</p>
+                    <p class="artist" id="mini-artist">Artist Name</p>
+                </div>
+                <div class="progress-visualizer-strip" id="mini-progress-visualizer-strip">
+                    <span class="time-text" id="mini-current-time">0:00</span>
+                    <div class="mini-visualizer">
+                        <canvas id="mini-visualizer-canvas"></canvas>
+                    </div>
+                    <span class="time-text" id="mini-duration">0:00</span>
+                </div>
+            </div>
+        </div>
+        <div class="thin-bottom-progress-container">
+            <div class="thin-bottom-progress-bar">
+                <div class="thin-bottom-progress-fill" id="mini-thin-progress-fill"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+
+        const albumArt = document.getElementById('mini-album-art');
+        const titleEl = document.getElementById('mini-title');
+        const artistEl = document.getElementById('mini-artist'); // Ambil elemen artis
+        const currentTimeEl = document.getElementById('mini-current-time');
+        const durationEl = document.getElementById('mini-duration');
+        const thinProgressFill = document.getElementById('mini-thin-progress-fill');
+
+        const canvas = document.getElementById('mini-visualizer-canvas');
+        const visualizerContainer = canvas.parentElement;
+        const ctx = canvas.getContext('2d');
+
+        const NUM_MINI_BARS = 21;
+        const BAR_COLOR = '#F95369';
+        const BAR_WIDTH = 2.5;
+        const BAR_GAP = 3.2;
+        const BASE_DOT_HEIGHT = 2;
+
+        let lastVisualizerData = new Array(NUM_MINI_BARS).fill(0);
+        let lastTitleForAlbumArtUpdate = null;
+
+        function setupCanvas() {
+            if (!visualizerContainer || !canvas || !ctx) return;
+            const dpr = window.devicePixelRatio || 1;
+            const rect = visualizerContainer.getBoundingClientRect();
+
+            if (rect.width <= 0 || rect.height <= 0) {
+                requestAnimationFrame(setupCanvas); // Coba lagi jika ukuran belum siap
+                return;
+            }
+
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+            canvas.style.width = `${rect.width}px`;
+            canvas.style.height = `${rect.height}px`;
+            drawVisualizer(lastVisualizerData); // Gambar visualizer awal
+        }
+
+        // Panggil setupCanvas setelah DOM siap atau segera jika sudah siap
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            setupCanvas();
+        } else {
+            document.addEventListener('DOMContentLoaded', setupCanvas);
+        }
+        // Juga panggil saat window di-resize jika perlu, tapi untuk mini-player mungkin tidak
+        // window.addEventListener('resize', setupCanvas); 
+
+        function drawVisualizer(normalizedFactors) {
+            if (!ctx || !canvas) return;
+            const canvasEffectiveWidth = canvas.width / (window.devicePixelRatio || 1);
+            const canvasEffectiveHeight = canvas.height / (window.devicePixelRatio || 1);
+
+            if (canvasEffectiveWidth <= 0 || canvasEffectiveHeight <= 0) return;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = BAR_COLOR;
+            const totalBarAreaWidth = (NUM_MINI_BARS * BAR_WIDTH) + ((NUM_MINI_BARS - 1) * BAR_GAP);
+            let startX = (canvasEffectiveWidth - totalBarAreaWidth) / 2;
+            const maxExtension = (canvasEffectiveHeight - BASE_DOT_HEIGHT) / 2;
+
+            for (let i = 0; i < NUM_MINI_BARS; i++) {
+                const normalizedFactor = normalizedFactors[i % normalizedFactors.length] || 0; // Gunakan modulo untuk data yang lebih sedikit
+                const actualExtension = normalizedFactor * maxExtension;
+                const totalBarHeight = BASE_DOT_HEIGHT + (2 * actualExtension);
+                const yPosition = (canvasEffectiveHeight / 2) - (totalBarHeight / 2);
+
+                ctx.beginPath(); // Mulai path baru untuk setiap bar
+                // Menggambar bar dengan sudut sedikit membulat (opsional, bisa dihilangkan jika performa jadi isu)
+                ctx.fillRect(startX, yPosition, BAR_WIDTH, totalBarHeight);
+                startX += BAR_WIDTH + BAR_GAP;
+            }
+        }
+
+        // untuk menjalankan loop render
+        function renderLoop() {
+            drawVisualizer(lastVisualizerData);
+            requestAnimationFrame(renderLoop);
+        }
+
+        ipcRenderer.on('mini-player-data-update', (event, data) => {
+            if (!albumArt || !titleEl || !artistEl || !currentTimeEl || !durationEl || !thinProgressFill || !canvas) {
+                console.error("Satu atau lebih elemen mini-player tidak ditemukan di DOM untuk pembaruan.");
+                return;
+            }
+
+            // Update judul dan artis (Hanya jika data dikirim)
+            if (data.title !== undefined) {
+                const currentProcessedTitle = data.title || 'No Title';
+                titleEl.textContent = currentProcessedTitle;
+
+                // Kondisi untuk memperbarui album art
+                if (lastTitleForAlbumArtUpdate === null || currentProcessedTitle !== lastTitleForAlbumArtUpdate) {
+                    if (data.coverSrc) {
+                        albumArt.style.backgroundImage = `url('${data.coverSrc.replace(/\\/g, '/')}')`;
+                    } else {
+                        albumArt.style.backgroundImage = `url('./aset/musik.png')`;
+                    }
+                    lastTitleForAlbumArtUpdate = currentProcessedTitle;
+                }
+            }
+
+            if (data.artist !== undefined) {
+                artistEl.textContent = data.artist || '';
+            }
+
+            // Format dan update waktu
+            const formatTime = (seconds) => {
+                if (isNaN(seconds) || seconds === Infinity || seconds == null) return "0:00";
+                const minutes = Math.floor(seconds / 60);
+                const remainingSeconds = Math.floor(seconds % 60).toString().padStart(2, '0');
+                return `${minutes}:${remainingSeconds}`;
+            };
+
+            if (data.currentTime !== undefined) {
+                currentTimeEl.textContent = formatTime(data.currentTime);
+            }
+
+            if (data.duration !== undefined) {
+                durationEl.textContent = formatTime(data.duration);
+            }
+
+            // Update progress bar
+            if (data.progressPercent !== undefined && thinProgressFill) {
+                thinProgressFill.style.width = `${data.progressPercent}%`;
+            }
+
+            // HANYA UPDATE DATA, JANGAN MENGGAMBAR DI SINI
+            if (data.visualizerData && data.visualizerData.length > 0) {
+                lastVisualizerData = data.visualizerData;
+            } else if (data.visualizerData && data.visualizerData.length === 0) {
+                // Jika array kosong dikirim eksplisit, reset
+                lastVisualizerData = new Array(NUM_MINI_BARS).fill(0);
+            }
+        });
+
+        // === HIDE ON CURSOR LOGIC ===
+        let hideOnCursorMode = false;
+        const overallContainer = document.querySelector('.overall-container');
+
+        // Load initial setting
+        ipcRenderer.invoke('load-settings').then(settings => {
+            if (settings && settings.miniPlayerHideOnCursor !== undefined) {
+                hideOnCursorMode = settings.miniPlayerHideOnCursor;
+            }
+        });
+
+        ipcRenderer.on('update-mini-player-settings', (event, settings) => {
+            if (settings.hideOnCursor !== undefined) {
+                hideOnCursorMode = settings.hideOnCursor;
+                console.log('[MiniPlayer] Mode Update:', hideOnCursorMode);
+                // Jika disable, paksa opacity full
+                if (!hideOnCursorMode) {
+                    overallContainer.style.opacity = '1';
+                }
+            }
+        });
+
+
+
+        // Handle cursor proximity signal from Main Process (since window ignores mouse events)
+        ipcRenderer.on('mini-player-cursor-status', (event, isNear) => {
+            if (hideOnCursorMode) {
+                if (isNear) {
+                    overallContainer.style.opacity = '0';
+                    overallContainer.style.transition = 'opacity 0.3s ease';
+                } else {
+                    overallContainer.style.opacity = '1';
+                }
+            } else {
+                // Ensure opacity is 1 if feature is disabled
+                overallContainer.style.opacity = '1';
+            }
+        });
+
+        // Mulai loop render setelah semuanya siap
+        renderLoop();
+    </script>
+</body>
+
+</html>
