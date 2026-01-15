@@ -14,6 +14,14 @@ Anda bebas menggunakan, memodifikasi, dan mendistribusikan engine ini untuk kepe
 
 > Lihat file [LICENSE](./LICENSE) untuk detail lengkap.
 
+## Support kami...!!
+Jika kamu menyukai semua proyek yang kami kerjakan, Kamu bisa dukung kami dengan mentraktir kami jajanan melalui trakteer atau secangkir kopi melalui Ko-fi ❤️:
+
+* 🇮🇩 **Trakteer (IDR):** [trakteer.id/rin_chocomint](https://trakteer.id/rin_chocomint)
+* 🌍 **Ko-fi (USD):** [ko-fi.com/rinchocomint](https://ko-fi.com/rinchocomint)
+
+---
+
 ## Download & Release
 Versi siap pakai (Binary) untuk Windows dapat diunduh di menu **Releases**.
 
