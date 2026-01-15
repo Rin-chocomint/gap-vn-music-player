@@ -4028,6 +4028,98 @@
             box-shadow: 0 6px 15px rgba(255, 65, 108, 0.4);
         }
 
+        /* ================================ Rotating Texts Editor =============================== */
+        .rotating-texts-editor-section {
+            margin-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding-top: 15px;
+        }
+
+        .rotating-texts-editor-section > label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: #aaa;
+        }
+
+        .rotating-texts-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .rotating-texts-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .rotating-texts-list::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 3px;
+        }
+
+        .rotating-texts-list::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, #00b4db 0%, #0083B0 100%);
+            border-radius: 3px;
+        }
+
+        .rotating-text-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .rotating-text-item input {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 4px;
+            padding: 8px 10px;
+            color: #fff;
+            font-size: 0.9rem;
+        }
+
+        .rotating-text-item input:focus {
+            outline: none;
+            border-color: #00b4db;
+            box-shadow: 0 0 5px rgba(0, 180, 219, 0.3);
+        }
+
+        .rotating-text-item .remove-rotating-text-btn {
+            background: transparent;
+            border: 1px solid #FF416C;
+            color: #FF416C;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+        }
+
+        .rotating-text-item .remove-rotating-text-btn:hover {
+            background: rgba(255, 65, 108, 0.2);
+            border-color: #ff5e81;
+            color: #ff5e81;
+        }
+
+        .rotating-text-item .drag-handle {
+            cursor: grab;
+            color: #666;
+            font-size: 1.1rem;
+            user-select: none;
+        }
+
+        .rotating-text-item .drag-handle:active {
+            cursor: grabbing;
+        }
+        /* ================================ End Rotating Texts Editor =============================== */
+
         /* ================================ End Profile CSS Editor =============================== */
 
         /*------------------- GIF Overlay Settings UI -------------------------*/
@@ -4424,6 +4516,16 @@
                     <input type="text" id="edit-title-subtitle" placeholder="Enter subtitle for title screen" />
                     <label for="edit-title-press-start">"Press Start" Text:</label>
                     <input type="text" id="edit-title-press-start" placeholder="Enter text for 'Press Start' message" />
+                    <!-- Rotating Texts Editor -->
+                    <div class="rotating-texts-editor-section">
+                        <label>Rotating Texts (ditampilkan bergantian di title screen):</label>
+                        <div id="rotating-texts-list-container" class="rotating-texts-list">
+                            <!-- Rotating text items will be rendered here -->
+                        </div>
+                        <button type="button" id="add-rotating-text-btn" class="editor-button-positive" style="margin-top: 10px; width: 100%;">
+                            + Tambah Rotating Text
+                        </button>
+                    </div>
                 </div>
 
                 <div class="input-section-container" id="edit-profile-section-inputs">
@@ -7450,6 +7552,12 @@
                     editorImagePreview.src = actualProfilePicSrc || './aset/ikon.jpg'; // Fallback ke default jika tidak ada
                 }
             }
+
+            // Render rotating texts editor
+            if (typeof renderRotatingTextsEditor === 'function') {
+                renderRotatingTextsEditor();
+            }
+            
             updateAllPreviews(false); // Update semua preview berdasarkan data game asli yang baru dimuat ke input
         }
         //------------------- end fungsi load data ke input editor -------------------------//
@@ -8035,6 +8143,123 @@
             }
         });
 
+                //------------------- ( Rotating Texts Editor Logic ) -------------------------//
+        const ROTATING_TEXTS_KEY = 'gameRotatingTexts'; // Key untuk localStorage
+
+        // Render semua rotating text items ke editor
+        function renderRotatingTextsEditor() {
+            const container = document.getElementById('rotating-texts-list-container');
+            if (!container) return;
+
+            container.innerHTML = '';
+
+            if (rotatingTexts.length === 0) {
+                container.innerHTML = '<p style="color: #777; text-align: center; padding: 10px;">Belum ada rotating text. Klik tombol di bawah untuk menambah.</p>';
+                return;
+            }
+
+            rotatingTexts.forEach((text, index) => {
+                const item = document.createElement('div');
+                item.className = 'rotating-text-item';
+                item.dataset.index = index;
+                item.innerHTML = `
+                    <span class="drag-handle" title="Drag untuk mengurutkan">⋮⋮</span>
+                    <input type="text" class="rotating-text-input" value="${escapeHtml(text)}" placeholder="Masukkan teks..." />
+                    <button type="button" class="remove-rotating-text-btn" title="Hapus">✕</button>
+                `;
+                container.appendChild(item);
+            });
+
+            // Add event listeners
+            container.querySelectorAll('.rotating-text-input').forEach((input, index) => {
+                input.addEventListener('input', () => {
+                    rotatingTexts[index] = input.value;
+                    isEditorDirty = true;
+                });
+            });
+
+            container.querySelectorAll('.remove-rotating-text-btn').forEach((btn, index) => {
+                btn.addEventListener('click', () => {
+                    rotatingTexts.splice(index, 1);
+                    renderRotatingTextsEditor();
+                    isEditorDirty = true;
+                });
+            });
+        }
+
+        // Helper untuk escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Event listener untuk tombol tambah rotating text
+        document.addEventListener('DOMContentLoaded', () => {
+            const addBtn = document.getElementById('add-rotating-text-btn');
+            if (addBtn) {
+                addBtn.addEventListener('click', () => {
+                    rotatingTexts.push('');
+                    renderRotatingTextsEditor();
+                    isEditorDirty = true;
+                    // Focus ke input terakhir
+                    setTimeout(() => {
+                        const inputs = document.querySelectorAll('#rotating-texts-list-container .rotating-text-input');
+                        if (inputs.length > 0) {
+                            inputs[inputs.length - 1].focus();
+                        }
+                    }, 50);
+                });
+            }
+        });
+
+        // Load rotating texts dari localStorage atau character_data.json
+        async function loadRotatingTexts() {
+            // Coba load dari localStorage dulu
+            const savedTexts = localStorage.getItem(ROTATING_TEXTS_KEY);
+            if (savedTexts) {
+                try {
+                    const parsed = JSON.parse(savedTexts);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        rotatingTexts = parsed;
+                        console.log('[RotatingTexts] Loaded from localStorage:', rotatingTexts);
+                        return;
+                    }
+                } catch (e) {
+                    console.error('[RotatingTexts] Error parsing localStorage:', e);
+                }
+            }
+
+            // Fallback: load dari character_data.json
+            try {
+                const response = await fetch('./aset/konten/character_data.json');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.rotatingTexts && Array.isArray(data.rotatingTexts) && data.rotatingTexts.length > 0) {
+                        rotatingTexts = data.rotatingTexts;
+                        console.log('[RotatingTexts] Loaded from character_data.json:', rotatingTexts);
+                    }
+                }
+            } catch (e) {
+                console.error('[RotatingTexts] Error loading from JSON:', e);
+            }
+        }
+
+        // Save rotating texts ke localStorage
+        function saveRotatingTextsToLocalStorage() {
+            // Filter out empty strings
+            const textsToSave = rotatingTexts.filter(text => text.trim() !== '');
+            localStorage.setItem(ROTATING_TEXTS_KEY, JSON.stringify(textsToSave));
+            rotatingTexts = textsToSave;
+            console.log('[RotatingTexts] Saved to localStorage:', textsToSave);
+        }
+
+        // Load rotating texts saat halaman dimuat
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadRotatingTexts();
+        });
+        //------------------- ( End Rotating Texts Editor Logic ) -------------------------//
+
         function setupCharacterMenuPreview() {
             console.log("Memulai setupCharacterMenuPreview (versi replika konten)...");
 
@@ -8180,6 +8405,11 @@
                 }
                 updateSpecificPreview(elementId, false); // Update preview berdasarkan data game asli yang baru saja diubah
             });
+
+            // Simpan rotating texts
+            if (typeof saveRotatingTextsToLocalStorage === 'function') {
+                saveRotatingTextsToLocalStorage();
+            }
 
             saveAllEditableContentToLocalStorage();
             showNotification('All changes saved successfully!', 'notification-success');
@@ -12276,7 +12506,7 @@
         }
 
         //------------------- ( rotating text di title-screen ) -------------------------//
-        const rotatingTexts = [
+        let rotatingTexts = [
             "sentence 1",
             "sentence 2",
             "sentence 3",
@@ -12289,12 +12519,16 @@
             const rotatingTextElement = document.getElementById("rotating-text");
 
             setTimeout(() => {
+                if (rotatingTexts.length === 0) {
+                    rotatingTextElement.textContent = "";
+                    return;
+                }
                 rotatingTextElement.textContent = rotatingTexts[currentTextIndex];
 
                 rotatingTextElement.classList.add("cycling");
 
                 rotatingTextElement.addEventListener('animationiteration', () => {
-
+                    if (rotatingTexts.length === 0) return;
                     currentTextIndex = (currentTextIndex + 1) % rotatingTexts.length;
                     rotatingTextElement.textContent = rotatingTexts[currentTextIndex];
                     console.log("Teks diganti pada animationiteration menjadi:", rotatingTexts[currentTextIndex]);
