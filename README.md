@@ -17,9 +17,12 @@ Anda bebas menggunakan, memodifikasi, dan mendistribusikan engine ini untuk kepe
 ## Support kami...!!
 Jika kamu menyukai semua proyek yang kami kerjakan, Kamu bisa dukung kami dengan mentraktir kami jajanan melalui trakteer atau secangkir kopi melalui Ko-fi ❤️:
 
-[![Trakteer](https://cdn.trakteer.id/images/embed/trbtn-red-1.png)](https://trakteer.id/rin_chocomint)
-
-[![Ko-fi](https://storage.ko-fi.com/cdn/kofi2.png?v=3)](https://ko-fi.com/rinchocomint)
+<a href="https://trakteer.id/rin_chocomint">
+  <img src="https://cdn.trakteer.id/images/embed/trbtn-red-1.png" width="200px">
+</a>
+&nbsp; <a href="https://ko-fi.com/rinchocomint">
+  <img src="https://storage.ko-fi.com/cdn/kofi2.png?v=3" width="200px">
+</a>
 
 ---
 
