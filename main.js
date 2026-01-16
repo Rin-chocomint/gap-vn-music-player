@@ -5,16 +5,22 @@
 const RPC = require('discord-rpc');
 const clientId = '1394882882220068924';
 
-let rpc;
-let rpcStartTime; // Waktu kapan RPC berhasil terhubung
-let isRpcEnabled = false; // Status RPC saat ini
+let rpc = null;
+let rpcStartTime = null;           // Waktu kapan RPC berhasil terhubung
+let isRpcEnabled = false;          // Status fitur RPC (diaktifkan/dinonaktifkan oleh user)
+let isRpcReady = false;            // Status koneksi RPC (true hanya saat ready dan terhubung)
+let isRpcConnecting = false;       // Flag untuk mencegah koneksi ganda saat proses koneksi
 let rpcRetryInterval = null;
-let currentAppMode = 'game'; // 'game' | 'native' | 'gif-overlay'
+let currentAppMode = 'game';       // 'game' | 'native' | 'gif-overlay'
 
 // Fungsi utama yang dipanggil untuk memulai koneksi
 function initRPC() {
-    if (!isRpcEnabled || rpc) { // Jangan mulai jika dinonaktifkan atau sudah berjalan
-        console.log(`[RPC] Inisialisasi dibatalkan. Enabled: ${isRpcEnabled}, Instance Exists: ${!!rpc}`);
+    if (!isRpcEnabled) {
+        console.log('[RPC] Inisialisasi dibatalkan karena fitur dinonaktifkan.');
+        return;
+    }
+    if (rpc || isRpcConnecting) {
+        console.log('[RPC] Instance RPC sudah ada atau sedang connecting, skip inisialisasi.');
         return;
     }
     console.log('[RPC] Mencoba memulai koneksi RPC...');
@@ -22,16 +28,50 @@ function initRPC() {
 }
 
 function connectRPC() {
-    // Hapus instance lama atau interval coba ulang jika ada
-    if (rpc) rpc.destroy().catch(console.error);
-    if (rpcRetryInterval) clearInterval(rpcRetryInterval);
-    rpc = null;
-    rpcRetryInterval = null;
+    // Cek ulang apakah fitur masih enabled (bisa berubah antara panggilan)
+    if (!isRpcEnabled) {
+        console.log('[RPC] Koneksi dibatalkan karena fitur sudah dinonaktifkan.');
+        return;
+    }
+    
+    // Cegah koneksi ganda
+    if (isRpcConnecting) {
+        console.log('[RPC] Sudah dalam proses koneksi, skip.');
+        return;
+    }
+    
+    // Hapus instance lama jika ada (tanpa async, langsung cleanup)
+    if (rpc) {
+        try {
+            rpc.removeAllListeners(); // Hapus semua listener untuk mencegah event lama
+            rpc.destroy().catch(() => {}); // Ignore error
+        } catch (e) { /* ignore */ }
+        rpc = null;
+    }
+    
+    // Reset status
+    isRpcReady = false;
+    isRpcConnecting = true;
+    
+    // Bersihkan retry interval jika ada
+    if (rpcRetryInterval) {
+        clearInterval(rpcRetryInterval);
+        rpcRetryInterval = null;
+    }
 
     rpc = new RPC.Client({ transport: 'ipc' });
 
     rpc.on('ready', () => {
+        // Pastikan masih enabled saat ready (bisa saja user toggle OFF saat connecting)
+        if (!isRpcEnabled) {
+            console.log('[RPC] Ready tapi fitur sudah dinonaktifkan, cleanup...');
+            cleanupRpcInstance();
+            return;
+        }
         console.log('[RPC] Berhasil terhubung ke Discord.');
+        isRpcConnecting = false;
+        isRpcReady = true;
+        
         if (rpcRetryInterval) {
             clearInterval(rpcRetryInterval);
             rpcRetryInterval = null;
@@ -58,30 +98,71 @@ function connectRPC() {
     });
 
     rpc.on('disconnected', () => {
-        console.error('[RPC] Terputus dari Discord. Mencoba menyambung ulang...');
+        // Hanya handle disconnect jika fitur masih enabled
+        if (!isRpcEnabled) {
+            console.log('[RPC] Terputus, tapi fitur sudah dinonaktifkan. Skip retry.');
+            return;
+        }
+        console.log('[RPC] Terputus dari Discord. Mencoba menyambung ulang...');
+        isRpcReady = false;
+        isRpcConnecting = false;
         setupRpcRetry();
     });
 
     rpc.login({ clientId }).catch(err => {
+        isRpcConnecting = false;
+        isRpcReady = false;
+        
+        // Hanya retry jika fitur masih enabled
+        if (!isRpcEnabled) {
+            console.log('[RPC] Login gagal tapi fitur sudah dinonaktifkan. Skip retry.');
+            cleanupRpcInstance();
+            return;
+        }
         console.error('[RPC] Gagal login, akan mencoba lagi.', err.message);
         setupRpcRetry();
     });
 }
 
+// helper untuk cleanup instance RPC tanpa trigger event
+function cleanupRpcInstance() {
+    if (rpc) {
+        try {
+            rpc.removeAllListeners();
+            rpc.destroy().catch(() => {});
+        } catch (e) { /* ignore */ }
+        rpc = null;
+    }
+    isRpcReady = false;
+    isRpcConnecting = false;
+}
+
 // Fungsi untuk menangani jadwal koneksi ulang
 function setupRpcRetry() {
-    destroyRPC(false); // Hancurkan instance saat ini tanpa menonaktifkan fitur
+    // Cek apakah fitur masih enabled sebelum setup retry
+    if (!isRpcEnabled) {
+        console.log('[RPC] Retry tidak dijadwalkan karena fitur dinonaktifkan.');
+        cleanupRpcInstance();
+        return;
+    }
+    
+    // Bersihkan instance lama
+    cleanupRpcInstance();
 
     if (!rpcRetryInterval) {
         console.log('[RPC] Menjadwalkan koneksi ulang dalam 15 detik.');
         rpcRetryInterval = setInterval(() => {
-            if (isRpcEnabled) { // Hanya coba lagi jika fitur masih aktif
-                console.log('[RPC] Mencoba menyambung ulang...');
-                connectRPC();
-            } else {
+            // Cek ulang status sebelum retry
+            if (!isRpcEnabled) {
                 console.log('[RPC] Fitur dinonaktifkan, membatalkan coba ulang.');
                 clearInterval(rpcRetryInterval);
                 rpcRetryInterval = null;
+                return;
+            }
+            
+            if (!rpc && !isRpcConnecting) {
+                console.log('[RPC] Mencoba menyambung ulang...');
+                connectRPC();
             }
         }, 15000);
     }
@@ -89,24 +170,65 @@ function setupRpcRetry() {
 
 // Fungsi untuk menghentikan dan membersihkan RPC
 function destroyRPC(isDisablingFeature = true) {
+    console.log(`[RPC] destroyRPC dipanggil. isDisablingFeature: ${isDisablingFeature}`);
+    
+    // Bersihkan retry interval terlebih dahulu
     if (rpcRetryInterval) {
         clearInterval(rpcRetryInterval);
         rpcRetryInterval = null;
+        console.log('[RPC] Retry interval dibersihkan.');
     }
-    if (!rpc) return;
-
-    rpc.destroy().catch(console.error);
-    rpc = null;
-    console.log('[RPC] Koneksi RPC dihentikan.');
-
-    // isRpcEnabled hanya diubah menjadi false jika fitur secara eksplisit dinonaktifkan
+    
+    // isRpcEnabled diubah segera jika fitur dinonaktifkan (mencegah retry baru)
     if (isDisablingFeature) {
         isRpcEnabled = false;
+    }
+        
+    // Reset flag koneksi
+    isRpcConnecting = false;
+    
+    if (!rpc) {
+        console.log('[RPC] Tidak ada instance RPC untuk dihentikan.');
+        isRpcReady = false;
+        return;
+    }
+
+    // Simpan referensi ke variabel lokal dan segera null-kan global
+    const rpcInstance = rpc;
+    const wasReady = isRpcReady;
+    
+    rpc = null;
+    isRpcReady = false;
+
+    // Hapus semua listener untuk mencegah event callback setelah destroy
+    try {
+        rpcInstance.removeAllListeners();
+    } catch (e) { /* ignore */ }
+
+    // Bersihkan activity hanya jika sebelumnya ready
+    if (wasReady) {
+        rpcInstance.clearActivity()
+            .then(() => {
+                console.log('[RPC] Activity berhasil dihapus dari Discord.');
+                return rpcInstance.destroy();
+            })
+            .then(() => {
+                console.log('[RPC] Koneksi RPC berhasil dihentikan.');
+            })
+            .catch((err) => {
+                // Error saat cleanup adalah normal, cukup log tanpa stack trace
+                console.log('[RPC] Cleanup selesai (dengan error minor, diabaikan).');
+            });
+    } else {
+        // Langsung destroy jika tidak pernah ready
+        rpcInstance.destroy().catch(() => {});
+        console.log('[RPC] Instance RPC di-destroy (tidak pernah ready).');
     }
 }
 
 function updateRpcActivity(data) {
-    if (!rpc || !isRpcEnabled) {
+    // Cek semua kondisi sebelum update
+    if (!rpc || !isRpcEnabled || !isRpcReady) {
         return;
     }
 
@@ -4246,20 +4368,38 @@ ipcMain.on('create-quick-boot', (event, data) => {
         `;
 
     const ps = spawn('powershell.exe', ['-Command', psScript]);
+        
+    let stderrOutput = '';
+
+    ps.stderr.on('data', (data) => {
+        stderrOutput += data.toString();
+        console.error(`[QuickBoot] Error: ${data}`);
+    });
 
     ps.on('close', (code) => {
-        // Send notification back to renderer if possible, or just log
+        // Kirim notifikasi status kembali ke renderer
         if (code === 0) {
-            console.log(`[QuickBoot] Shortcut created successfully.`);
-            // Optionally show a dialog or notification
+            console.log(`[QuickBoot] Shortcut berhasil dibuat.`);
+            event.sender.send('quick-boot-status', {
+                success: true,
+                message: `Shortcut "${safeName}" berhasil dibuat di Desktop!`
+            });
         } else {
-            console.log(`[QuickBoot] Shortcut creation failed with code ${code}`);
+            console.log(`[QuickBoot] Gagal membuat shortcut dengan kode: ${code}`);
+            event.sender.send('quick-boot-status', {
+                success: false,
+                message: `Gagal membuat shortcut. Kode error: ${code}${stderrOutput ? '\nDetail: ' + stderrOutput : ''}`
+            });
         }
     });
 
 
-    ps.stderr.on('data', (data) => {
-        console.error(`[QuickBoot] Error: ${data}`);
+    ps.on('error', (err) => {
+        console.error(`[QuickBoot] Gagal menjalankan PowerShell:`, err);
+        event.sender.send('quick-boot-status', {
+            success: false,
+            message: `Gagal menjalankan PowerShell: ${err.message}`
+        });
     });
 });
 
@@ -7321,22 +7461,32 @@ ipcMain.on('vn-engine:replay-chapter', () => {
 // ---------------------------------------
 
 ipcMain.on('set-rpc-enabled', (event, enabled) => {
-    if (isRpcEnabled === enabled) return;
+    // Jika status sama, tidak perlu lakukan apa-apa
+    if (isRpcEnabled === enabled) {
+        console.log(`[RPC] Status sudah ${enabled ? 'aktif' : 'nonaktif'}, skip toggle.`);
+        return;
+    }
 
-    isRpcEnabled = enabled;
+    console.log(`[RPC] Mengubah fitur dari ${isRpcEnabled} ke ${enabled}`);
     userSettings.rpcEnabled = enabled;
-    console.log(`[RPC] Fitur diatur ke: ${isRpcEnabled}`);
 
     scheduleSaveUserSettings();
 
-    if (isRpcEnabled) {
+    if (enabled) {
+        // Aktifkan RPC - set flag dulu baru init
+        isRpcEnabled = true;
         initRPC();
     } else {
+        // Nonaktifkan RPC - destroyRPC akan set isRpcEnabled = false
         destroyRPC(true);
     }
+
+    console.log(`[RPC] Fitur sekarang: ${isRpcEnabled}`);
 });
 
 app.on('before-quit', () => {
+    console.log('[App] Aplikasi akan keluar, membersihkan resource...');
+    
     if (snowWindow) {
         snowWindow.destroy();
     }
@@ -7347,7 +7497,40 @@ app.on('before-quit', () => {
         adSkipperWindow.destroy();
     }
 
+    // Bersihkan Discord RPC - destroyRPC akan handle semua cleanup
+    destroyRPC(true);
+});
+// Tambahan: Pastikan RPC dibersihkan saat semua window ditutup
+app.on('window-all-closed', () => {
+    console.log('[App] Semua window ditutup, membersihkan Discord RPC...');
+    
+    // Bersihkan retry interval jika ada
+    if (rpcRetryInterval) {
+        clearInterval(rpcRetryInterval);
+        rpcRetryInterval = null;
+    }
+    
+    // Reset flag status
+    isRpcEnabled = false;
+    isRpcReady = false;
+    isRpcConnecting = false;
+    
+    // Bersihkan RPC instance
+
     if (rpc) {
-        rpc.destroy();
+        try {
+            rpc.removeAllListeners();
+            rpc.clearActivity().catch(() => {});
+            rpc.destroy().catch(() => {});
+        } catch (err) {
+            // Ignore error saat cleanup
+        }
+        rpc = null;
+        console.log('[RPC] Discord RPC cleanup selesai saat window-all-closed.');
+    }
+    
+    // Pada Windows, aplikasi biasanya keluar saat semua window ditutup
+    if (process.platform !== 'darwin') {
+        app.quit();
     }
 });
