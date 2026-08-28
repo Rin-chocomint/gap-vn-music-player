@@ -38,7 +38,7 @@ Dua hal yang tinggal serumah:
 Tiga bahasa antarmuka tersedia untuk runtime novel: Indonesia, Inggris, Jepang.
 
 ## Download & Release
-Versi siap pakai (Binary) untuk Windows dapat diunduh di menu Releases atau **[Klick disini!](../../releases)**, Jika mau mendapatkan pembaruan berkala, pastikan kamu memilih rilis ber-tag (Pre-release).
+Versi siap pakai (Binary) untuk Windows dapat diunduh di menu Releases atau **[Klick disini!](../../releases)**, Rilis paling baru itu yang ber-tag (Pre-release), Tetapi jika kamu memilih versi Rilis Stable mulai dari versi 0.0.0.9 kamu tetap bisa mendapatkan versi Terbaru/Nightly melalui fitur Cek update.
 
 * **Versi Release:** Berisi Engine siap pakai dengan halaman "About" yang memuat sejarah pengembangan proyek ini.
 * **Versi Repo:** Berisi kode sumber murni ("Clean") tanpa konten personal, siap untuk dikembangkan ulang oleh developer lain.
