@@ -1,7 +1,7 @@
 {
     "app": {
-        "version": "0.0.0.10-nightly.11",
-        "build": 11,
+        "version": "0.0.0.10-nightly.13",
+        "build": 13,
         "stage": "alpha",
         "requiresFullUpdate": false,
         "minCompatibleVersion": "0.0.0.9"
@@ -34,9 +34,9 @@
     },
     "components": {
         "vnManager": {
-            "version": "0.0.4",
+            "version": "0.0.5",
             "file": "aset/game/vnManager.html",
-            "hash": "a20e2bd4ab478b3857a4e92b568614a54ad3388dbea9846ca67e8cfc4f735763"
+            "hash": "f4814fe5a892c62e009b7bfc14eea538ccd93e0eb28fcee087c2e85b9304b4a4"
         },
         "vnPlayer": {
             "version": "0.1.5",
@@ -63,7 +63,7 @@
     },
     "files": {
         "Petunjuk cara pakai aplikasi (Baca Akuu).txt": "345147ab0fbcfd2516d8069470e7b6021387024ebc22b0c84b86804fb558d24c",
-        "README.md": "f5cf7b040b7440e5dcc38deb9f0f14d05d0c9a40c52b2b5fe9f2230c44072189",
+        "README.md": "cf62d51954f08139bfc3892c5fbe1c6bca13231ce69c8dbc3e7223cedaab906e",
         "ad-skkiper.html": "3d9930fc57788762ca8248bc7abddd2f827328c34a473e1afeeca7a25df59086",
         "aset/fonts/fonts.json": "15bf4d83687df346908b347df8cfb1988b4622a09f37ecc616bb9ee945688657",
         "aset/game/hub-templates/README.md": "686196be9f395b8c47cb24ecc5ef7773d8c19fdd97b57196a4e801465a9b967f",
@@ -127,7 +127,7 @@
         "aset/game/vnLib/cytoscape.min.js": "92d752b48ea949720675865197fd2a0001c95bc5888545e990af60321712d4c6",
         "aset/game/vnLib/dagre.min.js": "62eb9787ccfdbdf4148d4d99d31dbf9ee4770eafee81e637d759b52aac22cd51",
         "aset/game/vnManager-codeEditor.html": "de639283fe10c1b997367f9654d3ed7a3c32fb1f027d7cc4f6625f51ed0ddce1",
-        "aset/game/vnManager.html": "a20e2bd4ab478b3857a4e92b568614a54ad3388dbea9846ca67e8cfc4f735763",
+        "aset/game/vnManager.html": "f4814fe5a892c62e009b7bfc14eea538ccd93e0eb28fcee087c2e85b9304b4a4",
         "aset/game/vnModules/editor/achievementEditor.js": "19d93000ad3c660e8bb176024a1b6db7aa2811ab81142a86f846cab9eb6193cd",
         "aset/game/vnModules/editor/assetManager.js": "fc7f6031048abb76130950e58e81df80243a5221fe525c0d7074fa8282a21a77",
         "aset/game/vnModules/editor/codeEditorCore.js": "c9de8b05adad126d32a9f01cddd38dcb7a71ea2bccfc9c0337b16e7f48e0c080",
@@ -151,7 +151,7 @@
         "aset/game/vnModules/editor/previewFrame.js": "a567629859cc3294ff6992b6221a19a46458b4b06dcb6f55a5ad22ca152a94cd",
         "aset/game/vnModules/editor/scriptEditor.js": "3ed79235924571abeb37265b6bbf3e35cadb841f58c50b4a819939f11b90012b",
         "aset/game/vnModules/editor/translationEditor.js": "085869aa939ddcea51634e4394e892e63c923e9ad912e966587d7067ba3d07ff",
-        "aset/game/vnModules/player/intro.js": "7d7a0b3ed3c4d2d9947902dba9861a080f950fb308956cb4a02a258090d3c9bd",
+        "aset/game/vnModules/player/intro.js": "7a375ebb85367364ce55b208589d5c851eaed12d1e16849bdd73a2705a41406e",
         "aset/game/vnModules/player/mainMenu.js": "7938b2494ac8ce55d522ea57abdacbdab88d896148a6bf4f4a92bf7ff47678f5",
         "aset/game/vnModules/preview/preview-preload.js": "835c0a8640c7762eabc5de4cc02424b3944fe86c683fde4d2e5b8a7e4ef96cd6",
         "aset/game/vnModules/shared/diagnostics.js": "53c9f9551c37ff0f6d074459fd22d83413a4fac0df301e7b51084ce19a34e81d",
@@ -165,7 +165,7 @@
         "aset/game/vnStyles/editor/modal.css": "01291410ba35c19ee4cbb75ef094013cd501a7e48937788f9c7c1b629c6620db",
         "aset/game/vnStyles/editor/screen-editor.css": "61c90b1a6c8cb34a8f69c24d8379924319ec1a2dd4b061d5a165cf6b1a2ec508",
         "aset/game/vnStyles/player/global.css": "689caa009361272e010c95112bca1f597d23a0867897b368dd58ac4e395a87d1",
-        "aset/game/vnStyles/player/intro.css": "71763a6b3924d6bed739cfd9276f8097911c8da9396d2d3561f5aa9266c467f1",
+        "aset/game/vnStyles/player/intro.css": "ef6905e8e3ecffb1ef15ec20c2c6c2a8c06190f43344f46fc8d9c8c27d3cfd3a",
         "aset/game/vnStyles/player/main-menu.css": "078f6d2f8046d7bee649188b8c7381f0e5ef7bf7c044a501002ac3dd68e40a02",
         "aset/js/dynamic-ytm-styling.js": "543f3c195c762fba5c8e34d38e022a9ffa2c140a9fcf246859f8154b5f2736ac",
         "aset/js/vibrant.min.js": "cc2c98843df5d35f4722eb1f7b1f0a504ec6bb63f461aaa2a7a6fe91b9761aac",
@@ -174,9 +174,9 @@
         "gif-overlay-standalone.html": "4fec1bdf8ad54395379013a9c8e1830a3bb6a75522b40da73dde7ade67a6d668",
         "gif-overlay.html": "e94cfc36e3ec2e4fad9e7e34d9feb1af165794cdf11e89104f7ac1ab83e2d74f",
         "global-notification.html": "4ac2af6bfdb8d2b36caf1a21c9e575f3207c5367c320eeb95735b1bedb658d53",
-        "index.html": "9284e8f9ef42253bbfa9ddbf4e23ea776a134d0dfa13168540cbe9c5e210896f",
+        "index.html": "e27c21783e8617874ede641cc1b5ba49c44329e487145931fde4876a262629b9",
         "lineSplitter.js": "60e00eaeb48602806ba4d80c011a45e1fd1582a071187dc91808cbc1becc40e0",
-        "main.js": "e3cce6f3e75d20584a207de164ab96e7ed5d00bc83968c06de944ae8b7334a75",
+        "main.js": "66b27b8d520399990288d063d1e4e34b88a1424912fe1ec96ccb4fd250012fa1",
         "mini-player.html": "c154508fae6284365959b75ca8d0e4324bfb7781f7ca1a49f7f640d4f7550ae9",
         "native-player.html": "3308aba9c99318256f44d0d08093bc7f6ee3d7ae5039964983b87927b8b997a8",
         "overlay.html": "c33b25d5ad839c06cf233c9178da68132e4fb74bb82650d0c2e4649ebcb248db",

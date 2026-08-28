@@ -29,13 +29,48 @@
     <div id="intro-scene" class="intro-scene">
         <div class="tips-container">
             <div class="tips-header">Info</div>
-            <div class="tips-content">
-                <b style="color: lightcoral;">Penting untuk di ketahui !! :</b>
-                <p style="margin-top: 20px; font-size: 0.9em; opacity: 0.85;">
-                Fitur ini masih dalam tahap konstruksi dan penelitian!!, Tetapi meski begitu, 
-                sebagian besar fitur dasar visual novel sudah bisa kamu coba gunakan.
-                </p>
+            <!-- Tiap blok di dalam sini adalah satu pesan. Menambah pesan cukup
+                 menyalin satu blok — rotasinya (intro.js) membaca berapa pun yang
+                 ada, dan menyembunyikan navigasinya sendiri kalau cuma tersisa
+                 satu pesan. -->
+            <div class="tips-content" id="tips-content">
+                <div class="tips-slide is-active">
+                    <b style="color: lightcoral;">Penting untuk di ketahui !! :</b>
+                    <p style="margin-top: 20px; font-size: 0.9em; opacity: 0.85;">
+                    Fitur ini masih dalam tahap konstruksi dan penelitian!!, Tetapi meski begitu,
+                    sebagian besar fitur dasar visual novel sudah bisa kamu coba gunakan.
+                    </p>
+                </div>
+
+                <div class="tips-slide tips-slide--panjang">
+                    <b style="color: lightcoral;">Literatur :</b>
+                    <p>
+                    Aplikasi ini bekerja dengan kode yang tidak terkompilasi untuk transparansi
+                    maksimal. Siapa pun bisa mengkostum aplikasi ini langsung ke kodenya, atau
+                    membuat novel buatan mereka dengan kode-kode yang pembuat/moder aplikasi
+                    atau novel mau. Maka dari itu sangat tidak direkomendasikan kamu mengubah
+                    kode program aplikasi ini jika kamu tidak tahu apa yang sedang kamu lakukan.
+                    </p>
+                    <p>
+                    Entah itu kode yang kreatif tetapi bisa-bisa saja sensitif terhadap sistem
+                    atau lain sebagainya. Meskipun aplikasi kami ada scanner keamanan yang suatu
+                    saat bisa memberitahu kamu jika ada kode yang berbahaya pada novel buatan
+                    orang lain yang sedang kamu mainkan, ini tidak menjamin 100% bisa terdeteksi.
+                    </p>
+                    <p>
+                    Jadi pastikan kamu mempercayai pembuat novelnya untuk kamu mainkan.
+                    </p>
+                    <p>
+                    Kalau kamu mau mencari kepastian lebih soal keamanan novel buatan orang lain
+                    di komputer kamu namun awam koding/pemrograman, kamu bisa gunakan AI Agent
+                    koding (mis. Antigravity, Codex) untuk disuruh melakukan pengecekan
+                    menyeluruh terhadap folder novel yang mau kamu mainkan sebelum di-play.
+                    </p>
+                </div>
             </div>
+
+            <div class="tips-nav" id="tips-nav"></div>
+            <div class="tips-hint" id="tips-hint">Klik untuk pesan berikutnya</div>
         </div>
         <div class="continue-section">
             <span class="continue-text">Press Enter</span>

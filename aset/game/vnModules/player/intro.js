@@ -96,4 +96,68 @@
         animation: none;
       }
     `;
-        document.head.appendChild(swipeOutAnimation);
+        document.head.appendChild(swipeOutAnimation);
+        // ------------------- Rotasi pesan intro ------------------- //
+        // Pesan berganti sendiri setiap beberapa detik, dan bisa dipercepat
+        // dengan klik. Timer BERHENTI selama kursor berada di atas kotaknya —
+        // pesan panjang tidak boleh berpindah justru ketika orang sedang
+        // membacanya. Enter tetap milik exitIntroScene(), tidak diganggu.
+        document.addEventListener('DOMContentLoaded', () => {
+            const wadah = document.getElementById('tips-content');
+            const nav = document.getElementById('tips-nav');
+            const petunjuk = document.getElementById('tips-hint');
+            if (!wadah) return;
+
+            const slides = Array.from(wadah.querySelectorAll('.tips-slide'));
+            if (slides.length < 2) {
+                // Satu pesan: tak ada yang perlu diputar, dan navigasinya cuma
+                // akan membingungkan.
+                if (nav) nav.style.display = 'none';
+                if (petunjuk) petunjuk.style.display = 'none';
+                return;
+            }
+
+            const JEDA_MS = 14000;
+            let aktif = 0;
+            let timer = null;
+            let tertahan = false;
+
+            const titik = slides.map((_, i) => {
+                const d = document.createElement('button');
+                d.type = 'button';
+                d.className = 'tips-dot';
+                d.setAttribute('aria-label', 'Pesan ' + (i + 1) + ' dari ' + slides.length);
+                d.addEventListener('click', (e) => {
+                    e.stopPropagation();   // jangan ikut memicu klik-maju di kotak
+                    tampilkan(i);
+                });
+                if (nav) nav.appendChild(d);
+                return d;
+            });
+
+            function tampilkan(i) {
+                // Intro dihapus dari DOM saat Enter ditekan; timer yang terlanjur
+                // dijadwalkan tidak boleh menyentuh node yatim.
+                if (!document.body.contains(wadah)) {
+                    clearTimeout(timer);
+                    return;
+                }
+                aktif = ((i % slides.length) + slides.length) % slides.length;
+                slides.forEach((s, n) => s.classList.toggle('is-active', n === aktif));
+                titik.forEach((d, n) => d.classList.toggle('is-active', n === aktif));
+                jadwalkan();
+            }
+
+            function jadwalkan() {
+                clearTimeout(timer);
+                if (tertahan) return;
+                timer = setTimeout(() => tampilkan(aktif + 1), JEDA_MS);
+            }
+
+            const kotak = wadah.closest('.tips-container') || wadah;
+            kotak.addEventListener('click', () => tampilkan(aktif + 1));
+            kotak.addEventListener('mouseenter', () => { tertahan = true; clearTimeout(timer); });
+            kotak.addEventListener('mouseleave', () => { tertahan = false; jadwalkan(); });
+
+            tampilkan(0);
+        });

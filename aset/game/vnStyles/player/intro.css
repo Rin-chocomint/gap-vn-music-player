@@ -131,4 +131,92 @@
         /*---- End gambar karakter Responsif resolusi 720 ke bawah -----*/
 
         /* ======================= End Scene Intro ======================= */
-
+
+        /* ---------------- Rotasi pesan intro ---------------- */
+        /* Kotaknya dibatasi tinggi supaya pesan panjang tidak mendorong
+           tips-container melewati layar — ia terpusat lewat translate(-50%),
+           jadi luapannya akan terpotong di atas DAN bawah sekaligus. */
+        .tips-container {
+            max-height: 76vh;
+            overflow-y: auto;
+        }
+
+        .tips-content {
+            position: relative;
+        }
+
+        .tips-slide {
+            display: none;
+        }
+
+        .tips-slide.is-active {
+            display: block;
+            animation: tipsMasuk 0.35s ease;
+        }
+
+        @keyframes tipsMasuk {
+            from {
+                opacity: 0;
+                transform: translateY(6px);
+            }
+
+            to {
+                opacity: 1;
+                transform: none;
+            }
+        }
+
+        /* Paragraf panjang rata-tengah sulit dibaca — mata kehilangan awal baris
+           berikutnya. Yang panjang dibuat rata kiri dan sedikit lebih kecil. */
+        .tips-slide--panjang {
+            text-align: left;
+            font-size: 0.95rem;
+            line-height: 1.65;
+        }
+
+        .tips-slide--panjang b {
+            display: block;
+            text-align: center;
+            margin-bottom: 14px;
+            font-size: 1.15rem;
+        }
+
+        .tips-slide--panjang p {
+            margin: 0 0 12px 0;
+            opacity: 0.85;
+        }
+
+        .tips-nav {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 18px;
+        }
+
+        .tips-dot {
+            width: 9px;
+            height: 9px;
+            padding: 0;
+            border: none;
+            border-radius: 50%;
+            background: #d3d3d3;
+            cursor: pointer;
+            transition: background 0.2s ease, transform 0.2s ease;
+        }
+
+        .tips-dot:hover {
+            background: #b0b0b0;
+        }
+
+        .tips-dot.is-active {
+            background: lightcoral;
+            transform: scale(1.25);
+        }
+
+        .tips-hint {
+            margin-top: 10px;
+            text-align: center;
+            font-size: 0.75rem;
+            color: #999;
+            user-select: none;
+        }

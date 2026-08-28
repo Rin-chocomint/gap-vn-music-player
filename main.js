@@ -399,7 +399,7 @@ function updateRpcActivity(data) {
     // ketiga perbedaan sisanya supaya jalur yang TERBUKTI jalan dan jalur ini
     // benar-benar sebangun, dan `type` ditulis eksplisit (0 = Playing) alih-alih
     // dibiarkan kosong.
-    const largeText = 'Aplikasi visual novel & pemutar musik — Alpha v0.0.0.9';
+    const largeText = `Aplikasi visual novel & pemutar musik — ${stageAplikasi() || 'Alpha'} v${versiAplikasi()}`;
     const activity = {
         type: 0, // Playing
         details: details || 'Idle',
@@ -698,6 +698,41 @@ try {
     }
 } catch (e) {
     console.error('[Integrity] Failed to load versions.json:', e.message);
+}
+
+// ======================== Teks berversi — SATU sumber ========================
+// Judul jendela, footer, dan status Discord dulu menuliskan nomornya sendiri
+// secara hardcode, sehingga tidak pernah ikut berubah: build baru hasil
+// pembaruan masih memperkenalkan diri dengan nomor rilis lama — termasuk di
+// status Discord yang dilihat orang lain. Ketiganya kini membaca versions.json
+// lewat sini, jadi cukup satu tempat yang perlu benar.
+// Aman dipanggil dari mana pun di bawah baris ini: manifest sudah dimuat di atas.
+function versiAplikasi() {
+    const a = (versionsManifest && versionsManifest.app) || {};
+    const versi = String(a.version || '?');
+    const build = Number(a.build);
+    // Versi yang sudah membawa penanda (mis. -nightly.11) memuat penghitungnya
+    // sendiri; menempelkan build lagi hanya menggandakan angka yang sama.
+    return versi + (build > 0 && !versi.includes('-') ? '-' + build : '');
+}
+
+function stageAplikasi() {
+    const s = String((versionsManifest && versionsManifest.app && versionsManifest.app.stage) || '').trim();
+    return s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+}
+
+// Judul jendela dipasang SESUDAH halaman dimuat, karena <title> di HTML akan
+// menimpanya kalau disetel lebih awal. Bukan `once`: reload harus dapat judul
+// yang sama.
+function pasangJudulVersi(win) {
+    if (!win || win.isDestroyed()) return;
+    const terap = () => {
+        if (win.isDestroyed()) return;
+        const stage = stageAplikasi();
+        win.setTitle(`Gap vn & music Player | v${versiAplikasi()}${stage ? ' ' + stage : ''}`);
+    };
+    win.webContents.on('did-finish-load', terap);
+    terap();
 }
 
 // Inisialisasi sistem update (Tier-1 per-file dari GitHub).
@@ -4111,7 +4146,7 @@ function stopCursorTracking() {
 // ======================================= Akhir Logika GIF Overlay =================================== //
 
 // ======================== Logika Version Overlay (BrowserView) =======================//
-const VERSION_TEXT = 'versi 0.0.0.9 | Versi Eksperimental, tidak mengindikasikan hasil akhir aplikasi...';
+const VERSION_TEXT = `versi ${versiAplikasi()} | Versi Eksperimental, tidak mengindikasikan hasil akhir aplikasi...`;
 const VERSION_OVERLAY_WIDTH = 548;
 const VERSION_OVERLAY_HEIGHT = 30;
 const VERSION_OVERLAY_MARGIN = 0;
@@ -6078,6 +6113,7 @@ function setupGameWindow(data) {
 
     mainWindow.loadFile('index.html');
     mainWindow.setMenu(null);
+    pasangJudulVersi(mainWindow);
 
     // Buat version overlay (BrowserView) setelah mainWindow siap
     mainWindow.once('ready-to-show', () => {
