@@ -495,10 +495,20 @@
 
         ipcRenderer.on('updater:info', (e, data) => {
             info = data || {};
-            el('cur-ver').textContent = 'v' + (info.currentVersion || '?');
+            // Nomor build ikut ditampilkan karena versi boleh DIAM di antara rilis —
+            // tanpa build, dua rilis berbeda akan tampak bernomor sama persis.
+            // Kecuali versinya sudah membawa penanda sendiri (mis. 0.0.0.10-nightly.11):
+            // di situ penghitungnya sudah kelihatan, menempelkan build lagi hanya
+            // menggandakan angka yang sama.
+            const labelRilis = (versi, build) => {
+                const v = versi || '?';
+                return 'v' + v + (build && !v.includes('-') ? '-' + build : '');
+            };
+
+            el('cur-ver').textContent = labelRilis(info.currentVersion, info.currentBuild);
             // Channel pra-rilis menawarkan build alpha; katakan apa adanya supaya
             // pemasangnya tahu ini bukan versi stabil.
-            el('new-ver').textContent = 'v' + (info.latestVersion || '?')
+            el('new-ver').textContent = labelRilis(info.latestVersion, info.latestBuild)
                 + (info.prerelease ? ' · pra-rilis' : '');
             el('n-mod').textContent = (info.modified || []).length;
             el('n-add').textContent = (info.added || []).length;

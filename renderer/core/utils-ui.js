@@ -83,8 +83,13 @@ function initAboutPanel() {
             // tabel versi
             let versionRows = '';
             if (versions && versions.app) {
+                // Versi yang sudah membawa penanda sendiri (mis. 0.0.0.10-nightly.11)
+                // sudah memuat penghitungnya; menempelkan build lagi cuma dobel.
+                const versiApp = String(versions.app.version || '?');
+                const labelApp = versiApp
+                    + (versions.app.build && !versiApp.includes('-') ? '-' + versions.app.build : '');
                 versionRows = `
-                    <tr><td>Aplikasi</td><td>v${versions.app.version} <span style="color:#00ccff;font-size:0.75rem;">${versions.app.stage}</span></td></tr>
+                    <tr><td>Aplikasi</td><td>v${labelApp} <span style="color:#00ccff;font-size:0.75rem;">${versions.app.stage}</span></td></tr>
                     <tr><td>VN Player</td><td>v${versions.components?.vnPlayer?.version || 'N/A'}</td></tr>
                     <tr><td>VN Hub</td><td>v${versions.components?.vnHub?.version || 'N/A'}</td></tr>
                     <tr><td>VN Manager</td><td>v${versions.components?.vnManager?.version || 'N/A'}</td></tr>
