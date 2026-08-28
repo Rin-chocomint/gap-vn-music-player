@@ -33,17 +33,17 @@ Dua hal yang tinggal serumah:
 
 **Pemutar musik.** Playlist dari berkas lokal, webview YouTube Music, mini player, overlay yang bisa ditumpuk di atas aplikasi lain, visualizer WebGPU, wallpaper video di latar, dan kehadiran Discord Rich Presence.
 
-**Engine visual novel.** Bukan cuma pemutar — ada editornya. Novel disusun dari JSON deklaratif lewat editor visual, bukan dengan menulis kode: dialog, pilihan bercabang, sprite berlapis, transisi, variabel cerita, achievement, galeri, dan hub menu utama yang bisa dipilih dari pustaka template. Yang mau turun lebih dalam bisa menulis `player.html` sendiri atau menambah extension JavaScript, tanpa kehilangan fitur bawaan engine.
+**Engine visual novel.** Bukan cuma pemutar ada editornya. Novel disusun dari JSON deklaratif lewat editor visual, bukan dengan menulis kode: dialog, pilihan bercabang, sprite berlapis, transisi, variabel cerita, achievement, galeri, dan hub menu utama yang bisa dipilih dari pustaka template. Yang mau turun lebih dalam bisa menulis `player.html` sendiri atau menambah extension JavaScript, tanpa kehilangan fitur bawaan engine.
 
 Tiga bahasa antarmuka tersedia untuk runtime novel: Indonesia, Inggris, Jepang.
 
 ## Download & Release
-Versi siap pakai (Binary) untuk Windows dapat diunduh di menu **[Releases](../../releases)**.
+Versi siap pakai (Binary) untuk Windows dapat diunduh di menu Releases atau **[Klick disini!](../../releases)**, Jika mau mendapatkan pembaruan berkala, pastikan kamu memilih rilis ber-tag (Pre-release).
 
 * **Versi Release:** Berisi Engine siap pakai dengan halaman "About" yang memuat sejarah pengembangan proyek ini.
 * **Versi Repo:** Berisi kode sumber murni ("Clean") tanpa konten personal, siap untuk dikembangkan ulang oleh developer lain.
 
-Ekstrak arsipnya ke folder kosong lalu jalankan `Gap.exe` — tidak ada pemasang, aplikasinya berjalan langsung dari folder itu. Petunjuk pemakaian sehari-hari (menambah musik, wallpaper, tips) ada di berkas `Petunjuk cara pakai aplikasi (Baca Akuu).txt` di dalam arsip.
+Ekstrak arsipnya ke folder kosong lalu jalankan `Gap.exe` tidak ada pemasang, aplikasinya berjalan langsung dari folder itu. Petunjuk pemakaian sehari-hari (menambah musik, wallpaper, tips) ada di berkas `Petunjuk cara pakai aplikasi (Baca Akuu).txt` di dalam arsip.
 
 > Letak tombol **Releases** ada di sebelah kanan halaman ini. Pastikan kamu tidak mengambil versi lama untuk tahu kemajuan sebenarnya aplikasi ini.
 
