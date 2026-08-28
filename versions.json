@@ -1,7 +1,7 @@
 {
     "app": {
-        "version": "0.0.0.10-nightly.13",
-        "build": 13,
+        "version": "0.0.0.10-nightly.16",
+        "build": 16,
         "stage": "alpha",
         "requiresFullUpdate": false,
         "minCompatibleVersion": "0.0.0.9"
@@ -63,7 +63,7 @@
     },
     "files": {
         "Petunjuk cara pakai aplikasi (Baca Akuu).txt": "345147ab0fbcfd2516d8069470e7b6021387024ebc22b0c84b86804fb558d24c",
-        "README.md": "cf62d51954f08139bfc3892c5fbe1c6bca13231ce69c8dbc3e7223cedaab906e",
+        "README.md": "63a53aa8a15d4d1a88598a11df9fc3fe713b0ea18d99dda0707a2fff687b6d8a",
         "ad-skkiper.html": "3d9930fc57788762ca8248bc7abddd2f827328c34a473e1afeeca7a25df59086",
         "aset/fonts/fonts.json": "15bf4d83687df346908b347df8cfb1988b4622a09f37ecc616bb9ee945688657",
         "aset/game/hub-templates/README.md": "686196be9f395b8c47cb24ecc5ef7773d8c19fdd97b57196a4e801465a9b967f",
