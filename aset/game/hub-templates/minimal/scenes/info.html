@@ -1,0 +1,21 @@
+<!-- ===== Scene: {{SCENE_NAME}} (info) =====
+     Info/sinopsis novel (layar terminal). Dicapai dari menu via goto,
+     kembali via back. Semua nilai terisi otomatis dari Profil Novel. -->
+    <section class="hub-scene m-info" data-scene-id="{{SCENE_ID}}" data-scene-type="info" data-scene-name="{{SCENE_NAME}}">
+      <div class="m-sheet" data-node="content">
+        <header class="m-head">
+          <h1 class="m-title" data-node="title" data-bind="title">Tentang Novel</h1>
+        </header>
+        <p class="m-prose" data-node="desc" data-bind="description">Sinopsis novel akan tampil di sini dari Profil Novel.</p>
+        <dl class="m-dl" data-node="meta">
+          <dt>Genre</dt><dd data-bind="genre">&mdash;</dd>
+          <dt>Penulis</dt><dd data-bind="author">&mdash;</dd>
+          <dt>Ilustrator</dt><dd data-bind="illustrator">&mdash;</dd>
+          <dt>VN Mapper</dt><dd data-bind="vnMapper">&mdash;</dd>
+          <dt>Versi</dt><dd data-bind="version">&mdash;</dd>
+        </dl>
+        <div class="m-back">
+          <button type="button" class="m-btn" data-node="back-btn" data-action="back">&larr; Kembali</button>
+        </div>
+      </div>
+    </section>

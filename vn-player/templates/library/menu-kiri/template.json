@@ -1,0 +1,12 @@
+{
+    "id": "menu-kiri",
+    "label": "Menu Kiri \u2014 Bilah Tembus Pandang",
+    "description": "Kerumunan tombol di pojok kanan-atas TURUN jadi kolom menu berlabel di tepi kiri bawah, dan kotak teks jadi bilah rata penuh yang tembus pandang \u2014 gambar tetap terlihat di baliknya. Nama pembicara duduk SEBARIS di kiri kalimat, bukan di atasnya, dan tanda lanjut naik ke sudut kanan-ATAS bilah. Semuanya lewat CSS di atas markup engine: nol peran dibekukan.",
+    "category": "layout",
+    "layoutFamily": "menu-kiri",
+    "thumbnail": "preview.png",
+    "tags": ["menu samping", "bilah tembus", "nama sebaris"],
+    "dialogueStyle": "bottom-bar",
+    "materializeStory": false,
+    "themeCascade": "replace-novel"
+}

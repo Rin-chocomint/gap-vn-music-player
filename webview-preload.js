@@ -18,6 +18,7 @@ let lastSentFavicon = null;
 let lastSentPlaybackTitle = null; // Khusus untuk judul dari sendPlaybackState
 let lastSentPlaybackThumbnail = null; // Khusus untuk thumbnail dari sendPlaybackState
 let lastSentPlaybackArtist = null; // Khusus untuk artis dari sendPlaybackState
+let lastCaptionText = null;
 
 let audioCtx = null;
 let analyser = null;
@@ -161,6 +162,260 @@ function formatTime(seconds) {
     return `${minutes}:${remainingSeconds}`;
 }
 
+// =====================================================================
+// [LOGIN-WATCHDOG] Deteksi & bantu alur login YouTube Music / Google
+// ---------------------------------------------------------------------
+// - Mencatat (LOG) tiap tahap alur login dan meneruskannya ke host (app).
+// - Menampilkan ELEMEN GUI kecil (toast) bila halaman login lama merespon,
+//   lengkap dengan tombol "Muat ulang".
+// - Mendeteksi halaman blokir Google ("browser may not be secure").
+// Preload dijalankan ulang tiap navigasi dokumen, jadi blok ini otomatis
+// aktif saat webview berpindah ke accounts.google.com.
+// Semua DOM dibuat via createElement + textContent (aman dari Trusted Types).
+// =====================================================================
+(function setupLoginWatchdog() {
+    const href = String(location.href || '');
+    const host = String(location.hostname || '');
+    const isGoogleAuth = /accounts\.google\.com|accounts\.youtube\.com/i.test(host) ||
+        /ServiceLogin|\/signin|\/oauth|\/consent/i.test(href);
+
+    function log(msg, extra) {
+        try {
+            console.log(`[Login] ${msg}`, extra !== undefined ? extra : '');
+            sendToApp('login-flow-log', { msg, url: href, time: Date.now(), extra: extra ?? null });
+        } catch (e) { /* abaikan */ }
+    }
+
+    function whenBodyReady(cb) {
+        if (document.body) return cb();
+        document.addEventListener('DOMContentLoaded', cb, { once: true });
+    }
+
+    const TOAST_ID = 'gap-login-watchdog-toast';
+
+    function styleBtn(btn, primary) {
+        Object.assign(btn.style, {
+            cursor: 'pointer', border: 'none', borderRadius: '6px',
+            padding: '6px 12px', fontSize: '12px', fontWeight: '600',
+            color: primary ? '#0b0b0c' : '#fff',
+            background: primary ? '#ffffff' : 'rgba(255,255,255,0.14)'
+        });
+    }
+
+    function ensureSpinKeyframes() {
+        if (document.getElementById('gap-login-spin-kf')) return;
+        const st = document.createElement('style');
+        st.id = 'gap-login-spin-kf';
+        st.textContent = '@keyframes gapLoginSpin{to{transform:rotate(360deg)}}';
+        (document.head || document.documentElement).appendChild(st);
+    }
+
+    function removeToast() {
+        const t = document.getElementById(TOAST_ID);
+        if (t && t.parentNode) t.parentNode.removeChild(t);
+    }
+
+    // state: 'loading' (spinner) | 'warn' (peringatan + tombol aksi)
+    // detail (opsional): baris kedua kecil untuk penjelasan/saran tambahan.
+    function buildToast(state, message, detail) {
+        whenBodyReady(() => {
+            let toast = document.getElementById(TOAST_ID);
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = TOAST_ID;
+                Object.assign(toast.style, {
+                    position: 'fixed', left: '50%', bottom: '24px',
+                    transform: 'translateX(-50%)', zIndex: '2147483647',
+                    maxWidth: '360px', padding: '12px 16px',
+                    background: 'rgba(20,20,22,0.96)', color: '#fff',
+                    font: '13px/1.4 system-ui, sans-serif', borderRadius: '10px',
+                    boxShadow: '0 6px 24px rgba(0,0,0,0.45)',
+                    display: 'flex', flexDirection: 'column', gap: '8px',
+                    border: '1px solid rgba(255,255,255,0.12)'
+                });
+                document.body.appendChild(toast);
+            }
+            while (toast.firstChild) toast.removeChild(toast.firstChild);
+
+            const row = document.createElement('div');
+            Object.assign(row.style, { display: 'flex', alignItems: 'center', gap: '10px' });
+
+            if (state === 'loading') {
+                ensureSpinKeyframes();
+                const spinner = document.createElement('div');
+                Object.assign(spinner.style, {
+                    width: '16px', height: '16px', borderRadius: '50%',
+                    border: '2px solid rgba(255,255,255,0.25)', borderTopColor: '#fff',
+                    animation: 'gapLoginSpin 1s linear infinite', flex: '0 0 auto'
+                });
+                row.appendChild(spinner);
+            } else if (state === 'warn') {
+                const icon = document.createElement('span');
+                icon.textContent = '⚠️';
+                row.appendChild(icon);
+            }
+
+            const text = document.createElement('span');
+            text.textContent = message;
+            row.appendChild(text);
+            toast.appendChild(row);
+
+            if (detail) {
+                const detailEl = document.createElement('div');
+                detailEl.textContent = detail;
+                Object.assign(detailEl.style, {
+                    fontSize: '11px', lineHeight: '1.45', color: 'rgba(255,255,255,0.72)'
+                });
+                toast.appendChild(detailEl);
+            }
+
+            if (state === 'warn') {
+                const btnRow = document.createElement('div');
+                Object.assign(btnRow.style, { display: 'flex', gap: '8px', justifyContent: 'flex-end' });
+
+                const dismiss = document.createElement('button');
+                dismiss.textContent = 'Tutup';
+                styleBtn(dismiss, false);
+                dismiss.addEventListener('click', removeToast);
+
+                const reload = document.createElement('button');
+                reload.textContent = 'Muat ulang';
+                styleBtn(reload, true);
+                reload.addEventListener('click', () => { log('User menekan "Muat ulang" dari toast.'); location.reload(); });
+
+                btnRow.appendChild(dismiss);
+                btnRow.appendChild(reload);
+                toast.appendChild(btnRow);
+            }
+        });
+    }
+
+    // --- Di halaman YTM biasa: deteksi klik tombol Login & teruskan ke main ---
+    if (!isGoogleAuth) {
+        document.addEventListener('click', (ev) => {
+            const t = ev.target;
+            if (!t || !t.closest) return;
+            // Prioritas: tombol login resmi YT Music <a class="sign-in-link ...">
+            const signInLink = t.closest('a.sign-in-link');
+            const el = signInLink || t.closest('a, button, ytmusic-button-renderer, [aria-label]');
+            if (!el) return;
+
+            const label = ((el.getAttribute && (el.getAttribute('aria-label') || el.textContent)) || '').trim().toLowerCase();
+            const targetHref = (signInLink && signInLink.getAttribute('href')) ||
+                (el.getAttribute && el.getAttribute('href')) || '';
+            const isLogin = !!signInLink ||
+                /sign in|masuk|log ?in/i.test(label) ||
+                /accounts\.google|ServiceLogin|\/signin/i.test(targetHref);
+
+            if (isLogin) {
+                log('Tombol LOGIN YT Music ditekan.', { viaSignInLink: !!signInLink, label, target: targetHref });
+                // 'target' dipakai main.js untuk memverifikasi navigasi & deadline.
+                sendToApp('login-flow-start', {
+                    from: signInLink ? 'ytmusic-signin-link' : 'ytmusic',
+                    url: href,
+                    target: targetHref
+                });
+            }
+        }, true);
+        return;
+    }
+
+    // ===== Berada di halaman login Google: aktifkan watchdog penuh =====
+    log('Halaman login Google terdeteksi, watchdog aktif.', { host });
+    sendToApp('login-flow-start', { from: 'google', url: href });
+    buildToast('loading', 'Memuat halaman login Google…');
+
+    let settled = false;
+
+    function loginUiPresent() {
+        return !!document.querySelector(
+            'input[type="email"], input[type="password"], #identifierId, ' +
+            '[data-identifier], [data-authuser], form[action*="signin"]'
+        );
+    }
+
+    function detectBlockPage() {
+        // Sinyal PALING andal: URL hasil tolakan Google (tidak bergantung render teks).
+        const liveUrl = String(location.href || '');
+        const urlBlocked = /\/signin\/rejected|deniedsigninrejected|rejected\?/i.test(liveUrl);
+        // Sinyal cadangan: teks pada body (EN/ID).
+        const body = ((document.body && document.body.innerText) || '').toLowerCase();
+        const textBlocked = /couldn.?t sign you in|browser or app may not be secure|tidak dapat memproses|browser atau aplikasi ini mungkin tidak aman/i.test(body);
+
+        if (urlBlocked || textBlocked) {
+            log('Google MEMBLOKIR login (browser dianggap tidak aman).', { urlBlocked, textBlocked });
+            buildToast('warn', 'Google menolak login di jendela ini.',
+                'Biasanya karena identitas browser (User-Agent). Tekan "Muat ulang"; bila tetap gagal, login lewat browser lalu buka kembali.');
+            sendToApp('login-flow-anomaly', { kind: 'google-blocked-useragent', url: liveUrl });
+            settled = true;
+            clearTimeout(softWatchdog);
+            clearTimeout(hardWatchdog);
+            return true;
+        }
+        return false;
+    }
+
+    function settle(reason) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(softWatchdog);
+        clearTimeout(hardWatchdog);
+        clearInterval(poll);
+        removeToast();
+        log('Halaman login selesai dimuat / interaktif.', { reason });
+    }
+
+    const poll = setInterval(() => {
+        if (settled) { clearInterval(poll); return; }
+        if (detectBlockPage()) { clearInterval(poll); return; }
+        if (loginUiPresent()) { settle('login-ui-present'); }
+    }, 400);
+
+    window.addEventListener('load', () => {
+        log('window.load halaman login terpicu.');
+        setTimeout(() => {
+            if (settled) return;
+            if (detectBlockPage()) return;
+            if (loginUiPresent()) settle('load+ui');
+        }, 600);
+    }, { once: true });
+
+    // -----------------------------------------------------------------
+    // [DEV-NOTE] Soal "jaringan/provider" pada anomali login:
+    // Gejala umum & membingungkan: BROWSING/streaming lancar (YouTube,
+    // music.youtube.com) tapi LOGIN ke accounts.google.com MACET. Ini wajar
+    // karena login dan konten memakai jalur jaringan berbeda — login butuh
+    // handshake TLS baru + POST + redirect ke domain auth, sementara streaming
+    // memakai CDN (googlevideo.com) yang koneksinya sudah mapan.
+    // Penyebab tipikal yang DI LUAR kendali aplikasi:
+    //   - QUIC/HTTP3 (UDP 443) di-drop diam-diam oleh provider -> handshake
+    //     menggantung sampai timeout (tersangka utama).
+    //   - IPv6 rusak ke domain Google, MTU black hole, DNS auth gagal,
+    //     atau transparent proxy yang mengganggu POST login.
+    // Karena itu, saat anomali kita SEBUTKAN kemungkinan provider/jaringan ke
+    // user (lihat 'detail' di bawah) + sarankan ganti jaringan/DNS sebentar,
+    // persis solusi manual "ganti ke data seluler dulu agar bisa login".
+    // -----------------------------------------------------------------
+
+    const NETWORK_HINT = 'Browsing bisa lancar walau login terblokir provider. Coba ganti jaringan/data seluler sebentar, ganti DNS (mis. 8.8.8.8), atau tekan "Muat ulang".';
+
+    // Watchdog lunak (12 dtk): tampilkan peringatan tapi tetap memantau.
+    const softWatchdog = setTimeout(() => {
+        if (settled) return;
+        log('ANOMALI: halaman login >12 dtk belum menampilkan form.', { readyState: document.readyState });
+        buildToast('warn', 'Halaman login lama merespon.', NETWORK_HINT);
+        sendToApp('login-flow-anomaly', { kind: 'slow-login-page', url: href, readyState: document.readyState });
+    }, 12000);
+
+    // Watchdog keras (25 dtk): kemungkinan macet total (sering bertanda jaringan).
+    const hardWatchdog = setTimeout(() => {
+        if (settled) return;
+        log('ANOMALI BERAT: halaman login mungkin macet total (>25 dtk) — kemungkinan jalur login diblokir jaringan/provider.');
+        buildToast('warn', 'Halaman login sepertinya macet (kemungkinan masalah jaringan/provider).', NETWORK_HINT);
+        sendToApp('login-flow-anomaly', { kind: 'stuck-login-page', url: href, suspect: 'network-provider' });
+    }, 25000);
+})();
+
 // --- Fungsi untuk mendapatkan informasi halaman umum ---
 function sendPageInfo() {
     // Kirim URL jika berubah
@@ -236,7 +491,7 @@ async function sendPlaybackState() {
         sendToApp('playback-update', {
             currentTime: 0, duration: 0, progressPercent: 0,
             timeText: '0:00 / 0:00', isPlaying: false,
-            title: 'Loading...', thumbnail: './aset/musik.png', artist: ''
+            title: 'Loading...', thumbnail: './aset/musik.png', artist: '', album: ''
         });
         return;
     }
@@ -302,6 +557,11 @@ async function sendPlaybackState() {
     if (titleEl?.textContent) title = titleEl.textContent.trim();
     if (artistLink) artist = artistLink.textContent.trim();
 
+    // Nama album (untuk teks hover RPC). Sumber paling andal: MediaSession.
+    // Jika tak tersedia, biarkan kosong → hover anggun jatuh ke judul.
+    let album = '';
+    try { album = navigator.mediaSession?.metadata?.album || ''; } catch (e) { album = ''; }
+
     // Logika Thumbnail (Priority Check) ---
     const mainContentThumbSrc = getSongImageSrc();
     const newPlayerBarThumbEl = playerBar?.querySelector('.thumbnail-image-wrapper .image.ytmusic-player-bar');
@@ -338,7 +598,7 @@ async function sendPlaybackState() {
         title !== 'Loading...' &&
         (title !== lastSentPlaybackTitle || thumbnail !== lastSentPlaybackThumbnail || artist !== lastSentPlaybackArtist)
     ) {
-        sendToApp('track-changed', { title, thumbnail, duration: duration > 0 ? duration : 0, artist });
+        sendToApp('track-changed', { title, thumbnail, duration: duration > 0 ? duration : 0, artist, album });
 
         // Update cache
         lastSentPlaybackTitle = title;
@@ -349,11 +609,33 @@ async function sendPlaybackState() {
     // B. Kirim 'playback-update' terus menerus (Untuk Progress Bar & Waktu)
     sendToApp('playback-update', {
         currentTime, duration: duration > 0 ? duration : 0, progressPercent,
-        timeText, isPlaying, title, thumbnail, artist
+        timeText, isPlaying, title, thumbnail, artist, album
     });
 
     // C. Kirim status play simpel
     sendToApp('play-state', { playing: isPlaying });
+}
+
+// Caption tidak diaktifkan oleh aplikasi. Fungsi ini hanya membaca teks yang
+// YouTube Music tampilkan setelah user sendiri menekan tombol CC.
+function readActiveCaptionText() {
+    const captionSegments = document.querySelectorAll(
+        '#ytp-caption-window-container .ytp-caption-segment, .caption-window .ytp-caption-segment'
+    );
+    const text = Array.from(captionSegments)
+        .filter(segment => segment.getClientRects().length > 0)
+        .map(segment => segment.textContent || '')
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    return text;
+}
+
+function sendCaptionUpdate(force = false) {
+    const text = readActiveCaptionText();
+    if (!force && text === lastCaptionText) return;
+    lastCaptionText = text;
+    sendToApp('subtitle-update', { text, active: Boolean(text) });
 }
 
 // --- Fungsi untuk Analyser ---
@@ -563,15 +845,7 @@ window.addEventListener('DOMContentLoaded', () => {
     // Hapus 'let lastAdState = 'none';' dari sini karena sudah dipindah ke global
     let lastAdDetailsJSON = '';
 
-    const adObserver = new MutationObserver(() => {
-        if (!adSkipperEnabled) {
-            if (lastAdState !== 'none') {
-                lastAdState = 'none';
-                sendToApp('ad-status-update', { state: 'none' });
-            }
-            return;
-        }
-
+    const detectAdState = () => {
         // --- Selectors dari Informasi Kamu ---
         const skipButtonContainer = document.querySelector('.ytp-ad-skip-button-container');
         const countdownContainer = document.querySelector('.ytp-ad-preview-container');
@@ -703,7 +977,7 @@ window.addEventListener('DOMContentLoaded', () => {
             currentBounds = { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
 
             // === [AUTO SKIP] ===
-            if (autoSkipEnabled) {
+            if (adSkipperEnabled && autoSkipEnabled) {
                 if (!window.isAutoSkipping) {
                     console.log('[Preload] Auto Skip aktif! Mengirim koordinat ke Host...');
 
@@ -745,7 +1019,7 @@ window.addEventListener('DOMContentLoaded', () => {
         // === [LOGIKA BARU: AUTO MUTE] ===
         const mediaElements = document.querySelectorAll('video, audio');
 
-        if (autoMuteEnabled) {
+        if (adSkipperEnabled && autoMuteEnabled) {
             // Jika sedang ada iklan (Waiting atau Skippable)
             if (currentState === 'waiting' || currentState === 'skippable') {
                 // Dan belum di-mute oleh sistem kita
@@ -790,7 +1064,20 @@ window.addEventListener('DOMContentLoaded', () => {
                 details: adDetails
             });
         }
-    });
+    };
+
+    // Deteksi tetap aktif walau Ad Skipper dimatikan supaya overlay rhythm
+    // tidak menghitung audio iklan. Pemeriksaan dibatasi agar tidak membebani
+    // halaman saat YouTube Music banyak mengubah DOM.
+    let adDetectionTimer = null;
+    const scheduleAdDetection = () => {
+        if (adDetectionTimer) return;
+        adDetectionTimer = setTimeout(() => {
+            adDetectionTimer = null;
+            detectAdState();
+        }, 120);
+    };
+    const adObserver = new MutationObserver(scheduleAdDetection);
 
     // Mulai mengamati perubahan
     adObserver.observe(document.body, {
@@ -799,7 +1086,12 @@ window.addEventListener('DOMContentLoaded', () => {
         attributes: true,
         attributeFilter: ['style', 'class', 'hidden'] // Perubahan style/class/hidden bisa jadi ad muncul/hilang
     });
+    scheduleAdDetection();
     console.log('[Preload] Ad Skipper MutationObserver is now active.');
+
+    // Poll ringan untuk caption karena teksnya sering diubah langsung oleh player.
+    sendCaptionUpdate(true);
+    setInterval(sendCaptionUpdate, 180);
 
     let specialElementFound = false; // Flag untuk mencegah pengiriman berulang
     let playlistUpdateDebounceTimer;

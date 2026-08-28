@@ -1,0 +1,14 @@
+/* =============================================================
+ * theme.css — dihasilkan dari template player, kini MILIKMU.
+ * Ubah sesukamu: file ini tidak akan ditimpa kecuali kamu menerapkan
+ * template lain (dan itu pun bisa di-Undo).
+ *
+ * Nama variabel di bawah diturunkan dari vn-player/css/variables.css,
+ * jadi dijamin benar-benar dibaca runtime.
+ * ============================================================= */
+
+:root {
+    /* Template Default tidak meng-override apa pun —
+       nilai bawaan engine sudah dipakai apa adanya.
+       Tambahkan override-mu sendiri di sini. */
+}

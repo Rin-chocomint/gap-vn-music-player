@@ -1,0 +1,117 @@
+/* ===================================================================
+   Template: Anime — Langit & Cahaya
+   Gradien langit cerah, judul bercahaya, tombol membulat. Bebas diubah.
+   =================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&family=Nunito:wght@400;600;700&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --a-sky1: #8ec5fc;
+  --a-sky2: #e0c3fc;
+  --a-pink: #ff7eb3;
+  --a-blue: #5ab0ff;
+  --a-ink: #2a2350;
+  --a-muted: #5b5483;
+  --a-card: rgba(255, 255, 255, 0.82);
+  --display: var(--vn-novel-font, "Baloo 2", "Segoe UI", system-ui, sans-serif);
+  --body: var(--vn-novel-font, "Nunito", "Segoe UI", system-ui, sans-serif);
+}
+
+body {
+  font-family: var(--body);
+  color: var(--a-ink);
+  min-height: 100vh;
+  overflow: hidden;
+  background: linear-gradient(160deg, var(--a-sky1) 0%, var(--a-sky2) 60%, #ffd6ec 100%);
+}
+
+#hub-root { position: relative; width: 100vw; height: 100vh; }
+
+/* Bola cahaya lembut sebagai latar. */
+#hub-root::before,
+#hub-root::after {
+  content: ""; position: absolute; border-radius: 50%; filter: blur(8px); opacity: .5; pointer-events: none;
+}
+#hub-root::before { width: 320px; height: 320px; top: -80px; right: -60px; background: radial-gradient(circle, #fff 0%, transparent 70%); }
+#hub-root::after  { width: 260px; height: 260px; bottom: -70px; left: -50px; background: radial-gradient(circle, #ffd6ec 0%, transparent 70%); }
+
+/* --- Sistem layar: satu scene aktif (WAJIB) --- */
+.hub-scene {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: 6vmin;
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transform: scale(1.01);
+  transition: opacity .45s ease, visibility .45s ease, transform .45s ease;
+}
+.hub-scene.active { opacity: 1; visibility: visible; pointer-events: auto; transform: scale(1); }
+
+/* --- Tombol --- */
+.tpl-btn {
+  font-family: var(--display); font-weight: 600;
+  min-width: 230px; padding: 13px 26px; margin: 6px 0;
+  border: 2px solid #fff; background: rgba(255,255,255,.7); color: var(--a-ink);
+  border-radius: 999px; font-size: 1.02rem; cursor: pointer;
+  box-shadow: 0 8px 20px -10px rgba(90, 80, 160, .6);
+  transition: transform .18s, box-shadow .18s, background .18s;
+}
+.tpl-btn:hover { transform: translateY(-2px); box-shadow: 0 14px 26px -10px rgba(90, 80, 160, .7); }
+.tpl-btn-primary {
+  color: #fff; border-color: transparent;
+  background: linear-gradient(120deg, var(--a-pink), var(--a-blue));
+}
+.tpl-btn-ghost { background: transparent; border-color: rgba(255,255,255,.7); color: var(--a-muted); box-shadow: none; }
+
+/* --- Splash --- */
+.tpl-splash { flex-direction: column; cursor: pointer; }
+.tpl-splash-inner { text-align: center; }
+.tpl-splash-title {
+  font-family: var(--display); font-weight: 700; font-size: clamp(3rem, 9vw, 6.5rem); color: #fff;
+  text-shadow: 0 0 18px rgba(255,255,255,.8), 0 6px 24px rgba(120, 90, 200, .5);
+}
+.tpl-splash-sub { color: #fff; opacity: .95; font-size: 1.1rem; margin-top: 12px; text-shadow: 0 2px 8px rgba(120,90,200,.5); }
+.tpl-splash-skip { position: absolute; bottom: 28px; right: 32px; color: #fff; opacity: .85; font-size: .9rem; }
+
+/* --- Kartu kaca (warning / info) --- */
+.tpl-warning, .tpl-info { }
+.tpl-warning-box, .tpl-info-card {
+  max-width: 600px; padding: 42px 38px;
+  background: var(--a-card); backdrop-filter: blur(10px);
+  border: 2px solid rgba(255,255,255,.9); border-radius: 26px;
+  box-shadow: 0 26px 60px -28px rgba(90, 70, 160, .6);
+  text-align: center;
+}
+.tpl-warning-head { font-family: var(--display); font-weight: 700; font-size: 2.3rem; margin-bottom: 14px; }
+.tpl-warning-text { color: var(--a-muted); line-height: 1.7; margin-bottom: 26px; }
+
+/* --- Main Menu --- */
+.tpl-menu-inner { text-align: center; max-width: 540px; }
+.tpl-menu-title {
+  font-family: var(--display); font-weight: 700; font-size: clamp(2.6rem, 8vw, 5rem); color: #fff;
+  text-shadow: 0 0 16px rgba(255,255,255,.85), 0 6px 22px rgba(120, 90, 200, .55);
+}
+.tpl-menu-tagline { color: #fff; opacity: .95; margin: 14px 0 30px; font-size: 1.08rem; text-shadow: 0 2px 8px rgba(120,90,200,.5); }
+.tpl-menu-actions { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+
+/* --- Info --- */
+.tpl-info-card { text-align: left; }
+.tpl-info-title { font-family: var(--display); font-weight: 700; font-size: 2.3rem; margin-bottom: 14px; text-align: center; }
+.tpl-info-desc { color: var(--a-ink); opacity: .9; line-height: 1.7; margin-bottom: 22px; }
+.tpl-info-meta { display: grid; grid-template-columns: auto 1fr; gap: 8px 18px; margin-bottom: 24px; }
+.tpl-info-meta dt { color: var(--a-muted); font-weight: 700; }
+.tpl-info-meta dd { font-weight: 600; }
+.tpl-info .tpl-btn { display: block; margin: 0 auto; }
+
+/* --- Credits --- */
+.tpl-credits-inner { text-align: center; max-width: 560px; }
+.tpl-credits-title { font-family: var(--display); font-weight: 700; font-size: 2.6rem; color: #fff; text-shadow: 0 0 16px rgba(255,255,255,.8); }
+.tpl-credits-lines { color: #fff; opacity: .96; line-height: 2; margin: 18px 0 28px; text-shadow: 0 2px 8px rgba(120,90,200,.45); }
+.tpl-credits-lines span { font-weight: 700; }
+.tpl-credits-footer { margin-top: 14px; font-style: italic; opacity: .9; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hub-scene { transition: opacity .2s ease, visibility .2s ease; transform: none; }
+  .tpl-btn { transition: none; }
+}

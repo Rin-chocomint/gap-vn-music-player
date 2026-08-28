@@ -1,0 +1,1526 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rhythm Gamification Overlay</title>
+    <style>
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 300;
+            src: url('./aset/fonts/lexend-v26-latin-300.woff2') format('woff2');
+        }
+
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 400;
+            src: url('./aset/fonts/lexend-v26-latin-regular.woff2') format('woff2');
+        }
+
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 700;
+            src: url('./aset/fonts/lexend-v26-latin-700.woff2') format('woff2');
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body,
+        html {
+            background: transparent;
+            font-family: 'Lexend', sans-serif;
+            color: white;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        /* ========== SCORE DISPLAY (Kanan Atas) ========== */
+        .score-container {
+            position: fixed;
+            top: 24px;
+            right: 28px;
+            text-align: right;
+            z-index: 10;
+        }
+
+        .score-label {
+            font-size: 11px;
+            font-weight: 300;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.58);
+            margin-bottom: 2px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.88);
+        }
+
+        .score-value {
+            font-size: clamp(38px, 3.2vw, 52px);
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0.4px;
+            line-height: 1;
+            color: #fff;
+            text-shadow:
+                0 2px 2px rgba(0, 0, 0, 0.95),
+                1px 0 2px rgba(0, 0, 0, 0.85),
+                -1px 0 2px rgba(0, 0, 0, 0.85),
+                0 0 15px rgba(249, 83, 105, 0.58);
+            -webkit-text-stroke: 0.65px rgba(0, 0, 0, 0.38);
+            transition: transform 0.08s ease-out, text-shadow 0.2s ease;
+        }
+
+        .score-value.pulse {
+            transform: scale(1.075);
+            text-shadow:
+                0 2px 2px rgba(0, 0, 0, 0.95),
+                0 0 22px rgba(249, 83, 105, 0.9),
+                0 0 44px rgba(249, 83, 105, 0.48);
+        }
+
+        /* ========== NOW PLAYING + EQ GRAPH (Kiri Atas) ========== */
+        /* Tanpa background — hanya elemennya saja. Keterbacaan ditopang text-shadow & glow. */
+        .nowplaying-panel {
+            position: fixed;
+            top: 28px;
+            left: 32px;
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            z-index: 8;
+            opacity: 0;
+            transform: translateY(-6px);
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+
+        .nowplaying-panel.ready {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .np-cover {
+            width: 160px;
+            height: 160px;
+            border-radius: 16px;
+            flex-shrink: 0;
+            background: linear-gradient(135deg, #2a2230, #1a1620);
+            background-size: cover;
+            background-position: center;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.55);
+        }
+
+        .np-cover.placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 38px;
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .np-right {
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .np-title {
+            font-size: 25px;
+            font-weight: 900;
+            line-height: 1.1;
+            color: #fff;
+            max-width: 360px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9), 0 0 14px rgba(0, 0, 0, 0.5);
+        }
+
+        .np-artist {
+            font-size: 14px;
+            font-weight: 400;
+            color: rgba(255, 255, 255, 0.7);
+            max-width: 360px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-top: 3px;
+            text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9), 0 0 14px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Grafik garis multi-band (canvas) */
+        .np-graph {
+            width: 320px;
+            height: 96px;
+            margin-top: 8px;
+            display: block;
+        }
+
+        /* Legend: warna garis + label + counter "berapa kali" */
+        .eq-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 16px;
+            margin-top: 6px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .legend-swatch {
+            width: 16px;
+            height: 3px;
+            border-radius: 2px;
+        }
+
+        .legend-label {
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            color: rgba(255, 255, 255, 0.55);
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+        }
+
+        .legend-count {
+            font-size: 12px;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.9);
+            font-variant-numeric: tabular-nums;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+            transition: color 0.15s ease, transform 0.1s ease;
+        }
+
+        .legend-count.hit {
+            color: #fff;
+            transform: scale(1.2);
+        }
+
+        /* ========== COMBO DISPLAY (Kiri Bawah) ========== */
+        .combo-container {
+            position: fixed;
+            bottom: 40px;
+            left: 32px;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .combo-multiplier {
+            font-size: 62px;
+            font-weight: 700;
+            line-height: 1;
+            color: #fff;
+            text-shadow:
+                0 0 25px rgba(249, 83, 105, 0.5),
+                0 0 50px rgba(249, 83, 105, 0.2);
+            transition: transform 0.06s cubic-bezier(0.22, 1, 0.36, 1),
+                text-shadow 0.15s ease,
+                color 0.3s ease;
+            transform-origin: left bottom;
+        }
+
+        /* Efek denyut saat kombo bertambah */
+        .combo-multiplier.beat {
+            transform: scale(1.25);
+            text-shadow:
+                0 0 40px rgba(249, 83, 105, 1),
+                0 0 80px rgba(249, 83, 105, 0.6),
+                0 0 120px rgba(255, 200, 100, 0.3);
+        }
+
+        /* Efek warna berubah seiring combo naik */
+        .combo-multiplier.tier-hot {
+            color: #FF6B6B;
+            text-shadow:
+                0 0 30px rgba(255, 107, 107, 0.8),
+                0 0 60px rgba(255, 107, 107, 0.4);
+        }
+
+        .combo-multiplier.tier-fire {
+            color: #FFA726;
+            text-shadow:
+                0 0 30px rgba(255, 167, 38, 0.8),
+                0 0 60px rgba(255, 167, 38, 0.4),
+                0 0 100px rgba(255, 100, 0, 0.2);
+        }
+
+        .combo-multiplier.tier-legendary {
+            color: #FFD700;
+            text-shadow:
+                0 0 30px rgba(255, 215, 0, 0.9),
+                0 0 60px rgba(255, 215, 0, 0.5),
+                0 0 120px rgba(255, 180, 0, 0.3);
+            animation: legendary-glow 0.8s ease-in-out infinite alternate;
+        }
+
+        @keyframes legendary-glow {
+            from {
+                filter: brightness(1);
+            }
+
+            to {
+                filter: brightness(1.3);
+            }
+        }
+
+        .combo-label {
+            font-size: 12px;
+            font-weight: 400;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.45);
+            margin-top: 2px;
+        }
+
+        /* ========== COMBO PER SECOND ========== */
+        .cps-container {
+            position: fixed;
+            bottom: 20px;
+            left: 32px;
+            display: flex;
+            align-items: baseline;
+            gap: 7px;
+            color: rgba(255, 255, 255, 0.82);
+            text-shadow: 0 2px 5px rgba(0, 0, 0, 0.9);
+        }
+
+        .cps-value {
+            min-width: 1.3ch;
+            font-size: 24px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            color: #fff;
+        }
+
+        .cps-label {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 2.1px;
+            color: rgba(255, 255, 255, 0.52);
+        }
+
+        /* ========== BASS IMPACT FLASH (Efek lingkaran saat bass kuat) ========== */
+        .bass-ring {
+            position: fixed;
+            bottom: 80px;
+            left: 60px;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 2px solid rgba(249, 83, 105, 0);
+            pointer-events: none;
+            opacity: 0;
+            transform: scale(0.5);
+            transition: none;
+        }
+
+        .bass-ring.flash {
+            opacity: 1;
+            border-color: rgba(249, 83, 105, 0.6);
+            transform: scale(1.5);
+            transition: opacity 0.4s ease-out, transform 0.4s ease-out, border-color 0.4s ease-out;
+        }
+
+        /* ========== BREAK TIME NOTIFICATION ========== */
+        .break-notice {
+            position: fixed;
+            bottom: clamp(96px, 17vh, 190px);
+            left: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: clamp(10px, 1.1vw, 18px);
+            color: #e8f8ff;
+            font-size: clamp(15px, 1.5vw, 20px);
+            font-weight: 700;
+            letter-spacing: clamp(2px, 0.38vw, 5px);
+            text-transform: uppercase;
+            text-shadow: 0 2px 5px rgba(0, 0, 0, 0.95), 0 0 11px rgba(129, 212, 250, 0.5);
+            visibility: hidden;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            z-index: 12;
+        }
+
+        .break-notice.entering,
+        .break-notice.visible,
+        .break-notice.leaving {
+            visibility: visible;
+        }
+
+        .break-bracket {
+            color: #81d4fa;
+            font-size: 1.45em;
+            font-weight: 300;
+            line-height: 0.65;
+            text-shadow: 0 0 12px rgba(129, 212, 250, 0.8);
+            opacity: 0;
+            will-change: opacity, transform;
+        }
+
+        .break-label {
+            opacity: 0;
+            will-change: opacity, transform;
+        }
+
+        .break-notice.entering .break-bracket--left {
+            animation: break-bracket-left-in 560ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .break-notice.entering .break-bracket--right {
+            animation: break-bracket-right-in 560ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .break-notice.entering .break-label {
+            animation: break-label-in 360ms ease-out 150ms forwards;
+        }
+
+        .break-notice.visible .break-bracket,
+        .break-notice.visible .break-label {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .break-notice.leaving .break-bracket--left {
+            animation: break-bracket-left-out 500ms cubic-bezier(0.7, 0, 0.84, 0) forwards;
+        }
+
+        .break-notice.leaving .break-bracket--right {
+            animation: break-bracket-right-out 500ms cubic-bezier(0.7, 0, 0.84, 0) forwards;
+        }
+
+        .break-notice.leaving .break-label {
+            animation: break-label-out 240ms ease-in forwards;
+        }
+
+        @keyframes break-bracket-left-in {
+            0% { opacity: 0; transform: translateX(-52vw); }
+            100% { opacity: 1; transform: translateX(0); }
+        }
+
+        @keyframes break-bracket-right-in {
+            0% { opacity: 0; transform: translateX(52vw); }
+            100% { opacity: 1; transform: translateX(0); }
+        }
+
+        @keyframes break-label-in {
+            0% { opacity: 0; transform: translateY(5px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes break-bracket-left-out {
+            0% { opacity: 1; transform: translateX(0); }
+            100% { opacity: 0; transform: translateX(-52vw); }
+        }
+
+        @keyframes break-bracket-right-out {
+            0% { opacity: 1; transform: translateX(0); }
+            100% { opacity: 0; transform: translateX(52vw); }
+        }
+
+        @keyframes break-label-out {
+            0% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-4px); }
+        }
+
+        /* ========== LIRIK / SUBTITLE AKTIF ========== */
+        .subtitle-container {
+            position: fixed;
+            right: 50%;
+            bottom: clamp(24px, 5vh, 58px);
+            width: min(900px, calc(100vw - 48px));
+            color: #fff;
+            font-size: clamp(17px, 2vw, 28px);
+            font-weight: 700;
+            line-height: 1.35;
+            text-align: center;
+            text-shadow: 0 2px 3px rgba(0, 0, 0, 1), 0 0 5px rgba(0, 0, 0, 0.92);
+            opacity: 0;
+            transform: translate(50%, 12px);
+            transition: opacity 180ms ease, transform 220ms ease;
+            z-index: 9;
+        }
+
+        .subtitle-container.show {
+            opacity: 1;
+            transform: translate(50%, 0);
+        }
+
+        @media (max-width: 760px) {
+            /* Score mendapat area eksklusif di atas pada layar overlay sempit. */
+            .nowplaying-panel { left: 16px; top: clamp(126px, 21vw, 160px); gap: 10px; }
+            .np-cover { width: 86px; height: 86px; border-radius: 12px; }
+            .np-title { font-size: 17px; max-width: min(48vw, 260px); }
+            .np-artist { max-width: min(48vw, 260px); }
+            .np-graph { width: min(48vw, 260px); height: 64px; }
+            .history-container { display: none; }
+            .combo-container { left: 20px; bottom: 46px; }
+            .cps-container { left: 20px; }
+            .bass-ring { left: 40px; bottom: 95px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 1ms !important;
+                animation-iteration-count: 1 !important;
+                scroll-behavior: auto !important;
+                transition-duration: 1ms !important;
+            }
+        }
+
+        /* ========== HISTORY PANEL ========== */
+        .history-container {
+            position: fixed;
+            top: 140px;
+            /* Di bawah skor */
+            right: 40px;
+            width: 250px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 5;
+        }
+
+        .history-header-text {
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 11px;
+            letter-spacing: 2px;
+            font-weight: 600;
+            margin-bottom: 2px;
+            text-align: right;
+            text-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .history-item {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            width: 100%;
+            animation: slideInRight 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .history-title {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 2px;
+            font-weight: 400;
+            text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+            max-width: 100%;
+        }
+
+        .history-score-combo {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            align-items: center;
+        }
+
+        .history-score {
+            color: #FFD700;
+            font-size: 11px;
+            font-weight: 600;
+            text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+        }
+
+        .history-combo {
+            color: #F95369;
+            font-size: 11px;
+            font-weight: 600;
+            text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(120%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Now Playing + EQ Graph (Kiri Atas) -->
+    <div class="nowplaying-panel" id="nowplaying-panel">
+        <div class="np-cover placeholder" id="np-cover">&#9835;</div>
+        <div class="np-right">
+            <div class="np-title" id="np-title">&mdash;</div>
+            <div class="np-artist" id="np-artist">&mdash;</div>
+            <canvas class="np-graph" id="np-graph"></canvas>
+            <div class="eq-legend" id="eq-legend">
+                <!-- item legend di-generate lewat JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Score Display -->
+    <div class="score-container">
+        <div class="score-label">SCORE</div>
+        <div class="score-value" id="score-display">0</div>
+    </div>
+
+    <!-- Combo Display -->
+    <div class="combo-container">
+        <div class="combo-multiplier" id="combo-display">0x</div>
+        <div class="combo-label">COMBO</div>
+    </div>
+
+    <!-- Combo Per Second -->
+    <div class="cps-container" aria-label="Combo per second">
+        <div class="cps-value" id="cps-display">0</div>
+        <div class="cps-label">CPS</div>
+    </div>
+
+    <!-- Bass Impact Ring -->
+    <div class="bass-ring" id="bass-ring"></div>
+
+    <!-- Break Time adalah notifikasi terpisah dari kombo -->
+    <div class="break-notice" id="break-notice" aria-live="polite">
+        <span class="break-bracket break-bracket--left">&gt;</span>
+        <span class="break-label">BREAK TIME</span>
+        <span class="break-bracket break-bracket--right">&lt;</span>
+    </div>
+
+    <!-- Subtitle hanya tampil jika CC YouTube Music sedang aktif dan menyediakan teks -->
+    <div class="subtitle-container" id="subtitle-display" aria-live="polite"></div>
+
+    <!-- History Panel -->
+    <div class="history-container">
+        <div class="history-header-text">HISTORY</div>
+        <div id="history-list" style="display: flex; flex-direction: column; gap: 6px;">
+            <!-- Item history akan di-generate di sini lewat JS -->
+        </div>
+    </div>
+
+    <script>
+        // Di Electron `require` tersedia. Saat HTML dibuka langsung di browser (mode pengembangan)
+        // `require` tidak ada, jadi kita guard supaya script tidak mati & bisa pakai data dummy.
+        let ipcRenderer = null;
+        try {
+            ipcRenderer = require('electron').ipcRenderer;
+        } catch (e) {
+            /* Bukan lingkungan Electron */
+        }
+        const DEV_MODE = !ipcRenderer; // true saat dibuka sendiri tanpa Electron
+
+        // =================== DOM Elements ===================
+        const scoreDisplay = document.getElementById('score-display');
+        const comboDisplay = document.getElementById('combo-display');
+        const cpsDisplay = document.getElementById('cps-display');
+        const bassRing = document.getElementById('bass-ring');
+        const breakNotice = document.getElementById('break-notice');
+        const subtitleDisplay = document.getElementById('subtitle-display');
+        const historyList = document.getElementById('history-list');
+
+        // Now Playing + EQ panel
+        const npPanel = document.getElementById('nowplaying-panel');
+        const npCover = document.getElementById('np-cover');
+        const npTitle = document.getElementById('np-title');
+        const npArtist = document.getElementById('np-artist');
+        const eqLegend = document.getElementById('eq-legend');
+        const graphCanvas = document.getElementById('np-graph');
+        const gctx = graphCanvas.getContext('2d');
+
+        // Apakah panel Now Playing (cover + judul + grafik EQ) boleh tampil.
+        // Dikendalikan dari pengaturan: "Hide Now Playing panel". Default tampil.
+        let nowPlayingVisible = true;
+        function setNowPlayingVisible(visible) {
+            nowPlayingVisible = visible !== false;
+            npPanel.style.display = nowPlayingVisible ? '' : 'none';
+            if (nowPlayingVisible) startGraphRender();
+            else stopGraphRender();
+        }
+
+        // =================== EQ Band Meter (Kiri Atas) ===================
+        // Spektrum dari webview-preload.js: fftSize 64 -> 32 bin, nilai 0-255.
+        // Resolusi sengaja kasar, jadi pembagian band ini aproksimatif (untuk visual, bukan analisis presisi).
+        // color = string "r, g, b" agar gampang dipakai di rgba().
+        const BANDS = [
+            { label: 'SUB', lo: 0, hi: 1, color: '249, 83, 105' },   // pink khas brand
+            { label: 'BASS', lo: 2, hi: 4, color: '255, 112, 67' },  // oranye-merah
+            { label: 'MID', lo: 5, hi: 12, color: '255, 167, 38' },  // amber
+            { label: 'TREB', lo: 13, hi: 31, color: '255, 215, 0' }, // emas
+        ];
+
+        const BAND_COOLDOWN = 140;  // jeda min antar hit per band (ms)
+        const BAND_HISTORY = 50;    // panjang riwayat untuk threshold adaptif
+        const GRAPH_POINTS = 130;   // jumlah titik di grafik (durasi gulir ~2 detik @60fps)
+
+        // Karakter tinggi garis. Garis = sedikit "badan" dari level + dominan lonjakan transien,
+        // supaya saat lagu padat/keras (nightcore) garis tak mentok di atas tapi MELONJAK tiap pukulan.
+        const GRAPH_BASE_WEIGHT = 0.5;   // kontribusi level energi (badan garis)
+        const GRAPH_FLUX_WEIGHT = 0.95;  // kontribusi lonjakan transien (tinggi spike saat ada pukulan)
+        const GRAPH_FLUX_REF = 0.5;      // skala normalisasi flux relatif ke puncak band (kecil = lebih sensitif)
+        const GRAPH_RELEASE = 0.86;      // 0-1; makin besar makin pelan garis turunnya
+
+        // Bangun legend (warna garis + label + counter) & state runtime per band
+        const bandRuntime = BANDS.map(b => {
+            const item = document.createElement('div');
+            item.className = 'legend-item';
+            item.innerHTML =
+                `<span class="legend-swatch" style="background: rgb(${b.color})"></span>` +
+                `<span class="legend-label">${b.label}</span>` +
+                `<span class="legend-count">0</span>`;
+            eqLegend.appendChild(item);
+            const count = item.querySelector('.legend-count');
+
+            return {
+                ...b, count,
+                prevEnergy: 0,  // energi frame sebelumnya (untuk flux)
+                smooth: 0,      // nilai energi yang dihaluskan (0-1) untuk grafik
+                peak: 0.06,     // puncak adaptif untuk auto-gain per band
+                hist: [],       // riwayat energi untuk threshold counter
+                hits: 0,        // berapa kali band ini "memukul"
+                lastHit: 0,
+                trail: new Array(GRAPH_POINTS).fill(0), // riwayat nilai untuk garis grafik
+            };
+        });
+
+        let graphFrameId = null;
+
+        // Canvas crisp di layar HiDPI: skalakan buffer sesuai devicePixelRatio.
+        // DPR dibatasi agar overlay tidak memakai buffer berlebihan di layar resolusi tinggi.
+        function setupGraphCanvas() {
+            const cssW = graphCanvas.clientWidth || 320;
+            const cssH = graphCanvas.clientHeight || 96;
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            graphCanvas.width = Math.round(cssW * dpr);
+            graphCanvas.height = Math.round(cssH * dpr);
+            gctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
+
+        // Loop render grafik garis — terpisah dari tick analyser agar gulirnya halus & stabil
+        function renderGraph() {
+            // Panel tersembunyi benar-benar menghentikan render loop.
+            if (!nowPlayingVisible) {
+                graphFrameId = null;
+                return;
+            }
+
+            const cssW = graphCanvas.clientWidth || 320;
+            const cssH = graphCanvas.clientHeight || 96;
+            const pad = 3;
+            const usableH = cssH - pad * 2;
+
+            // Majukan trail tiap frame dengan nilai band terkini, lalu gambar ulang
+            for (const b of bandRuntime) {
+                b.trail.push(b.smooth);
+                if (b.trail.length > GRAPH_POINTS) b.trail.shift();
+            }
+
+            gctx.clearRect(0, 0, cssW, cssH);
+            gctx.lineJoin = 'round';
+            gctx.lineCap = 'round';
+            gctx.lineWidth = 2.5;
+
+            for (const b of bandRuntime) {
+                gctx.beginPath();
+                for (let i = 0; i < b.trail.length; i++) {
+                    const x = (i / (GRAPH_POINTS - 1)) * cssW;
+                    const y = cssH - pad - b.trail[i] * usableH;
+                    if (i === 0) gctx.moveTo(x, y);
+                    else gctx.lineTo(x, y);
+                }
+                gctx.strokeStyle = `rgb(${b.color})`;
+                gctx.shadowColor = `rgba(${b.color}, 0.7)`;
+                gctx.shadowBlur = 6;
+                gctx.stroke();
+            }
+            gctx.shadowBlur = 0;
+
+            graphFrameId = requestAnimationFrame(renderGraph);
+        }
+
+        function startGraphRender() {
+            if (!nowPlayingVisible || graphFrameId !== null) return;
+            graphFrameId = requestAnimationFrame(renderGraph);
+        }
+
+        function stopGraphRender() {
+            if (graphFrameId === null) return;
+            cancelAnimationFrame(graphFrameId);
+            graphFrameId = null;
+        }
+
+        // =================== State Gamifikasi ===================
+        let score = 0;
+        let combo = 0;
+        let maxCombo = 0; // Kombo tertinggi sepanjang lagu
+        let displayedScore = 0;
+        let scoreAnimationFrame = null;
+        let comboEvents = [];
+        let isAdPlaying = false;
+        let currentSubtitleText = '';
+
+        // =================== Analisa Bass ===================
+        // Bass detection menggunakan spectral flux - bukan hanya amplitude tapi perubahan energi
+        const BASS_BINS = 6; // Bin 0-5 adalah frekuensi rendah (~0-350Hz)
+        const SUB_BASS_BINS = 3; // Bin 0-2 untuk sub-bass yang paling dalam (~0-175Hz)
+
+        let previousBassEnergy = 0;
+        let bassEnergyHistory = []; // Riwayat energi bass untuk threshold adaptif
+        const HISTORY_SIZE = 60; // ~1 detik data untuk threshold adaptif
+
+        // Cooldown agar tidak terlalu banyak hit berturut-turut
+        let lastBeatTime = 0;
+        const MIN_BEAT_INTERVAL = 180; // Minimum 180ms antar beat (max ~5.5 beat/detik)
+
+        // Threshold dinamis - menyesuaikan dengan karakter lagu
+        let dynamicThreshold = 0.25;
+
+        // Formula kombo dipertahankan. Kombo memang tidak diturunkan saat lagu jeda.
+        let lastComboIncrementTime = 0;
+        const COMBO_DECAY_DELAY = 2500;
+
+        // Streak momentum - bass yang sering dan kuat membangun momentum
+        let momentumMultiplier = 1.0;
+        let consecutiveHits = 0; // Hit berturut-turut tanpa jeda panjang
+        let breakTimeActive = false;
+        let breakPresentationActive = false;
+        let breakEntranceTimer = null;
+        let breakLeaveTimer = null;
+        const BREAK_NOTICE_ENTER_DURATION = 580;
+        const BREAK_NOTICE_EXIT_DURATION = 520;
+        const pendingComboAwards = [];
+
+        // Sustained Combo - bar visualizer berada dalam rentang yang sama
+        let previousTotalEnergy = 0;
+        let sustainedStabilityCounter = 0;
+        let lastSustainedTickTime = 0;
+
+        // =================== Update Combo Tier Visual ===================
+        function updateComboTier() {
+            comboDisplay.classList.remove('tier-hot', 'tier-fire', 'tier-legendary');
+
+            if (combo >= 200) {
+                comboDisplay.classList.add('tier-legendary');
+            } else if (combo >= 100) {
+                comboDisplay.classList.add('tier-fire');
+            } else if (combo >= 50) {
+                comboDisplay.classList.add('tier-hot');
+            }
+        }
+
+        // =================== Animasi Denyut ===================
+        function triggerComboPulse(intensity) {
+            // Hapus class beat dulu, lalu tambahkan kembali agar animasi restart
+            comboDisplay.classList.remove('beat');
+
+            // Force reflow agar browser tahu kita mau restart animasi
+            void comboDisplay.offsetWidth;
+
+            comboDisplay.classList.add('beat');
+
+            // Skala denyut berdasarkan intensitas bass
+            const pulseScale = 1.15 + (intensity * 0.25); // 1.15x - 1.40x
+            comboDisplay.style.transform = `scale(${pulseScale})`;
+
+            setTimeout(() => {
+                comboDisplay.classList.remove('beat');
+                comboDisplay.style.transform = 'scale(1)';
+            }, 100);
+        }
+
+        function triggerScorePulse() {
+            scoreDisplay.classList.remove('pulse');
+            void scoreDisplay.offsetWidth;
+            scoreDisplay.classList.add('pulse');
+
+            setTimeout(() => {
+                scoreDisplay.classList.remove('pulse');
+            }, 120);
+        }
+
+        function triggerBassRing(intensity) {
+            bassRing.classList.remove('flash');
+            void bassRing.offsetWidth;
+
+            // Ukuran ring berdasarkan intensitas
+            const ringScale = 1.2 + (intensity * 0.8);
+            bassRing.style.transform = `scale(${ringScale})`;
+            bassRing.style.borderColor = `rgba(249, 83, 105, ${0.3 + intensity * 0.5})`;
+            bassRing.classList.add('flash');
+
+            setTimeout(() => {
+                bassRing.classList.remove('flash');
+                bassRing.style.opacity = '0';
+                bassRing.style.transform = 'scale(0.5)';
+            }, 400);
+        }
+
+        // Break Time juga dipublikasikan ke proses utama agar Media Overlay dapat
+        // memilih kondisi tampil yang sama di mode Game maupun Native.
+        function setBreakTimeState(active) {
+            const nextState = active === true;
+            if (breakTimeActive === nextState) return;
+            breakTimeActive = nextState;
+            if (ipcRenderer) ipcRenderer.send('rhythm-break-state', nextState);
+        }
+
+        // =================== Score Count-up + CPS ===================
+        function renderScore(value) {
+            displayedScore = value;
+            scoreDisplay.textContent = Math.round(value).toLocaleString('id-ID');
+        }
+
+        function animateScoreTo(target, immediate = false) {
+            if (scoreAnimationFrame !== null) {
+                cancelAnimationFrame(scoreAnimationFrame);
+                scoreAnimationFrame = null;
+            }
+
+            if (immediate || target === displayedScore) {
+                renderScore(target);
+                return;
+            }
+
+            const start = displayedScore;
+            const delta = target - start;
+            const duration = Math.min(700, Math.max(180, 150 + Math.log10(Math.abs(delta) + 1) * 145));
+            const startedAt = performance.now();
+
+            const step = (now) => {
+                const progress = Math.min(1, (now - startedAt) / duration);
+                const eased = 1 - Math.pow(1 - progress, 3);
+                renderScore(start + delta * eased);
+                if (progress < 1) scoreAnimationFrame = requestAnimationFrame(step);
+                else scoreAnimationFrame = null;
+            };
+            scoreAnimationFrame = requestAnimationFrame(step);
+        }
+
+        function updateCps(now = Date.now()) {
+            comboEvents = comboEvents.filter(event => now - event.at < 1000);
+            const cps = comboEvents.reduce((total, event) => total + event.gain, 0);
+            cpsDisplay.textContent = cps.toLocaleString('id-ID');
+        }
+
+        function recordComboGain(gain) {
+            comboEvents.push({ at: Date.now(), gain });
+            updateCps();
+        }
+
+        // Hanya menjaga angka CPS turun setelah satu detik; tidak melakukan analisis audio.
+        setInterval(() => updateCps(), 100);
+
+        // =================== Break Time Presentation ===================
+        function finishBreakTimePresentation() {
+            clearTimeout(breakEntranceTimer);
+            clearTimeout(breakLeaveTimer);
+            breakNotice.classList.remove('entering', 'visible', 'leaving');
+            breakPresentationActive = false;
+            setBreakTimeState(false);
+
+            const queuedAwards = pendingComboAwards.splice(0);
+            queuedAwards.forEach(applyAward => applyAward());
+        }
+
+        function endBreakTimePresentation() {
+            if (!breakPresentationActive || breakNotice.classList.contains('leaving')) return;
+            clearTimeout(breakEntranceTimer);
+            breakNotice.classList.remove('entering', 'visible');
+            void breakNotice.offsetWidth;
+            breakNotice.classList.add('leaving');
+            clearTimeout(breakLeaveTimer);
+            breakLeaveTimer = setTimeout(finishBreakTimePresentation, BREAK_NOTICE_EXIT_DURATION);
+        }
+
+        function showBreakTime() {
+            if (breakPresentationActive || isAdPlaying) return;
+            breakPresentationActive = true;
+            setBreakTimeState(true);
+            breakNotice.classList.remove('visible', 'leaving');
+            void breakNotice.offsetWidth;
+            breakNotice.classList.add('entering');
+
+            clearTimeout(breakEntranceTimer);
+            breakEntranceTimer = setTimeout(() => {
+                if (!breakPresentationActive || breakNotice.classList.contains('leaving')) return;
+                breakNotice.classList.remove('entering');
+                breakNotice.classList.add('visible');
+            }, BREAK_NOTICE_ENTER_DURATION);
+        }
+
+        function dismissBreakTimePresentation(discardPendingAwards = false) {
+            clearTimeout(breakEntranceTimer);
+            clearTimeout(breakLeaveTimer);
+            breakNotice.classList.remove('entering', 'visible', 'leaving');
+            breakPresentationActive = false;
+            if (discardPendingAwards) pendingComboAwards.length = 0;
+            setBreakTimeState(false);
+        }
+
+        // Beat yang datang ketika BREAK TIME tampil menunggu animasi keluar selesai.
+        // Nilai award dan formula kombo tidak diubah; hanya penyajiannya yang diurutkan.
+        function queueComboAward(applyAward) {
+            if (breakPresentationActive) {
+                pendingComboAwards.push(applyAward);
+                endBreakTimePresentation();
+                return;
+            }
+            setBreakTimeState(false);
+            applyAward();
+        }
+
+        function updateSubtitle(info) {
+            currentSubtitleText = String(info?.text || '').trim().replace(/\s+/g, ' ');
+            subtitleDisplay.textContent = currentSubtitleText;
+            subtitleDisplay.classList.toggle('show', Boolean(currentSubtitleText) && !isAdPlaying);
+        }
+
+        function setAdState(active) {
+            isAdPlaying = active === true;
+            if (isAdPlaying) {
+                dismissBreakTimePresentation(true);
+                subtitleDisplay.classList.remove('show');
+            } else if (currentSubtitleText) {
+                subtitleDisplay.classList.add('show');
+            }
+        }
+
+        // =================== EQ Band: bar live + counter "berapa kali" ===================
+        function updateBands(data, now) {
+            if (!data || !data.length) return;
+
+            for (const b of bandRuntime) {
+                // Rata-rata energi band (normalisasi 0-255 -> 0-1)
+                const hiIdx = Math.min(b.hi, data.length - 1);
+                let sum = 0, n = 0;
+                for (let i = b.lo; i <= hiIdx; i++) {
+                    const raw = data[i] || 0;
+                    sum += raw > 1.0 ? raw / 255.0 : raw;
+                    n++;
+                }
+                const energy = n ? sum / n : 0;
+
+                // Flux = lonjakan energi dari frame sebelumnya (dipakai untuk spike grafik & counter)
+                const flux = Math.max(0, energy - b.prevEnergy);
+
+                // Auto-gain: tiap band dinormalisasi ke puncaknya sendiri agar band lemah
+                // (mis. treble) tetap kelihatan hidup. Puncak meluruh pelan.
+                b.peak = Math.max(energy, b.peak * 0.997, 0.04);
+
+                // Tinggi garis = sedikit badan dari level + dominan lonjakan transien.
+                // Efeknya: lagu padat/keras tak bikin garis mentok di atas, justru MELONJAK tiap pukulan.
+                const inst = Math.min(1, energy / b.peak);
+                const fluxNorm = Math.min(1, flux / Math.max(0.03, b.peak * GRAPH_FLUX_REF));
+                const target = Math.min(1, inst * GRAPH_BASE_WEIGHT + fluxNorm * GRAPH_FLUX_WEIGHT);
+                // Attack cepat (melonjak), release pelan (turun perlahan)
+                b.smooth = target > b.smooth ? target : b.smooth * GRAPH_RELEASE + target * (1 - GRAPH_RELEASE);
+
+                // Onset detection per band -> counter. Threshold adaptif (mean + std).
+                b.hist.push(energy);
+                if (b.hist.length > BAND_HISTORY) b.hist.shift();
+
+                if (b.hist.length >= 8) {
+                    const avg = b.hist.reduce((a, c) => a + c, 0) / b.hist.length;
+                    const variance = b.hist.reduce((s, v) => s + (v - avg) * (v - avg), 0) / b.hist.length;
+                    const std = Math.sqrt(variance);
+                    const thr = avg + std * 0.9;
+
+                    // Cooldown juga menyerap double-send analyser-data per frame dari preload
+                    if (flux > Math.max(0.012, std * 0.6) && energy > thr && (now - b.lastHit) > BAND_COOLDOWN) {
+                        b.lastHit = now;
+                        b.hits++;
+                        b.count.textContent = b.hits;
+                        b.count.classList.remove('hit');
+                        void b.count.offsetWidth;
+                        b.count.classList.add('hit');
+                        setTimeout(() => b.count.classList.remove('hit'), 140);
+                    }
+                }
+
+                b.prevEnergy = energy;
+            }
+
+            // Tampilkan panel begitu ada data audio mengalir
+            npPanel.classList.add('ready');
+        }
+
+        // =================== Kartu Now Playing (judul / artis / cover) ===================
+        let curTitle = null, curArtist = null, curCover = null;
+
+        function showCoverPlaceholder() {
+            npCover.classList.add('placeholder');
+            npCover.style.backgroundImage = 'none';
+            npCover.innerHTML = '&#9835;';
+        }
+
+        function setCover(src) {
+            if (!src) { showCoverPlaceholder(); return; }
+            // Preload dulu agar tidak menampilkan gambar rusak; fallback ke placeholder bila gagal
+            const probe = new Image();
+            probe.onload = () => {
+                npCover.classList.remove('placeholder');
+                npCover.textContent = '';
+                npCover.style.backgroundImage = `url("${src}")`;
+            };
+            probe.onerror = () => showCoverPlaceholder();
+            probe.src = src;
+        }
+
+        function updateTrackInfo(title, artist, cover) {
+            title = title || '';
+            artist = artist || '';
+            cover = cover || '';
+
+            if (title !== curTitle) {
+                curTitle = title;
+                npTitle.textContent = title || '—';
+            }
+            if (artist !== curArtist) {
+                curArtist = artist;
+                npArtist.textContent = artist || '—';
+            }
+            if (cover !== curCover) {
+                curCover = cover;
+                setCover(cover);
+            }
+
+            if (title || artist || cover) {
+                npPanel.classList.add('ready');
+            }
+        }
+
+        // =================== Algoritma Deteksi Beat Bass ===================
+        function processAnalyserData(data) {
+            if (!data || data.length === 0 || isAdPlaying) return;
+
+            const now = Date.now();
+
+            // EQ band meter (bar live + counter) — independen dari logika combo/score
+            updateBands(data, now);
+
+            // Hitung energi bass dari bin frekuensi rendah dan total energi
+            let bassEnergy = 0;
+            let subBassEnergy = 0;
+            let totalEnergy = 0;
+
+            for (let i = 0; i < data.length; i++) {
+                // Konversi data mentah (0-255) ke rentang 0.0 - 1.0
+                const rawVal = data[i] || 0;
+                // Jika data sudah dalam rentang 0-1 (misal dari implementasi lama), tidak masalah dibagi 255, tapi lebih aman cek:
+                const val = rawVal > 1.0 ? rawVal / 255.0 : rawVal;
+
+                totalEnergy += val;
+
+                if (i < BASS_BINS) {
+                    bassEnergy += val;
+                }
+
+                if (i < SUB_BASS_BINS) {
+                    subBassEnergy += val;
+                }
+            }
+
+            // Rata-rata energi
+            bassEnergy /= BASS_BINS;
+            subBassEnergy /= SUB_BASS_BINS;
+            totalEnergy /= data.length || 1;
+
+            // =================== Deteksi Sustained ===================
+            // Menghitung apakah visualizer sedang di rentang yang mirip-mirip (stabil)
+            const totalEnergyFlux = Math.abs(totalEnergy - previousTotalEnergy);
+
+            // Syarat Disesuaikan untuk VOLUME-INDEPENDENCE:
+            // Menggunakan `dynamicThreshold` sebagai referensi volume lagu rata-rata saat ini
+
+            // Rumusnya:
+            // 1. Suara cukup terdengar relatif terhadap volume saat ini
+            const hasAudio = totalEnergy > Math.max(0.02, dynamicThreshold * 0.4);
+            // 2. Perubahan frame sangat kecil relatif terhadap total energi
+            const isStable = totalEnergyFlux < Math.max(0.01, totalEnergy * 0.3); //sebelumnya 0.5
+            // 3. Bass sangat tinggi relatif terhadap rata-rata lagu 
+            const hasHeavyBass = bassEnergy > Math.max(0.05, dynamicThreshold * 1.35); //sebelumnya 1.3
+
+            const isSustained = hasAudio && isStable && hasHeavyBass;
+
+            if (isSustained) {
+                sustainedStabilityCounter++;
+            } else {
+                sustainedStabilityCounter = 0;
+            }
+
+            // Jika stabil selama ~10 frame berturut-turut (~160ms) maka masuk mode sustained combo
+            if (sustainedStabilityCounter > 10) {
+                // Tambah kombo secara berkala (misal tiap 100ms), bukan tiap frame
+                if (now - lastSustainedTickTime > 100) {
+                    lastSustainedTickTime = now;
+                    lastComboIncrementTime = now; // Mencegah decay
+
+                    queueComboAward(() => {
+                        combo += 1;
+                        maxCombo = Math.max(maxCombo, combo);
+
+                        // Score = base 30 * combo untuk sustained note (karena ini auto-clicker)
+                        const sustainedBasePoints = 30;
+                        const earnedPoints = sustainedBasePoints * combo;
+                        score += earnedPoints;
+
+                        // Animasi denyut kombo yang lebih lembut dari bass beat
+                        recordComboGain(1);
+                        triggerComboPulse(0.05);
+                        updateComboTier();
+                        updateDisplay();
+                    });
+                }
+            }
+
+            // Spectral flux: seberapa besar perubahan energi dari frame sebelumnya
+            // Ini jauh lebih baik daripada threshold statis karena menangkap "pukulan" bass
+            const flux = Math.max(0, bassEnergy - previousBassEnergy);
+
+            // Update riwayat untuk threshold adaptif
+            bassEnergyHistory.push(bassEnergy);
+            if (bassEnergyHistory.length > HISTORY_SIZE) {
+                bassEnergyHistory.shift();
+            }
+
+            // Threshold adaptif: rata-rata + standar deviasi dari riwayat
+            // Ini membuat deteksi menyesuaikan lagu yang bass-nya kuat maupun ringan
+            if (bassEnergyHistory.length >= 10) {
+                const avg = bassEnergyHistory.reduce((a, b) => a + b, 0) / bassEnergyHistory.length;
+                const variance = bassEnergyHistory.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / bassEnergyHistory.length;
+                const stdDev = Math.sqrt(variance);
+
+                // Threshold = rata-rata + 0.8 * standar deviasi
+                // Angka 0.8 bisa di-tweak: lebih rendah = lebih sensitif, lebih tinggi = hanya bass kuat
+                dynamicThreshold = avg + (stdDev * 0.8);
+
+                // Clamp threshold agar tidak terlalu tinggi.
+                // Batas bawah diturunkan drastis ke 0.02 agar fitur tetap aktif walau volume player cuma 10-20%
+                dynamicThreshold = Math.max(0.02, Math.min(0.65, dynamicThreshold));
+            }
+
+            // =================== Deteksi Beat ===================
+            const isBeat = (
+                flux > dynamicThreshold * 0.5 &&  // Flux harus signifikan
+                bassEnergy > dynamicThreshold &&    // Energi absolute harus di atas threshold
+                (now - lastBeatTime) > MIN_BEAT_INTERVAL // Cooldown
+            );
+
+            // Bonus: sub-bass yang sangat kuat mendapat boost ekstra
+            const isHeavyBass = subBassEnergy > 0.55;
+
+            if (isBeat) {
+                lastBeatTime = now;
+                lastComboIncrementTime = now;
+                consecutiveHits++;
+
+                // Hitung intensitas beat (0-1)
+                const beatIntensity = Math.min(1, (bassEnergy - dynamicThreshold) / (1 - dynamicThreshold));
+
+                // Momentum multiplier: semakin banyak hit berturut-turut, semakin cepat naik
+                momentumMultiplier = Math.min(3.0, 1.0 + (consecutiveHits * 0.05));
+
+                // Tambah combo berdasarkan kekuatan bass dan momentum
+                let comboGain = 1;
+
+                if (isHeavyBass) {
+                    // Bass super kuat = tambah ekstra
+                    comboGain = Math.ceil(2 * momentumMultiplier);
+                } else if (beatIntensity > 0.6) {
+                    // Bass kuat = tambah sedikit ekstra
+                    comboGain = Math.ceil(1.5 * momentumMultiplier);
+                } else {
+                    comboGain = Math.ceil(1 * momentumMultiplier);
+                }
+
+                queueComboAward(() => {
+                    combo += comboGain;
+                    maxCombo = Math.max(maxCombo, combo);
+
+                    // Hitung score: base points 300 * combo
+                    const basePoints = 300;
+                    // Extra point tambahan jika intensitas beat sangat tinggi
+                    const bonusIntensity = Math.round(50 * beatIntensity);
+                    const earnedPoints = (basePoints + bonusIntensity) * combo;
+                    score += earnedPoints;
+
+                    // Animasi!
+                    recordComboGain(comboGain);
+                    triggerComboPulse(beatIntensity);
+                    triggerScorePulse();
+
+                    // Bass ring hanya muncul untuk beat yang cukup kuat
+                    if (beatIntensity > 0.4 || isHeavyBass) {
+                        triggerBassRing(beatIntensity);
+                    }
+
+                    // Update visual
+                    updateComboTier();
+                    updateDisplay();
+                });
+            }
+
+            // =================== Break Time (Kombo tidak turun kalau sepi) ===================
+            const timeSinceLastHit = now - lastComboIncrementTime;
+
+            if (
+                timeSinceLastHit > COMBO_DECAY_DELAY &&
+                combo > 0 &&
+                !breakPresentationActive
+            ) {
+                // Tetap tampil sampai ada kombo baru; tidak diulang selama jeda yang sama.
+                consecutiveHits = 0;
+                momentumMultiplier = 1.0;
+                showBreakTime();
+            }
+
+            // Simpan untuk frame berikutnya
+            previousBassEnergy = bassEnergy;
+            previousTotalEnergy = totalEnergy;
+        }
+
+        // =================== Update Tampilan ===================
+        function updateDisplay(immediateScore = false) {
+            animateScoreTo(score, immediateScore);
+            comboDisplay.textContent = `${combo}x`;
+        }
+
+        // =================== Reset Saat Ganti Lagu ===================
+        function resetGameState() {
+            score = 0;
+            combo = 0;
+            maxCombo = 0;
+            previousBassEnergy = 0;
+            bassEnergyHistory = [];
+            dynamicThreshold = 0.25;
+            lastBeatTime = 0;
+            lastComboIncrementTime = 0;
+            momentumMultiplier = 1.0;
+            consecutiveHits = 0;
+            setBreakTimeState(false);
+            previousTotalEnergy = 0;
+            sustainedStabilityCounter = 0;
+            lastSustainedTickTime = 0;
+            comboEvents = [];
+            pendingComboAwards.length = 0;
+            dismissBreakTimePresentation(true);
+            cpsDisplay.textContent = '0';
+            subtitleDisplay.textContent = '';
+            subtitleDisplay.classList.remove('show');
+            currentSubtitleText = '';
+
+            // Reset visual
+            comboDisplay.classList.remove('tier-hot', 'tier-fire', 'tier-legendary', 'beat');
+            comboDisplay.style.transform = 'scale(1)';
+            scoreDisplay.classList.remove('pulse');
+
+            // Reset counter & grafik per band (riwayat/peak/trail ikut bersih agar lagu baru mulai segar)
+            bandRuntime.forEach(b => {
+                b.hits = 0;
+                b.prevEnergy = 0;
+                b.smooth = 0;
+                b.peak = 0.06;
+                b.hist = [];
+                b.lastHit = 0;
+                b.count.textContent = '0';
+                b.count.classList.remove('hit');
+                b.trail.fill(0);
+            });
+
+            updateDisplay(true);
+            console.log('[Rhythm Overlay] State direset - lagu baru terdeteksi');
+        }
+
+        // =================== IPC Listeners (hanya saat di Electron) ===================
+        if (ipcRenderer) {
+            // Menerima data analyser dari main process
+            ipcRenderer.on('rhythm-analyser-data', (event, data) => {
+                if (data && data.data) {
+                    processAnalyserData(data.data);
+                }
+            });
+
+            // Identitas lagu (judul / artis / cover) untuk kartu Now-Playing
+            ipcRenderer.on('rhythm-track-info', (event, info) => {
+                if (!info) return;
+                updateTrackInfo(info.title, info.artist, info.coverSrc);
+            });
+
+            // Preferensi: tampilkan / sembunyikan panel Now Playing
+            ipcRenderer.on('rhythm-set-nowplaying-visible', (event, visible) => {
+                setNowPlayingVisible(visible);
+            });
+
+            // Iklan tidak berkontribusi pada analyser, kombo, score, atau subtitle overlay.
+            ipcRenderer.on('rhythm-ad-state', (event, state) => {
+                setAdState(state?.active === true);
+            });
+
+            // Caption ini hanya dikirim jika user sudah mengaktifkan CC di YouTube Music.
+            ipcRenderer.on('rhythm-subtitle', (event, subtitle) => {
+                updateSubtitle(subtitle);
+            });
+
+            // Track berubah, catat ke history dan reset
+            ipcRenderer.on('rhythm-track-changed', (event, data) => {
+                // Catat history jika ada lagu sebelumnya dan skor/kombo > 0
+                if (data && data.oldTitle && (score > 0 || maxCombo > 0)) {
+                    addHistoryItem(data.oldTitle, score, maxCombo);
+                }
+                resetGameState();
+            });
+        }
+
+        // =================== History Log ===================
+        function addHistoryItem(title, finalScore, finalCombo) {
+            const item = document.createElement('div');
+            item.className = 'history-item';
+
+            // Format angka kombo dengan gaya dinamis (jika legendary bedakan warna dll)
+            let comboColor = '#F95369';
+            if (finalCombo >= 200) comboColor = '#FFD700'; // Gold untuk legendary
+
+            const historyTitle = document.createElement('div');
+            historyTitle.className = 'history-title';
+            historyTitle.textContent = title || '—';
+
+            const scoreCombo = document.createElement('div');
+            scoreCombo.className = 'history-score-combo';
+
+            const scoreText = document.createElement('span');
+            scoreText.className = 'history-score';
+            scoreText.textContent = Number(finalScore || 0).toLocaleString('id-ID');
+
+            const comboText = document.createElement('span');
+            comboText.className = 'history-combo';
+            comboText.style.color = comboColor;
+            comboText.textContent = `${Number(finalCombo || 0)}x Max`;
+
+            scoreCombo.append(scoreText, comboText);
+            item.append(historyTitle, scoreCombo);
+
+            // Insert di paling atas
+            historyList.prepend(item);
+
+            // Batasi maksimal 4 history
+            while (historyList.children.length > 4) {
+                historyList.removeChild(historyList.lastChild);
+            }
+        }
+
+        // =================== DEV DUMMY (hanya saat HTML dibuka sendiri) ===================
+        // Mensimulasikan spektrum audio + identitas lagu agar overlay bisa di-preview di browser
+        // tanpa Electron. Otomatis NONAKTIF di dalam aplikasi (karena ipcRenderer tersedia).
+        function makeDummyCover(c1, c2) {
+            const svg =
+                `<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'>` +
+                `<defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>` +
+                `<stop offset='0' stop-color='${c1}'/><stop offset='1' stop-color='${c2}'/>` +
+                `</linearGradient></defs>` +
+                `<rect width='160' height='160' rx='22' fill='url(#g)'/>` +
+                `<text x='80' y='108' font-size='84' text-anchor='middle' fill='rgba(255,255,255,0.85)'>&#9835;</text>` +
+                `</svg>`;
+            return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+        }
+
+        function startDevDummy() {
+            const NUM_BINS = 32;
+            const BPM = 145;                 // tempo ala nightcore
+            const beatMs = 60000 / BPM;
+            const sixteenthMs = beatMs / 4;
+            const startTime = performance.now();
+            const env = (phase, sharp) => Math.exp(-phase * sharp); // amplop peluruhan transien
+
+            const tracks = [
+                { title: 'Nightcore Dummy Mix', artist: 'Dev Mode Artist', cover: makeDummyCover('#F95369', '#7C4DFF') },
+                { title: 'Test Bass Cannon', artist: 'Synthwave Bot', cover: makeDummyCover('#FF7043', '#FFD700') },
+                { title: 'Treble Storm (Demo)', artist: 'QA Engine', cover: makeDummyCover('#26C6DA', '#5C6BC0') },
+            ];
+            let trackIdx = 0;
+            const applyTrack = (i) => updateTrackInfo(tracks[i].title, tracks[i].artist, tracks[i].cover);
+            applyTrack(0);
+
+            // Generator spektrum: kick tiap beat, snare di backbeat, hi-hat tiap 16th
+            setInterval(() => {
+                const t = performance.now() - startTime;
+                const data = new Array(NUM_BINS).fill(0);
+
+                const beatPhase = (t % beatMs) / beatMs;
+                const sixteenthPhase = (t % sixteenthMs) / sixteenthMs;
+                const beatInBar = Math.floor(t / beatMs) % 4;
+
+                // Kick -> sub/bass (bin 0-3)
+                const kick = env(beatPhase, 9);
+                for (let i = 0; i < 4; i++) data[i] += kick * (235 - i * 28);
+                // Bass sustain bergoyang
+                for (let i = 0; i < 6; i++) data[i] += 38 + 26 * Math.sin(t / 380 + i);
+
+                // Snare/clap di beat ke-2 & ke-4 -> mid (bin 5-12)
+                if (beatInBar === 1 || beatInBar === 3) {
+                    const snare = env(beatPhase, 7);
+                    for (let i = 5; i <= 12; i++) data[i] += snare * (165 - (i - 5) * 9) + Math.random() * 35;
+                }
+
+                // Hi-hat tiap 16th -> treble (bin 13-31)
+                const hat = env(sixteenthPhase, 14);
+                for (let i = 13; i < NUM_BINS; i++) {
+                    data[i] += hat * (85 + Math.random() * 45) * (1 - (i - 13) / (NUM_BINS - 13) * 0.5);
+                }
+
+                // Noise dasar + clamp 0-255
+                for (let i = 0; i < NUM_BINS; i++) {
+                    data[i] = Math.max(0, Math.min(255, data[i] + Math.random() * 12));
+                }
+
+                processAnalyserData(data);
+            }, 1000 / 60);
+
+            // Ganti lagu tiap 25 detik untuk menguji reset + history (meniru sinyal track-changed)
+            setInterval(() => {
+                const oldTitle = tracks[trackIdx].title;
+                if (score > 0 || maxCombo > 0) addHistoryItem(oldTitle, score, maxCombo);
+                resetGameState();
+                trackIdx = (trackIdx + 1) % tracks.length;
+                applyTrack(trackIdx);
+            }, 25000);
+
+            console.log('[Rhythm Overlay][DEV] Mode pengembangan aktif — data dummy berjalan.');
+
+            // Tekan "H" untuk meniru toggle "Hide Now Playing panel" tanpa Electron
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'h' || e.key === 'H') {
+                    setNowPlayingVisible(!nowPlayingVisible);
+                    console.log(`[Rhythm Overlay][DEV] Panel Now Playing -> ${nowPlayingVisible ? 'tampil' : 'sembunyi'}`);
+                }
+            });
+        }
+
+        // Log siap
+        console.log('[Rhythm Overlay] Overlay gamifikasi siap. Menunggu data analyser...');
+
+        // Inisialisasi tampilan awal + grafik
+        updateDisplay(true);
+        setupGraphCanvas();
+        window.addEventListener('resize', setupGraphCanvas);
+        startGraphRender();
+
+        // Jalankan dummy hanya saat dibuka sendiri (tanpa Electron)
+        if (DEV_MODE) startDevDummy();
+    </script>
+</body>
+
+</html>

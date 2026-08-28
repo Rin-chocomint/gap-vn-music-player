@@ -1,0 +1,16 @@
+<!-- ===== Scene: {{SCENE_NAME}} (custom_code → Muat Permainan) =====
+     Pengganti modal Load Game milik hub 0.0.0.8. Ia scene penuh, bukan overlay,
+     supaya ikut sistem scene yang sama dengan layar lain — jadi tombol Kembali
+     bawaan (data-action="back") sudah cukup, tanpa kode penutup sendiri.
+     Isi slot ditulis hub.js lewat VNHub.getSaveSlots(). -->
+    <section class="hub-scene dp-screen dp-load" data-scene-id="{{SCENE_ID}}" data-scene-type="custom_code" data-scene-name="{{SCENE_NAME}}">
+      <div class="dp-screen-sheet">
+        <div class="dp-screen-head">
+          <button type="button" class="dp-back" data-node="back-btn" data-action="back">&larr; Kembali</button>
+          <h2 class="dp-screen-title" data-node="title">Muat Permainan</h2>
+        </div>
+        <div class="dp-slots" data-node="slots" data-hub-slot="save-slots">
+          <p class="dp-empty">Memuat slot&hellip;</p>
+        </div>
+      </div>
+    </section>

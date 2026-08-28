@@ -1,0 +1,12 @@
+{
+    "id": "retro-sekolah",
+    "label": "Retro Sekolah \u2014 Plakat & Rel Kontrol",
+    "description": "Panel bertepi tebal yang MENGAMBANG dengan jarak dari keempat tepi layar, bukan menempel rata penuh \u2014 bayangannya keras tanpa blur, khas VN era CD. Nama pembicara jadi PLAKAT terpisah yang berdiri di atas panel, dan keempat kontrol berbaris jadi rel sempit di tepi dalam kanan panel. Semuanya lewat CSS di atas markup engine: nol peran dibekukan.",
+    "category": "layout",
+    "layoutFamily": "retro-sekolah",
+    "thumbnail": "preview.png",
+    "tags": ["panel mengambang", "plakat nama", "rel kontrol", "retro"],
+    "dialogueStyle": "bottom-bar",
+    "materializeStory": false,
+    "themeCascade": "replace-novel"
+}

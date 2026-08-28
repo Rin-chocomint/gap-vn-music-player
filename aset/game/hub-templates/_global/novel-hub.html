@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Novel Hub</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Lexend', 'Segoe UI', sans-serif;
+            background-color: #0f0f15;
+            color: #ffffff;
+            min-height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* ===== LAYER: Background (menu bg image/video) ===== */
+        #hub-bg-layer {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            z-index: 0; background: #0f0f15;
+        }
+        #hub-bg-layer img, #hub-bg-layer video {
+            width: 100%; height: 100%; object-fit: cover;
+        }
+        #hub-bg-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.45);
+        }
+
+        /* ===== SCREEN SYSTEM =====
+           display:flex permanen + visibility/opacity untuk toggle — CSS transition
+           tidak pernah terpicu bila 'display' berubah di frame yang sama dengan
+           'opacity' (browser tidak menganimasikan dari display:none). */
+        .hub-screen {
+            position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+            display: flex; z-index: 1;
+            opacity: 0; visibility: hidden; pointer-events: none;
+            transition: opacity 0.4s ease, visibility 0s linear 0.4s;
+        }
+        .hub-screen.active {
+            opacity: 1; visibility: visible; pointer-events: auto;
+            transition: opacity 0.4s ease, visibility 0s linear 0s;
+        }
+
+        /* ===== BLANK SCREEN (Hub kosong) ===== */
+        #screen-blank {
+            justify-content: center; align-items: center;
+            background: transparent; z-index: 1;
+        }
+        .blank-preview-hint {
+            display: flex; flex-direction: column; gap: 10px;
+            max-width: 460px; padding: 28px 32px; text-align: center;
+            border: 1px dashed #3a3a3a; border-radius: 10px;
+            background: rgba(255,255,255,0.02); color: #aaa;
+        }
+        .blank-hint-title {
+            font-size: 1.5rem; font-weight: 700;
+            background-image: linear-gradient(110deg, #ff2a6d, #ffffff, #05d9e8, #ffffff, #ff9f1c);
+            -webkit-background-clip: text; background-clip: text; color: transparent;
+        }
+        .blank-hint-desc { font-size: 0.95rem; line-height: 1.55; opacity: 0.8; }
+
+        /* ===== BOOT SCREEN ===== */
+        #screen-boot {
+            justify-content: center; align-items: center;
+            background: #000; z-index: 100; cursor: pointer;
+        }
+        #screen-boot img, #screen-boot video {
+            max-width: 100%; max-height: 100%; object-fit: contain;
+        }
+        #boot-skip-hint {
+            position: absolute; bottom: 30px; right: 30px;
+            color: rgba(255,255,255,0.4); font-size: 0.85rem;
+            pointer-events: none;
+        }
+
+        /* ===== WARNING SCREEN ===== */
+        #screen-warning {
+            justify-content: center; align-items: center;
+            background: transparent; z-index: 90; cursor: pointer;
+            flex-direction: column; text-align: center; padding: 60px;
+        }
+        #screen-warning .warning-text {
+            font-size: 1.3rem; line-height: 2; color: #ccc;
+            max-width: 700px; white-space: pre-wrap;
+        }
+        #screen-warning .warning-hint {
+            margin-top: 40px; color: rgba(255,255,255,0.3); font-size: 0.85rem;
+        }
+        /* Retro style variant */
+        #screen-warning.retro { font-family: 'Courier New', monospace; }
+        #screen-warning.retro .warning-text {
+            color: #00ff41; text-shadow: 0 0 10px rgba(0,255,65,0.4);
+            border: 1px solid #00ff41; padding: 40px; background: rgba(0,255,65,0.03);
+        }
+
+        /* ===== MAIN MENU SCREEN ===== */
+        #screen-main-menu {
+            flex-direction: column; justify-content: center; align-items: center;
+            padding: 60px; gap: 15px;
+        }
+        #menu-title {
+            font-size: 3rem; margin-bottom: 40px;
+            background: linear-gradient(45deg, #fff, #aaa);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            text-align: center;
+        }
+        .menu-btn {
+            background: rgba(255,255,255,0.08); color: #fff;
+            border: 1px solid rgba(255,255,255,0.15); border-radius: 8px;
+            padding: 16px 50px; font-size: 1.15rem; font-weight: 500;
+            cursor: pointer; transition: all 0.25s ease;
+            min-width: 280px; text-align: center;
+            backdrop-filter: blur(5px);
+        }
+        .menu-btn:hover {
+            background: rgba(243, 85, 122, 0.2); border-color: rgba(243, 85, 122, 0.5);
+            transform: translateY(-2px); box-shadow: 0 6px 20px rgba(243, 85, 122, 0.25);
+        }
+
+        /* ===== HUB INFO SCREEN (fallback / classic view) ===== */
+        #screen-hub-info {
+            flex-direction: column; padding: 30px; overflow-y: auto;
+        }
+        .hub-back-button {
+            position: fixed; top: 20px; left: 20px;
+            padding: 10px 20px; background: rgba(255,255,255,0.1);
+            color: #fff; border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px; font-weight: 500; cursor: pointer;
+            z-index: 1000; transition: all 0.2s ease; backdrop-filter: blur(5px);
+        }
+        .hub-back-button:hover {
+            background: #f3557a; border-color: #f3557a;
+            transform: translateY(-2px); box-shadow: 0 4px 12px rgba(243, 85, 122, 0.3);
+        }
+        #hub-info-title {
+            font-size: 3rem; margin-bottom: 30px; text-align: center;
+            background: linear-gradient(45deg, #fff, #aaa);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .content-container {
+            display: flex; gap: 40px; max-width: 1200px; margin: 0 auto; width: 100%;
+        }
+        .left-container { flex: 1; display: flex; flex-direction: column; gap: 25px; }
+        .novel-info {
+            background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1); line-height: 1.6;
+        }
+        .novel-info strong { color: #f3557a; display: inline-block; width: 100px; }
+        .description {
+            background: rgba(0,0,0,0.3); padding: 25px; border-radius: 12px;
+            border-left: 4px solid #f3557a; font-size: 1.05rem; line-height: 1.8;
+            color: #ccc; white-space: pre-wrap;
+        }
+        .chapter-list { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; }
+        .chapter-item {
+            background: rgba(255,255,255,0.08); padding: 15px 20px; border-radius: 8px;
+            color: #fff; display: flex; justify-content: space-between; align-items: center;
+            transition: all 0.2s ease; border: 1px solid transparent; cursor: pointer;
+        }
+        .chapter-item:hover {
+            background: rgba(243, 85, 122, 0.15); border-color: rgba(243, 85, 122, 0.4);
+            transform: translateX(5px);
+        }
+        .right-column { width: 350px; display: flex; flex-direction: column; gap: 20px; flex-shrink: 0; }
+        .image-container {
+            width: 100%; aspect-ratio: 2/3; border-radius: 15px; overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); position: relative;
+            background: #111; border: 1px solid rgba(255,255,255,0.1);
+        }
+        .image-container img {
+            width: 100%; height: 100%; object-fit: cover; position: absolute; transition: opacity 1s ease;
+        }
+        .play-btn {
+            background: linear-gradient(45deg, #f3557a, #ff7b9a); color: white;
+            border: none; padding: 15px 20px; border-radius: 8px;
+            font-size: 1.2rem; font-weight: bold; cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            width: 100%; box-shadow: 0 4px 15px rgba(243, 85, 122, 0.4); display: none;
+        }
+        .play-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(243, 85, 122, 0.6); }
+        .progress-summary {
+            background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px; text-align: center;
+        }
+        .progress-summary p { margin-top: 10px; color: #aaa; font-size: 0.9rem; }
+
+        /* ===== CHAPTER SELECT SCREEN ===== */
+        #screen-chapter-select {
+            flex-direction: column; justify-content: center; align-items: center; padding: 60px;
+        }
+        .screen-header {
+            font-size: 2rem; margin-bottom: 30px; color: #fff; text-align: center;
+        }
+        .screen-back-btn {
+            position: absolute; top: 25px; left: 25px;
+            background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 8px; padding: 10px 20px; cursor: pointer; transition: all 0.2s ease;
+        }
+        .screen-back-btn:hover { background: rgba(243,85,122,0.2); border-color: rgba(243,85,122,0.5); }
+        .chapter-grid {
+            display: flex; flex-direction: column; gap: 12px;
+            max-width: 600px; width: 100%; max-height: 60vh; overflow-y: auto;
+        }
+        .chapter-grid .chapter-item { background: rgba(255,255,255,0.06); }
+
+        /* ===== LOAD GAME SCREEN ===== */
+        #screen-load-game {
+            flex-direction: column; justify-content: center; align-items: center; padding: 60px;
+        }
+        .save-slots {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px; max-width: 800px; width: 100%;
+        }
+        .save-slot {
+            background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px; padding: 20px; cursor: pointer; transition: all 0.2s ease;
+        }
+        .save-slot:hover { background: rgba(243,85,122,0.12); border-color: rgba(243,85,122,0.4); }
+        .save-slot.empty { opacity: 0.4; cursor: default; }
+        .save-slot .slot-title { font-weight: 600; margin-bottom: 8px; }
+        .save-slot .slot-info { font-size: 0.85rem; color: #aaa; }
+
+        /* ===== GALLERY SCREEN ===== */
+        #screen-gallery {
+            flex-direction: column; justify-content: center; align-items: center; padding: 60px;
+        }
+        .gallery-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px; max-width: 1000px; width: 100%; max-height: 65vh; overflow-y: auto;
+        }
+        .gallery-item {
+            aspect-ratio: 16/9; border-radius: 8px; overflow: hidden; cursor: pointer;
+            border: 2px solid transparent; transition: all 0.2s ease;
+        }
+        .gallery-item:hover { border-color: #f3557a; transform: scale(1.03); }
+        .gallery-item img { width: 100%; height: 100%; object-fit: cover; }
+
+        /* ===== GALLERY LIGHTBOX ===== */
+        .gallery-lightbox {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.92); z-index: 200; display: flex;
+            justify-content: center; align-items: center; cursor: pointer;
+        }
+        .gallery-lightbox img { max-width: 90vw; max-height: 90vh; object-fit: contain; border-radius: 8px; }
+
+        /* ===== SETTINGS SCREEN ===== */
+        #screen-settings {
+            flex-direction: column; justify-content: center; align-items: center; padding: 60px;
+        }
+        .settings-panel {
+            max-width: 500px; width: 100; text-align: center;
+        }
+        .settings-panel p { color: #aaa; margin-top: 15px; font-size: 1rem; }
+
+        /* ===== CREDITS SCREEN ===== */
+        #screen-credits {
+            flex-direction: column; justify-content: center; align-items: center; padding: 60px;
+        }
+        .credits-content {
+            max-width: 600px; text-align: center; line-height: 2;
+        }
+        .credits-content .credit-label { color: #f3557a; font-weight: 600; margin-top: 20px; }
+        .credits-content .credit-value { color: #ccc; }
+
+        @media (max-width: 900px) {
+            .content-container { flex-direction: column; align-items: center; }
+            .right-column { width: 100%; max-width: 400px; order: -1; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Background Layer (untuk menu bg) -->
+    <div id="hub-bg-layer">
+        <div id="hub-bg-overlay"></div>
+    </div>
+
+    <!-- ========== SCREEN: Boot Sequence ========== -->
+    <div id="screen-boot" class="hub-screen">
+        <span id="boot-skip-hint">Klik untuk lewati</span>
+    </div>
+
+    <!-- ========== SCREEN: Warning ========== -->
+    <div id="screen-warning" class="hub-screen">
+        <div class="warning-text" id="warning-text"></div>
+        <div class="warning-hint">Klik di mana saja untuk melanjutkan</div>
+    </div>
+
+    <!-- ========== SCREEN: Main Menu ========== -->
+    <div id="screen-main-menu" class="hub-screen">
+        <h1 id="menu-title">Novel Title</h1>
+        <div id="menu-buttons"></div>
+    </div>
+
+    <!-- ========== SCREEN: Hub Info (classic fallback) ========== -->
+    <div id="screen-hub-info" class="hub-screen">
+        <button class="hub-back-button" onclick="goBack()">← Kembali</button>
+        <h1 id="hub-info-title">Memuat Hub...</h1>
+
+        <div class="content-container" id="main-content">
+            <div class="left-container">
+                <div class="novel-info">
+                    <div><strong>Genre:</strong> <span id="genre">-</span></div>
+                    <div><strong>Penulis:</strong> <span id="author">-</span></div>
+                    <div><strong>Ilustrator:</strong> <span id="illustrator">-</span></div>
+                    <div><strong>VN Mapper:</strong> <span id="vn-mapper">-</span></div>
+                </div>
+                <div class="description" id="description">Memuat deskripsi...</div>
+                <div>
+                    <h3 style="margin-bottom: 15px; color: #fff; font-size: 1.4rem;">Daftar Chapter</h3>
+                    <div class="chapter-list" id="chapter-list"></div>
+                </div>
+            </div>
+            <div class="right-column">
+                <div class="image-container" id="image-slider"></div>
+                <button id="play-btn" class="play-btn">▶ Lanjutkan Permainan</button>
+                <div class="progress-summary">
+                    <h3 style="color: #fff;">Statistik Progres</h3>
+                    <p id="completion-status" style="color: #4CAF50; font-weight: bold;">0% Selesai</p>
+                    <p id="last-played-status">Belum pernah dimainkan.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== SCREEN: Blank (Hub kosong — didesain user sendiri) ========== -->
+    <div id="screen-blank" class="hub-screen">
+        <div id="blank-preview-hint" class="blank-preview-hint" style="display:none;">
+            <div class="blank-hint-title">Hub Kosong</div>
+            <div class="blank-hint-desc">Layar ini sengaja kosong. Tambahkan Hub Scene atau klik <strong>Pilih Template Hub</strong> di editor untuk mulai mendesain.</div>
+        </div>
+    </div>
+
+    <!-- ========== SCREEN: Chapter Select ========== -->
+    <div id="screen-chapter-select" class="hub-screen">
+        <button class="screen-back-btn" onclick="navigateTo('main_menu')">← Kembali</button>
+        <h2 class="screen-header">Pilih Chapter</h2>
+        <div class="chapter-grid" id="chapter-select-list"></div>
+    </div>
+
+    <!-- ========== SCREEN: Load Game ========== -->
+    <div id="screen-load-game" class="hub-screen">
+        <button class="screen-back-btn" onclick="navigateTo('main_menu')">← Kembali</button>
+        <h2 class="screen-header">Muat Permainan</h2>
+        <div class="save-slots" id="save-slots-container"></div>
+    </div>
+
+    <!-- ========== SCREEN: Gallery ========== -->
+    <div id="screen-gallery" class="hub-screen">
+        <button class="screen-back-btn" onclick="navigateTo('main_menu')">← Kembali</button>
+        <h2 class="screen-header">Galeri</h2>
+        <div class="gallery-grid" id="gallery-grid"></div>
+    </div>
+
+    <!-- ========== SCREEN: Settings ========== -->
+    <div id="screen-settings" class="hub-screen">
+        <button class="screen-back-btn" onclick="navigateTo('main_menu')">← Kembali</button>
+        <h2 class="screen-header">Pengaturan</h2>
+        <div class="settings-panel">
+            <p>Pengaturan akan ditampilkan di sini oleh engine.</p>
+        </div>
+    </div>
+
+    <!-- ========== SCREEN: Credits ========== -->
+    <div id="screen-credits" class="hub-screen">
+        <button class="screen-back-btn" onclick="navigateTo('main_menu')">← Kembali</button>
+        <h2 class="screen-header">Kredit</h2>
+        <div class="credits-content" id="credits-content"></div>
+    </div>
+
+    <!-- ========== HUB RUNTIME SCRIPT ========== -->
+    <script>
+        const { ipcRenderer } = require('electron');
+
+        // ===== STATE =====
+        let currentStoryTitle = '';
+        let currentNovelPath = '';
+        let currentMetaData = {};
+        let hubConfig = null;
+        let chapterData = null;
+        let currentScreen = null;
+        let menuAudio = null;
+        let bootSkipped = false;
+        let _activeSceneFlow = null; // alur dari hubConfig.scenes (null → fallback legacy)
+
+        console.log('[Novel Hub] Hub HTML dimuat. Menunggu konteks...');
+
+        // ===== SCREEN NAVIGATION =====
+        function navigateTo(screenId) {
+            const prevScreen = currentScreen;
+
+            // Hook: hub:screen-leave — extensions bisa cancel navigasi
+            if (prevScreen) {
+                const leaveResult = (typeof VNRegistry !== 'undefined')
+                    ? VNRegistry.runHooks('hub:screen-leave', { from: prevScreen, to: screenId })
+                    : { from: prevScreen, to: screenId };
+                if (leaveResult === false) return;
+            }
+
+            // Hook: hub:screen-enter — extensions bisa modify target screen
+            const enterResult = (typeof VNRegistry !== 'undefined')
+                ? VNRegistry.runHooks('hub:screen-enter', { screen: screenId, from: prevScreen })
+                : { screen: screenId, from: prevScreen };
+            if (enterResult === false) return;
+            const finalScreenId = enterResult?.screen ?? screenId;
+
+            // Fade out current, lalu fade in target setelahnya (mode 'sequential' —
+            // lihat vn-hub-runtime.js). .hub-screen selalu display:flex; opacity/visibility
+            // yang ditoggle, jadi transition CSS berjalan mulus tanpa jeda display:none.
+            if (currentScreen) {
+                const prev = document.getElementById(`screen-${currentScreen}`);
+                if (prev) prev.classList.remove('active');
+            }
+
+            const target = document.getElementById(`screen-${finalScreenId}`);
+            if (target) {
+                setTimeout(() => { target.classList.add('active'); }, currentScreen ? 400 : 0);
+            }
+
+            currentScreen = finalScreenId;
+
+            // Trigger per-screen init
+            if (finalScreenId === 'chapter-select') populateChapterSelect();
+            if (finalScreenId === 'load-game') populateLoadGame();
+            if (finalScreenId === 'gallery') populateGallery();
+            if (finalScreenId === 'credits') populateCredits();
+
+            // Menu BGM — play when entering main_menu, stop on boot/warning
+            if (finalScreenId === 'main-menu' && hubConfig && hubConfig.menu && hubConfig.menu.bgm) {
+                startMenuBGM();
+            }
+            if ((finalScreenId === 'boot' || finalScreenId === 'warning') && menuAudio) {
+                stopMenuBGM();
+            }
+
+            // Dispatch event for VNHub bridge
+            window.dispatchEvent(new CustomEvent('vnhub:navigate', { detail: { screen: finalScreenId, from: prevScreen } }));
+
+            // Preview bridge: laporkan layar aktif ke host editor untuk animasi hub-scene-list.
+            // Dipanggil dari world runtime sendiri (bukan injeksi), agar tembus tembok isolated-world.
+            // Di game standalone tak ada host → sendToHost no-op/throw, aman diabaikan.
+            try { ipcRenderer.sendToHost('hub:scene-shown', { screen: finalScreenId, from: prevScreen }); } catch (e) { /* not embedded in <webview> */ }
+        }
+
+        // Screen id uses hyphens in DOM but some callers use underscores — normalize
+        function normalizeScreenId(id) {
+            return (id || '').replace(/_/g, '-');
+        }
+
+        // ===== SCENE FLOW =====
+        // Jika hubConfig.scenes ada, alur Hub digerakkan oleh scenes (urutan + enabled),
+        // memetakan tiap scene ke data field lama. Tanpa scenes (atau Custom Hub) → null,
+        // sehingga runtime jatuh ke alur legacy (kompatibel mundur).
+        function computeSceneFlow() {
+            if (!hubConfig || hubConfig.hubType === 'custom') return null;
+            const scenes = Array.isArray(hubConfig.scenes) ? hubConfig.scenes : null;
+            if (!scenes || scenes.length === 0) return null;
+
+            const ordered = scenes.slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+            const boot = Array.isArray(hubConfig.bootSequence) ? hubConfig.bootSequence : [];
+            const flow = { bootItems: [], showWarning: false, warningScene: null, terminalType: null, terminalScene: null };
+
+            ordered.forEach(s => {
+                if (!s || s.enabled === false) return; // scene nonaktif → dilewati
+                if (s.type === 'splash') {
+                    const idx = parseInt(String(s.id).replace('hub_scene_splash_', ''), 10) - 1;
+                    if (boot[idx]) flow.bootItems.push(boot[idx]);
+                } else if (s.type === 'warning') {
+                    flow.showWarning = !!(hubConfig.warningScreen && hubConfig.warningScreen.text && String(hubConfig.warningScreen.text).trim());
+                    flow.warningScene = s;
+                } else if (s.type === 'main_menu' || s.type === 'info' || s.type === 'blank') {
+                    flow.terminalType = s.type;
+                    flow.terminalScene = s;
+                }
+            });
+            return flow;
+        }
+
+        // Terapkan background mandiri per-scene (rich-data scene.background) ke #hub-bg-layer.
+        // Layar blank/info/warning dibuat transparan agar layer ini tampak.
+        function applySceneBackground(bg) {
+            const bgLayer = document.getElementById('hub-bg-layer');
+            if (!bgLayer) return;
+            Array.from(bgLayer.children).forEach(c => { if (c.id !== 'hub-bg-overlay') c.remove(); });
+            const overlay = document.getElementById('hub-bg-overlay');
+            if (!bg || !bg.src) {
+                if (overlay) overlay.style.background = 'rgba(0,0,0,0.45)';
+                return;
+            }
+            const src = resolveAsset(bg.src);
+            let media;
+            if (bg.type === 'video') {
+                media = document.createElement('video');
+                media.src = src; media.autoplay = true; media.loop = true; media.muted = true;
+            } else {
+                media = document.createElement('img');
+                media.src = src;
+            }
+            bgLayer.insertBefore(media, bgLayer.firstChild);
+            if (overlay) overlay.style.background = 'rgba(0,0,0,' + (typeof bg.overlay === 'number' ? bg.overlay : 0.45) + ')';
+        }
+
+        // ===== BOOT SEQUENCE ENGINE =====
+        async function runBootSequence() {
+            const seq = _activeSceneFlow ? _activeSceneFlow.bootItems : (hubConfig.bootSequence || []);
+            if (seq.length === 0) { afterBoot(); return; }
+
+            navigateTo('boot');
+            const container = document.getElementById('screen-boot');
+
+            for (let i = 0; i < seq.length; i++) {
+                if (bootSkipped) break;
+                const item = seq[i];
+                const src = resolveAsset(item.src);
+
+                // Clear previous content (keep hint)
+                Array.from(container.children).forEach(child => {
+                    if (child.id !== 'boot-skip-hint') child.remove();
+                });
+
+                if (item.type === 'video') {
+                    await playBootVideo(container, src, item.duration || 10000);
+                } else {
+                    await showBootImage(container, src, item.duration || 3000);
+                }
+            }
+
+            afterBoot();
+        }
+
+        function showBootImage(container, src, duration) {
+            return new Promise(resolve => {
+                const img = document.createElement('img');
+                img.src = src;
+                container.insertBefore(img, container.firstChild);
+
+                let resolved = false;
+                const finish = () => { if (!resolved) { resolved = true; resolve(); } };
+
+                const timer = setTimeout(finish, duration);
+
+                // Click to skip this item
+                const clickHandler = () => {
+                    clearTimeout(timer);
+                    finish();
+                };
+                container.addEventListener('click', clickHandler, { once: true });
+
+                // Cleanup when resolved
+                const origFinish = finish;
+                // No extra cleanup needed, once:true handles click removal
+            });
+        }
+
+        function playBootVideo(container, src, maxDuration) {
+            return new Promise(resolve => {
+                const video = document.createElement('video');
+                video.src = src;
+                video.autoplay = true;
+                video.style.cssText = 'max-width: 100%; max-height: 100%; object-fit: contain;';
+                container.insertBefore(video, container.firstChild);
+
+                let resolved = false;
+                const finish = () => { if (!resolved) { resolved = true; video.pause(); resolve(); } };
+
+                video.onended = finish;
+                const timer = setTimeout(finish, maxDuration);
+
+                container.addEventListener('click', () => {
+                    clearTimeout(timer);
+                    finish();
+                }, { once: true });
+            });
+        }
+
+        function afterBoot() {
+            // After boot → show warning (digerakkan scene flow, atau legacy), else terminal
+            const showWarn = _activeSceneFlow
+                ? _activeSceneFlow.showWarning
+                : !!(hubConfig.warningScreen && hubConfig.warningScreen.enabled && hubConfig.warningScreen.text);
+            if (showWarn) {
+                showWarningScreen();
+            } else {
+                afterWarning();
+            }
+        }
+
+        // ===== WARNING SCREEN =====
+        function showWarningScreen() {
+            const warningEl = document.getElementById('screen-warning');
+            const textEl = document.getElementById('warning-text');
+            textEl.textContent = hubConfig.warningScreen.text;
+
+            // Apply style variant
+            warningEl.classList.remove('retro');
+            if (hubConfig.warningScreen.style === 'retro') {
+                warningEl.classList.add('retro');
+            }
+
+            // Background mandiri per-scene (rich-data)
+            applySceneBackground(_activeSceneFlow && _activeSceneFlow.warningScene && _activeSceneFlow.warningScene.background);
+
+            navigateTo('warning');
+
+            // Click to dismiss
+            warningEl.addEventListener('click', () => {
+                afterWarning();
+            }, { once: true });
+        }
+
+        function afterWarning() {
+            showTerminalScreen();
+        }
+
+        // Layar terminal Hub: Main Menu (jika ada item menu), Blank (jika hubLayout
+        // 'blank' — novel baru), atau Info Novel (fallback klasik untuk novel lama).
+        function showTerminalScreen() {
+            const hasMenu = hubConfig.menu && hubConfig.menu.items && hubConfig.menu.items.length > 0;
+            let terminalType = (_activeSceneFlow && _activeSceneFlow.terminalType)
+                ? _activeSceneFlow.terminalType
+                : (hasMenu ? 'main_menu' : (hubConfig.hubLayout === 'blank' ? 'blank' : 'info'));
+            // main_menu butuh item; jika kosong, jatuh ke blank/info agar tak menu hampa.
+            if (terminalType === 'main_menu' && !hasMenu) {
+                terminalType = (hubConfig.hubLayout === 'blank') ? 'blank' : 'info';
+            }
+            const termBg = _activeSceneFlow && _activeSceneFlow.terminalScene && _activeSceneFlow.terminalScene.background;
+            if (terminalType === 'main_menu') {
+                setupMenuBackground();
+                buildMainMenu();
+                navigateTo('main-menu');
+            } else if (terminalType === 'blank') {
+                applySceneBackground(termBg);
+                showBlankScreen();
+            } else {
+                applySceneBackground(termBg);
+                renderHubInfo();
+                navigateTo('hub-info');
+            }
+        }
+
+        function showBlankScreen() {
+            const hint = document.getElementById('blank-preview-hint');
+            // Hint hanya tampil di preview editor; pada game asli layar benar-benar kosong.
+            if (hint) hint.style.display = window.__previewMode ? 'flex' : 'none';
+            navigateTo('blank');
+        }
+
+        // ===== MENU BACKGROUND =====
+        function setupMenuBackground() {
+            const bgLayer = document.getElementById('hub-bg-layer');
+            const bg = hubConfig.menu.background;
+            if (!bg || !bg.src) return;
+
+            const src = resolveAsset(bg.src);
+            // Remove old media children (keep overlay)
+            Array.from(bgLayer.children).forEach(child => {
+                if (child.id !== 'hub-bg-overlay') child.remove();
+            });
+
+            if (bg.type === 'video') {
+                const video = document.createElement('video');
+                video.src = src; video.autoplay = true; video.loop = true; video.muted = true;
+                bgLayer.insertBefore(video, bgLayer.firstChild);
+            } else {
+                const img = document.createElement('img');
+                img.src = src;
+                bgLayer.insertBefore(img, bgLayer.firstChild);
+            }
+        }
+
+        // ===== MENU BGM =====
+        function startMenuBGM() {
+            if (menuAudio) return; // already playing
+            const src = resolveAsset(hubConfig.menu.bgm);
+            menuAudio = new Audio(src);
+            menuAudio.loop = true;
+            menuAudio.volume = 0.5;
+            menuAudio.play().catch(e => console.warn('[Hub] Menu BGM gagal:', e));
+        }
+
+        function stopMenuBGM() {
+            if (menuAudio) {
+                menuAudio.pause();
+                menuAudio.currentTime = 0;
+                menuAudio = null;
+            }
+        }
+
+        // ===== MAIN MENU =====
+        function buildMainMenu() {
+            const titleEl = document.getElementById('menu-title');
+            titleEl.textContent = currentMetaData.title || currentStoryTitle;
+
+            const container = document.getElementById('menu-buttons');
+            container.innerHTML = '';
+
+            hubConfig.menu.items.forEach(item => {
+                const btn = document.createElement('button');
+                btn.className = 'menu-btn';
+                btn.textContent = item.label;
+                btn.addEventListener('click', () => handleMenuAction(item.action, item.payload));
+                container.appendChild(btn);
+            });
+
+            // Hook: hub:menu-render — extensions bisa inject custom menu buttons
+            if (typeof VNRegistry !== 'undefined') {
+                VNRegistry.runHooks('hub:menu-render', { container, items: hubConfig.menu.items });
+            }
+        }
+
+        function handleMenuAction(action, payload) {
+            switch (action) {
+                case 'start_game':
+                    // Play first chapter (or the one specified in payload)
+                    if (payload && chapterData) {
+                        playChapter(payload);
+                    } else if (chapterData && chapterData.mainChapters && chapterData.mainChapters.length > 0) {
+                        playChapter(chapterData.mainChapters[0]);
+                    }
+                    break;
+                case 'load_chapter':
+                    navigateTo('chapter-select');
+                    break;
+                case 'load_save':
+                    navigateTo('load-game');
+                    break;
+                case 'gallery':
+                    navigateTo('gallery');
+                    break;
+                case 'credits':
+                    navigateTo('credits');
+                    break;
+                case 'settings':
+                    navigateTo('settings');
+                    break;
+                case 'link':
+                    if (payload) require('electron').shell.openExternal(payload);
+                    break;
+                case 'exit':
+                    goBack();
+                    break;
+                default:
+                    console.warn('[Hub] Aksi menu tidak dikenal:', action);
+            }
+        }
+
+        // ===== CHAPTER SELECT =====
+        async function populateChapterSelect() {
+            if (!chapterData) {
+                chapterData = await ipcRenderer.invoke('get-chapter-list', currentStoryTitle);
+            }
+            const container = document.getElementById('chapter-select-list');
+            container.innerHTML = '';
+
+            const chapterConfig = (hubConfig && hubConfig.chapterConfig) || {};
+            const mainChapters = sortChapters(chapterData.mainChapters || []);
+            const sideStories = chapterData.sideStories || [];
+
+            // Filter hidden chapters
+            const visibleMain = mainChapters.filter(ch => !chapterConfig[ch]?.hidden);
+            const visibleSide = sideStories.filter(ch => !chapterConfig[ch]?.hidden);
+
+            if (visibleMain.length === 0 && visibleSide.length === 0) {
+                container.innerHTML = '<p style="color: #888; text-align: center;">Belum ada chapter.</p>';
+                return;
+            }
+
+            visibleMain.forEach(ch => {
+                container.appendChild(createChapterItem(ch, chapterConfig[ch]?.badge));
+            });
+
+            if (visibleSide.length > 0) {
+                const header = document.createElement('h3');
+                header.textContent = 'Side Stories';
+                header.style.cssText = 'color: #ff9d00; margin: 20px 0 10px; font-size: 1rem;';
+                container.appendChild(header);
+                visibleSide.forEach(ch => container.appendChild(createChapterItem(ch, chapterConfig[ch]?.badge)));
+            }
+        }
+
+        // ===== LOAD GAME =====
+        async function populateLoadGame() {
+            const container = document.getElementById('save-slots-container');
+            container.innerHTML = '<p style="color: #888;">Memuat save slots...</p>';
+
+            try {
+                const slots = await ipcRenderer.invoke('vn-engine:get-save-slots', currentStoryTitle);
+                container.innerHTML = '';
+
+                if (!slots || slots.length === 0) {
+                    // Show 6 empty slots
+                    for (let i = 1; i <= 6; i++) {
+                        const slot = document.createElement('div');
+                        slot.className = 'save-slot empty';
+                        slot.innerHTML = `<div class="slot-title">Slot ${i}</div><div class="slot-info">Kosong</div>`;
+                        container.appendChild(slot);
+                    }
+                    return;
+                }
+
+                slots.forEach(s => {
+                    const slot = document.createElement('div');
+                    slot.className = 'save-slot' + (s.isEmpty ? ' empty' : '');
+                    slot.innerHTML = `
+                        <div class="slot-title">Slot ${s.slotId}</div>
+                        <div class="slot-info">${s.isEmpty ? 'Kosong' : (s.chapter || 'Unknown') + ' — ' + (s.date || '')}</div>
+                    `;
+                    if (!s.isEmpty) {
+                        slot.addEventListener('click', () => {
+                            ipcRenderer.send('vn-engine:load-game-from-hub', {
+                                storyTitle: currentStoryTitle,
+                                slotId: s.slotId
+                            });
+                        });
+                    }
+                    container.appendChild(slot);
+                });
+            } catch (err) {
+                console.error('[Hub] Gagal memuat save slots:', err);
+                container.innerHTML = '<p style="color: #f3557a;">Gagal memuat data save.</p>';
+            }
+        }
+
+        // ===== GALLERY =====
+        async function populateGallery() {
+            const container = document.getElementById('gallery-grid');
+            container.innerHTML = '<p style="color: #888;">Memuat galeri...</p>';
+
+            try {
+                const images = await ipcRenderer.invoke('vn-hub:get-gallery-images', currentStoryTitle);
+                container.innerHTML = '';
+
+                if (!images || images.length === 0) {
+                    container.innerHTML = '<p style="color: #888; text-align: center;">Belum ada gambar dalam galeri.</p>';
+                    return;
+                }
+
+                images.forEach(imgPath => {
+                    const item = document.createElement('div');
+                    item.className = 'gallery-item';
+                    const img = document.createElement('img');
+                    img.src = resolveAsset(imgPath);
+                    img.loading = 'lazy';
+                    item.appendChild(img);
+                    item.addEventListener('click', () => openLightbox(resolveAsset(imgPath)));
+                    container.appendChild(item);
+                });
+            } catch (err) {
+                console.error('[Hub] Gagal memuat galeri:', err);
+                container.innerHTML = '<p style="color: #f3557a;">Gagal memuat galeri.</p>';
+            }
+        }
+
+        function openLightbox(src) {
+            const lb = document.createElement('div');
+            lb.className = 'gallery-lightbox';
+            const img = document.createElement('img');
+            img.src = src;
+            lb.appendChild(img);
+            lb.addEventListener('click', () => lb.remove());
+            document.body.appendChild(lb);
+        }
+
+        // ===== CREDITS =====
+        function populateCredits() {
+            const container = document.getElementById('credits-content');
+            container.innerHTML = '';
+
+            // Coba baca dari hubConfig.credits terlebih dahulu
+            const creditsConfig = hubConfig.credits;
+            if (creditsConfig && creditsConfig.lines && creditsConfig.lines.length > 0) {
+                creditsConfig.lines.forEach(line => {
+                    if (line.type === 'heading') {
+                        const el = document.createElement('div');
+                        el.className = 'credit-label';
+                        el.textContent = line.text || '';
+                        container.appendChild(el);
+                    } else if (line.type === 'separator') {
+                        const el = document.createElement('hr');
+                        el.style.cssText = 'border: none; border-top: 1px solid rgba(255,255,255,0.15); margin: 15px 0;';
+                        container.appendChild(el);
+                    } else {
+                        const el = document.createElement('div');
+                        el.className = 'credit-value';
+                        el.textContent = line.text || '';
+                        container.appendChild(el);
+                    }
+                });
+                return;
+            }
+
+            // Fallback: baca dari metadata (backward compat)
+            const meta = currentMetaData;
+            const credits = [
+                { label: 'Penulis', value: meta.author },
+                { label: 'Ilustrator', value: meta.illustrator },
+                { label: 'VN Mapper', value: meta.vnMapper },
+                { label: 'Genre', value: meta.genre },
+            ];
+
+            credits.forEach(c => {
+                if (c.value && c.value !== '-') {
+                    const labelEl = document.createElement('div');
+                    labelEl.className = 'credit-label';
+                    labelEl.textContent = c.label;
+                    container.appendChild(labelEl);
+
+                    const valueEl = document.createElement('div');
+                    valueEl.className = 'credit-value';
+                    valueEl.textContent = c.value;
+                    container.appendChild(valueEl);
+                }
+            });
+
+            if (container.children.length === 0) {
+                container.innerHTML = '<p style="color: #888;">Belum ada informasi kredit.</p>';
+            }
+        }
+
+        // ===== HUB INFO (classic fallback — no menu configured) =====
+        async function renderHubInfo() {
+            const meta = currentMetaData;
+
+            document.getElementById('hub-info-title').textContent = meta.title || currentStoryTitle;
+            document.getElementById('genre').textContent = meta.genre || '-';
+            document.getElementById('author').textContent = meta.author || '-';
+            document.getElementById('illustrator').textContent = meta.illustrator || '-';
+            document.getElementById('vn-mapper').textContent = meta.vnMapper || '-';
+            document.getElementById('description').textContent = meta.description || 'Tidak ada deskripsi.';
+
+            // Gambar sorotan = cover novel. (Slideshow novel-meta.images dihapus
+            // 2026-07-21 bersama Media Showcase; hub yang mau galeri/slideshow
+            // membuatnya sendiri lewat kode hub-nya.)
+            const slider = document.getElementById('image-slider');
+            slider.innerHTML = '';
+            const img = document.createElement('img');
+            img.src = meta.cover
+                ? `${currentNovelPath}/${meta.cover}`
+                : '../../../../aset/placeholder.png';
+            img.style.opacity = '1';
+            slider.appendChild(img);
+
+            // Chapters
+            if (!chapterData) {
+                chapterData = await ipcRenderer.invoke('get-chapter-list', currentStoryTitle);
+            }
+
+            const chapterListEl = document.getElementById('chapter-list');
+            chapterListEl.innerHTML = '';
+            const chapterConfig = (hubConfig && hubConfig.chapterConfig) || {};
+            const mainChapters = sortChapters(chapterData.mainChapters || []);
+            const visibleChapters = mainChapters.filter(ch => !chapterConfig[ch]?.hidden);
+
+            if (visibleChapters.length === 0) {
+                chapterListEl.innerHTML = '<p style="color: #888;">Belum ada chapter.</p>';
+            } else {
+                document.getElementById('play-btn').style.display = 'block';
+                document.getElementById('play-btn').onclick = () => playChapter(visibleChapters[0]);
+
+                visibleChapters.forEach(ch => chapterListEl.appendChild(createChapterItem(ch, chapterConfig[ch]?.badge)));
+            }
+        }
+
+        // ===== HELPERS =====
+        function resolveAsset(relativePath) {
+            if (!relativePath) return '';
+            if (relativePath.startsWith('file://') || relativePath.startsWith('http')) return relativePath;
+            return `file:///${currentNovelPath}/${relativePath}`;
+        }
+
+        function playChapter(chapterName) {
+            stopMenuBGM();
+            ipcRenderer.send('play-chapter', { storyTitle: currentStoryTitle, chapter: chapterName });
+        }
+
+        function goBack() {
+            stopMenuBGM();
+            ipcRenderer.send('vn-engine:exit-to-manager');
+        }
+
+        function sortChapters(chapters) {
+            return [...chapters].sort((a, b) => {
+                const getNum = (name) => {
+                    if (name.toLowerCase().includes('prolog') || name.toLowerCase().includes('pengenalan')) return 0;
+                    const m = name.match(/\d+/);
+                    return m ? parseInt(m[0], 10) : Infinity;
+                };
+                return getNum(a) - getNum(b);
+            });
+        }
+
+        function createChapterItem(chapterName, badge) {
+            const item = document.createElement('div');
+            item.className = 'chapter-item';
+            const safeName = chapterName.replace(/</g, '&lt;');
+            const badgeHTML = badge ? '<span style="font-size:0.7rem;background:#f3557a;color:#fff;padding:2px 8px;border-radius:10px;margin-left:8px;font-weight:600;">' + badge.replace(/</g, '&lt;') + '</span>' : '';
+            item.innerHTML = `<span>${safeName}${badgeHTML}</span> <span style="font-size: 0.85rem; color: #888;">Mulai ▶</span>`;
+            item.addEventListener('click', () => playChapter(chapterName));
+            return item;
+        }
+
+        // ===== CONTEXT HANDLER (entry point) =====
+        ipcRenderer.on('vn-engine:set-hub-context', async (event, context) => {
+            console.log('[Novel Hub] Konteks diterima:', context);
+            const { storyTitle, novelPath, metaData, hubConfig: configFromContext } = context;
+
+            currentStoryTitle = storyTitle;
+            currentNovelPath = novelPath;
+            currentMetaData = metaData || {};
+
+            // Hub config: use from context if provided, else fetch via IPC
+            if (configFromContext) {
+                hubConfig = configFromContext;
+            } else {
+                try {
+                    const res = await ipcRenderer.invoke('get-hub-config', storyTitle);
+                    hubConfig = (res && res.success) ? res.config : {};
+                } catch (err) {
+                    console.warn('[Hub] Gagal ambil hub-config, pakai default:', err);
+                    hubConfig = {};
+                }
+            }
+
+            // Pre-fetch chapter data in background
+            ipcRenderer.invoke('get-chapter-list', storyTitle).then(data => { chapterData = data; }).catch(() => {});
+
+            // Hitung alur dari scenes null → fallback legacy.
+            _activeSceneFlow = computeSceneFlow();
+
+            // Start the hub flow: boot → warning → terminal (menu/info/blank)
+            const bootItems = _activeSceneFlow ? _activeSceneFlow.bootItems : (hubConfig.bootSequence || []);
+            if (bootItems.length > 0) {
+                runBootSequence();
+            } else {
+                afterBoot();
+            }
+        });
+
+        // Editor bridge events
+        ipcRenderer.on('update-title', (event, newTitle) => {
+            const el = document.getElementById('hub-info-title') || document.getElementById('menu-title');
+            if (el) el.textContent = newTitle;
+            currentStoryTitle = newTitle;
+        });
+
+        ipcRenderer.on('update-description', (event, newDesc) => {
+            const el = document.getElementById('description');
+            if (el) el.textContent = newDesc;
+        });
+
+        // ===== HOT-RELOAD: preview config push from editor =====
+        const TERMINAL_SCREENS = ['main-menu', 'hub-info', 'blank'];
+        ipcRenderer.on('preview:apply-hub-config', (event, newConfig) => {
+            if (!newConfig) return;
+            hubConfig = newConfig;
+            _activeSceneFlow = computeSceneFlow(); // alur ikut config terbaru
+            // Re-apply visual elements
+            setupMenuBackground();
+            // Jika sedang di layar terminal, evaluasi ulang (mis. menu ditambah →
+            // blank/info berganti ke Main Menu; menu dikosongkan → kembali blank/info).
+            if (TERMINAL_SCREENS.includes(currentScreen)) {
+                showTerminalScreen();
+            } else if (hubConfig.menu && hubConfig.menu.items && hubConfig.menu.items.length > 0) {
+                buildMainMenu();
+            }
+            // Update title/description if hub-info visible
+            const titleEl = document.getElementById('hub-info-title') || document.getElementById('menu-title');
+            if (titleEl && currentStoryTitle) titleEl.textContent = currentStoryTitle;
+            const descEl = document.getElementById('description');
+            if (descEl && currentMetaData.description) descEl.textContent = currentMetaData.description;
+        });
+
+        ipcRenderer.on('preview:apply-hub-meta', (event, newMeta) => {
+            if (!newMeta) return;
+            currentMetaData = Object.assign({}, currentMetaData, newMeta);
+            if (currentScreen === 'hub-info') {
+                renderHubInfo();
+            } else if (currentScreen === 'main-menu') {
+                buildMainMenu();
+            }
+            // Layar blank tidak terpengaruh metadata.
+        });
+
+        // Preview Per-scene: editor meminta runtime menampilkan satu layar tertentu.
+        // Membangun layar terkait bila perlu, lalu navigasi ke sana.
+        ipcRenderer.on('preview:goto-screen', (event, d) => {
+            const screen = d && d.screen;
+            if (!screen) return;
+            if (screen === 'main-menu') buildMainMenu();
+            else if (screen === 'hub-info') renderHubInfo();
+            navigateTo(screen);
+        });
+    </script>
+</body>
+</html>

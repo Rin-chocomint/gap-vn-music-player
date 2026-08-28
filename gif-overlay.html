@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GIF Overlay</title>
+    <title>GIF/Media Overlay</title>
     <style>
         * {
             margin: 0;
@@ -48,13 +48,46 @@
             box-shadow: 0 0 20px rgba(100, 200, 255, 0.5);
         }
 
-        /* GIF image */
-        #gif-image {
+        /* Media surfaces */
+        .media-element,
+        #media-canvas {
             width: 100%;
             height: 100%;
             object-fit: contain;
             pointer-events: none;
             transition: transform 0.2s ease, opacity 0.15s ease-out;
+        }
+
+        #gif-video,
+        #gif-audio,
+        #media-canvas,
+        #audio-badge {
+            display: none;
+        }
+
+        #gif-audio {
+            width: 100%;
+        }
+
+        #audio-badge {
+            width: 100%;
+            height: 100%;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 8px;
+            color: rgba(255, 255, 255, 0.88);
+            font-family: 'Segoe UI', sans-serif;
+            font-size: 12px;
+            text-align: center;
+            background: rgba(15, 18, 24, 0.78);
+            border: 1px solid rgba(100, 200, 255, 0.28);
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        #audio-badge .audio-icon {
+            font-size: 24px;
         }
 
         /* Resize handle */
@@ -146,7 +179,9 @@
             gap: 8px;
         }
 
-        #gif-container.no-image #gif-image {
+        #gif-container.no-image .media-element,
+        #gif-container.no-image #media-canvas,
+        #gif-container.no-image #audio-badge {
             display: none;
         }
 
@@ -170,9 +205,16 @@
 
 <body>
     <div id="gif-container" class="no-image">
-        <img id="gif-image" src="" alt="GIF Overlay">
+        <img id="gif-image" class="media-element" src="" alt="Media Overlay">
+        <video id="gif-video" class="media-element" playsinline></video>
+        <audio id="gif-audio"></audio>
+        <canvas id="media-canvas"></canvas>
+        <div id="audio-badge">
+            <span class="audio-icon">♪</span>
+            <span id="audio-label">Audio Overlay</span>
+        </div>
         <div id="placeholder">
-            <span>Gif ilang coba klik ini</span>
+            <span>Media ilang coba klik ini</span>
         </div>
         <div id="resize-handle"></div>
         <div id="rotate-controls">
@@ -186,6 +228,11 @@
 
         const gifContainer = document.getElementById('gif-container');
         const gifImage = document.getElementById('gif-image');
+        const gifVideo = document.getElementById('gif-video');
+        const gifAudio = document.getElementById('gif-audio');
+        const mediaCanvas = document.getElementById('media-canvas');
+        const audioBadge = document.getElementById('audio-badge');
+        const audioLabel = document.getElementById('audio-label');
         const resizeHandle = document.getElementById('resize-handle');
         const placeholder = document.getElementById('placeholder');
         const rotateLeftBtn = document.getElementById('rotate-left');
@@ -193,10 +240,13 @@
 
         let overlayId = null;
         let currentGifPath = null;
+        let currentMediaType = 'gif';
+        let currentSettings = {};
+        let activeMediaElement = gifImage;
+        let canvasAnimationFrame = null;
+        let lastCanvasFrameTime = 0;
         let isDragging = false;
         let isResizing = false;
-        let dragStartMouse = { x: 0, y: 0 };
-        let resizeStartMouse = { x: 0, y: 0 };
         let isLocked = false;
         let currentRotation = 0; // Rotasi saat ini dalam derajat
         let currentFlip = 1; // 1 untuk normal, -1 untuk flip horizontal
@@ -204,16 +254,20 @@
 
         // Helper untuk menerapkan semua transformasi
         function updateTransform() {
-            gifImage.style.transform = `rotate(${currentRotation}deg) scaleX(${currentFlip}) scaleY(${currentFlipY})`;
+            const transform = `rotate(${currentRotation}deg) scaleX(${currentFlip}) scaleY(${currentFlipY})`;
+            [gifImage, gifVideo, mediaCanvas, audioBadge].forEach(el => {
+                if (el) el.style.transform = transform;
+            });
         }
 
         // Inisialisasi dari Main Process
-        ipcRenderer.on('init-overlay', (event, { id, path, locked, bounds }) => {
+        ipcRenderer.on('init-overlay', (event, { id, path, sourcePath, mediaType, settings, locked, bounds }) => {
             overlayId = id;
             console.log(`[GIF Overlay #${id}] Diinisialisasi, terkunci: ${locked}`);
 
-            if (path) {
-                loadGif(path);
+            currentSettings = settings || currentSettings || {};
+            if (path || sourcePath) {
+                loadMedia({ path: sourcePath || path, mediaType, settings: currentSettings });
             }
 
             setLockedState(locked === true);
@@ -275,34 +329,255 @@
             console.log(`[GIF Overlay #${overlayId}] Locked state: ${locked}`);
         }
 
-        function loadGif(filePath) {
+        function inferMediaType(filePath = '') {
+            const ext = filePath.split('.').pop()?.toLowerCase() || '';
+            if (['mp4', 'webm', 'mov', 'm4v'].includes(ext)) return 'video';
+            if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a'].includes(ext)) return 'audio';
+            if (['png', 'jpg', 'jpeg', 'webp', 'apng'].includes(ext)) return 'image';
+            return 'gif';
+        }
+
+        function toFileUrl(filePath) {
+            return `file:///${filePath.replace(/\\/g, '/')}`;
+        }
+
+        function stopCanvasRenderer() {
+            if (canvasAnimationFrame) {
+                cancelAnimationFrame(canvasAnimationFrame);
+                canvasAnimationFrame = null;
+            }
+        }
+
+        function hideAllMediaSurfaces() {
+            stopCanvasRenderer();
+            gifImage.style.display = 'none';
+            gifVideo.style.display = 'none';
+            gifAudio.style.display = 'none';
+            mediaCanvas.style.display = 'none';
+            audioBadge.style.display = 'none';
+            gifVideo.pause();
+            gifAudio.pause();
+        }
+
+        function applyMediaSettings(settings = {}) {
+            currentSettings = settings || {};
+            const effects = currentSettings.effects || {};
+            const crop = effects.crop || {};
+            const cropClip = `inset(${crop.top || 0}% ${crop.right || 0}% ${crop.bottom || 0}% ${crop.left || 0}%)`;
+            const fit = effects.objectFit || 'contain';
+
+            [gifImage, gifVideo, mediaCanvas].forEach(el => {
+                el.style.objectFit = fit;
+                el.style.clipPath = cropClip;
+            });
+
+            const audio = currentSettings.audio || {};
+            const volume = Math.max(0, Math.min(1, Number(audio.volume ?? 0.8)));
+            gifVideo.volume = volume;
+            gifAudio.volume = volume;
+            gifVideo.loop = audio.loop !== false;
+            gifAudio.loop = audio.loop !== false;
+
+            if (currentMediaType === 'video' || currentMediaType === 'audio') {
+                const media = currentMediaType === 'video' ? gifVideo : gifAudio;
+                media.ontimeupdate = () => {
+                    const end = Number(audio.end || 0);
+                    const start = Number(audio.start || 0);
+                    if (end > start && media.currentTime >= end) {
+                        media.currentTime = start;
+                        if (audio.loop !== false) media.play().catch(() => { });
+                    }
+                };
+            }
+
+            // Flip dasar (manual) dari pengguna. Catatan: animasi tipe patrol/DVD
+            // tetap bisa menimpa flip horizontal saat berjalan (perilaku yang disengaja).
+            currentFlip = currentSettings.flipHorizontal ? -1 : 1;
+            currentFlipY = currentSettings.flipVertical ? -1 : 1;
+            updateTransform();
+
+            updateCanvasRenderer();
+        }
+
+        function updateCanvasRenderer() {
+            stopCanvasRenderer();
+            const effects = currentSettings.effects || {};
+            const chroma = effects.chromaKey || {};
+            const sprite = effects.sprite || {};
+            const useCanvas = chroma.enabled === true || sprite.enabled === true;
+
+            if (!useCanvas || currentMediaType === 'audio') {
+                if (activeMediaElement && currentMediaType !== 'audio') activeMediaElement.style.display = 'block';
+                mediaCanvas.style.display = 'none';
+                return;
+            }
+
+            if (activeMediaElement) activeMediaElement.style.display = 'none';
+            mediaCanvas.style.display = 'block';
+            const ctx = mediaCanvas.getContext('2d', { willReadFrequently: chroma.enabled === true });
+            const source = activeMediaElement;
+
+            const hex = chroma.color || '#00ff00';
+            const target = {
+                r: parseInt(hex.slice(1, 3), 16) || 0,
+                g: parseInt(hex.slice(3, 5), 16) || 255,
+                b: parseInt(hex.slice(5, 7), 16) || 0
+            };
+            const tolerance = Number(chroma.tolerance || 45);
+            let spriteFrame = 0;
+
+            function render(now) {
+                const fps = sprite.enabled ? Number(sprite.fps || 12) : 30;
+                if (now - lastCanvasFrameTime < 1000 / Math.max(1, fps)) {
+                    canvasAnimationFrame = requestAnimationFrame(render);
+                    return;
+                }
+                lastCanvasFrameTime = now;
+
+                const sourceWidth = source.videoWidth || source.naturalWidth || source.clientWidth || 1;
+                const sourceHeight = source.videoHeight || source.naturalHeight || source.clientHeight || 1;
+                mediaCanvas.width = sourceWidth;
+                mediaCanvas.height = sourceHeight;
+                ctx.clearRect(0, 0, mediaCanvas.width, mediaCanvas.height);
+
+                if (sprite.enabled && source.naturalWidth) {
+                    const rows = Math.max(1, Number(sprite.rows || 1));
+                    const columns = Math.max(1, Number(sprite.columns || 1));
+                    const total = rows * columns;
+                    const cellW = Math.floor(source.naturalWidth / columns);
+                    const cellH = Math.floor(source.naturalHeight / rows);
+                    const sx = (spriteFrame % columns) * cellW;
+                    const sy = Math.floor(spriteFrame / columns) * cellH;
+                    mediaCanvas.width = cellW;
+                    mediaCanvas.height = cellH;
+                    ctx.drawImage(source, sx, sy, cellW, cellH, 0, 0, cellW, cellH);
+                    spriteFrame = (spriteFrame + 1) % total;
+                } else {
+                    try {
+                        ctx.drawImage(source, 0, 0, mediaCanvas.width, mediaCanvas.height);
+                    } catch (e) {
+                        canvasAnimationFrame = requestAnimationFrame(render);
+                        return;
+                    }
+                }
+
+                if (chroma.enabled) {
+                    const imageData = ctx.getImageData(0, 0, mediaCanvas.width, mediaCanvas.height);
+                    const data = imageData.data;
+                    for (let i = 0; i < data.length; i += 4) {
+                        const dr = data[i] - target.r;
+                        const dg = data[i + 1] - target.g;
+                        const db = data[i + 2] - target.b;
+                        if (Math.sqrt(dr * dr + dg * dg + db * db) <= tolerance) {
+                            data[i + 3] = 0;
+                        }
+                    }
+                    ctx.putImageData(imageData, 0, 0);
+                }
+
+                canvasAnimationFrame = requestAnimationFrame(render);
+            }
+
+            canvasAnimationFrame = requestAnimationFrame(render);
+        }
+
+        function loadMedia(payload) {
+            const filePath = typeof payload === 'string' ? payload : payload?.path;
             if (!filePath) return;
 
             currentGifPath = filePath;
-            const imgUrl = `file:///${filePath.replace(/\\/g, '/')}`;
+            currentMediaType = (typeof payload === 'object' && payload.mediaType) || inferMediaType(filePath);
+            currentSettings = (typeof payload === 'object' && payload.settings) || currentSettings || {};
+            const mediaUrl = toFileUrl(filePath);
 
+            hideAllMediaSurfaces();
+
+            if (currentMediaType === 'video') {
+                activeMediaElement = gifVideo;
+                gifVideo.onloadedmetadata = () => {
+                    ipcRenderer.send('gif-overlay-media-loaded', {
+                        id: overlayId,
+                        path: filePath,
+                        sourcePath: filePath,
+                        mediaType: currentMediaType,
+                        naturalWidth: gifVideo.videoWidth || 320,
+                        naturalHeight: gifVideo.videoHeight || 180
+                    });
+                    gifContainer.classList.remove('no-image');
+                    gifVideo.style.display = 'block';
+                    applyMediaSettings(currentSettings);
+                    const start = Number(currentSettings.audio?.start || 0);
+                    if (start > 0) gifVideo.currentTime = start;
+                    gifVideo.play().catch(() => { });
+                };
+                gifVideo.onerror = () => {
+                    console.error(`[Media Overlay #${overlayId}] Gagal memuat video: ${filePath}`);
+                    gifContainer.classList.add('no-image');
+                };
+                gifVideo.src = mediaUrl;
+                gifVideo.loop = true;
+                return;
+            }
+
+            if (currentMediaType === 'audio') {
+                activeMediaElement = gifAudio;
+                audioLabel.textContent = filePath.split(/[\\/]/).pop() || 'Audio Overlay';
+                gifAudio.onloadedmetadata = () => {
+                    ipcRenderer.send('gif-overlay-media-loaded', {
+                        id: overlayId,
+                        path: filePath,
+                        sourcePath: filePath,
+                        mediaType: currentMediaType,
+                        naturalWidth: 260,
+                        naturalHeight: 80
+                    });
+                    gifContainer.classList.remove('no-image');
+                    audioBadge.style.display = 'flex';
+                    applyMediaSettings(currentSettings);
+                    const start = Number(currentSettings.audio?.start || 0);
+                    if (start > 0) gifAudio.currentTime = start;
+                    gifAudio.play().catch(() => { });
+                };
+                gifAudio.onerror = () => {
+                    console.error(`[Media Overlay #${overlayId}] Gagal memuat audio: ${filePath}`);
+                    gifContainer.classList.add('no-image');
+                };
+                gifAudio.src = mediaUrl;
+                gifAudio.loop = true;
+                return;
+            }
+
+            activeMediaElement = gifImage;
             const tempImg = new Image();
             tempImg.onload = () => {
                 const naturalWidth = tempImg.naturalWidth;
                 const naturalHeight = tempImg.naturalHeight;
 
-                ipcRenderer.send('gif-overlay-image-loaded', {
+                ipcRenderer.send('gif-overlay-media-loaded', {
                     id: overlayId,
                     path: filePath,
+                    sourcePath: filePath,
+                    mediaType: currentMediaType,
                     naturalWidth: naturalWidth,
                     naturalHeight: naturalHeight
                 });
 
-                gifImage.src = imgUrl;
+                gifImage.src = mediaUrl;
+                gifImage.style.display = 'block';
                 gifContainer.classList.remove('no-image');
+                applyMediaSettings(currentSettings);
 
-                console.log(`[GIF Overlay #${overlayId}] Gambar dimuat: ${filePath} (${naturalWidth}x${naturalHeight})`);
+                console.log(`[Media Overlay #${overlayId}] Media dimuat: ${filePath} (${naturalWidth}x${naturalHeight})`);
             };
             tempImg.onerror = () => {
-                console.error(`[GIF Overlay #${overlayId}] Gagal memuat gambar: ${filePath}`);
+                console.error(`[Media Overlay #${overlayId}] Gagal memuat gambar: ${filePath}`);
                 gifContainer.classList.add('no-image');
             };
-            tempImg.src = imgUrl;
+            tempImg.src = mediaUrl;
+        }
+
+        function loadGif(filePath) {
+            loadMedia({ path: filePath, mediaType: inferMediaType(filePath), settings: currentSettings });
         }
 
         // === HOVER DETECTION ===
@@ -331,7 +606,6 @@
             if (gifContainer.classList.contains('no-image')) return;
 
             isDragging = true;
-            dragStartMouse = { x: e.screenX, y: e.screenY };
             gifContainer.classList.add('dragging');
             gifContainer.classList.remove('hovered');
 
@@ -345,64 +619,57 @@
             e.stopPropagation();
 
             isResizing = true;
-            resizeStartMouse = { x: e.screenX, y: e.screenY };
             gifContainer.classList.add('dragging');
             document.body.style.cursor = 'nwse-resize';
 
             ipcRenderer.send('gif-overlay-resize-start', overlayId);
         });
 
+        function finishDrag() {
+            if (!isDragging) return;
+
+            isDragging = false;
+            gifContainer.classList.remove('dragging');
+            ipcRenderer.send('gif-overlay-drag-end', overlayId);
+        }
+
+        function finishResize() {
+            if (!isResizing) return;
+
+            isResizing = false;
+            gifContainer.classList.remove('dragging');
+            document.body.style.cursor = '';
+            // Hentikan polling main process segera setelah tombol mouse dilepas.
+            // Fallback idle di main tetap menangani mouseup yang benar-benar hilang
+            // saat pointer keluar dari window transparent.
+            ipcRenderer.send('gif-overlay-resize-end', overlayId);
+        }
+
         // === GLOBAL MOUSE MOVE & UP ===
         document.addEventListener('mousemove', (e) => {
-            if (isDragging) {
-                const deltaX = e.screenX - dragStartMouse.x;
-                const deltaY = e.screenY - dragStartMouse.y;
-
-                ipcRenderer.send('gif-overlay-drag-move', {
-                    id: overlayId,
-                    deltaX: deltaX,
-                    deltaY: deltaY
-                });
-
-                dragStartMouse = { x: e.screenX, y: e.screenY };
-            }
-
-            if (isResizing) {
-                const deltaX = e.screenX - resizeStartMouse.x;
-                const deltaY = e.screenY - resizeStartMouse.y;
-
-                ipcRenderer.send('gif-overlay-resize-move', {
-                    id: overlayId,
-                    deltaX: deltaX,
-                    deltaY: deltaY
-                });
-
-                resizeStartMouse = { x: e.screenX, y: e.screenY };
-            }
+            // Posisi drag dan ukuran resize dipantau secara global oleh main
+            // process agar satuan koordinatnya selalu sama dengan BrowserWindow.
         });
 
         document.addEventListener('mouseup', () => {
             if (isDragging) {
                 console.log('[GIF Overlay] Drag ended via mouseup');
-                isDragging = false;
-                gifContainer.classList.remove('dragging');
-                ipcRenderer.send('gif-overlay-drag-end', overlayId);
+                finishDrag();
             }
 
             if (isResizing) {
-                // NOTE: Tidak mengirim resize-end ke main process di sini
-                // Karena mouseup sering terkirim saat mouse keluar window (shrinking)
-                // Main process akan handle via idle detection (cursor tidak bergerak 300ms)
-                console.log('[GIF Overlay] Resize mouseup detected (letting main process handle end)');
-                isResizing = false;
-                gifContainer.classList.remove('dragging');
-                document.body.style.cursor = '';
-                // TIDAK mengirim: ipcRenderer.send('gif-overlay-resize-end', overlayId);
+                console.log('[GIF Overlay] Resize ended via mouseup');
+                finishResize();
             }
         });
 
-        // NOTE: Blur handler dihapus karena menyebabkan resize-end dikirim terlalu cepat
-        // saat window kehilangan fokus akibat mouse keluar saat shrinking
+        // Jika mouseup diterima oleh window tetapi tidak melalui document, tetap
+        // hentikan resize. Main process memiliki fallback idle untuk kasus pointer
+        // sudah berada di luar window.
+        window.addEventListener('mouseup', () => {
+            finishDrag();
+            finishResize();
+        });
 
         // === IPC HANDLERS ===
 
@@ -417,18 +684,22 @@
 
             if (Math.abs(diff) < 0.01) {
                 currentProximityOpacity = targetProximityOpacity;
-                gifImage.style.opacity = currentProximityOpacity;
+                [gifImage, gifVideo, mediaCanvas, audioBadge].forEach(el => {
+                    if (el) el.style.opacity = currentProximityOpacity;
+                });
                 opacityAnimationFrame = null;
                 return;
             }
 
             currentProximityOpacity += step;
-            gifImage.style.opacity = currentProximityOpacity;
+            [gifImage, gifVideo, mediaCanvas, audioBadge].forEach(el => {
+                if (el) el.style.opacity = currentProximityOpacity;
+            });
             opacityAnimationFrame = requestAnimationFrame(smoothOpacityTransition);
         }
 
         ipcRenderer.on('gif-overlay-set-image', (event, filePath) => {
-            loadGif(filePath);
+            loadMedia(filePath);
         });
 
         ipcRenderer.on('set-locked', (event, locked) => {
@@ -437,7 +708,9 @@
             if (!locked) {
                 targetProximityOpacity = 1.0;
                 currentProximityOpacity = 1.0;
-                gifImage.style.opacity = 1.0;
+                [gifImage, gifVideo, mediaCanvas, audioBadge].forEach(el => {
+                    if (el) el.style.opacity = 1.0;
+                });
                 if (opacityAnimationFrame) {
                     cancelAnimationFrame(opacityAnimationFrame);
                     opacityAnimationFrame = null;
@@ -450,11 +723,18 @@
             console.log(`[GIF Overlay #${overlayId}] Opacity: ${opacity}`);
         });
 
+        ipcRenderer.on('set-media-effects', (event, settings) => {
+            applyMediaSettings(settings || {});
+        });
+
         // (Rotation & Flip handlers moved up)
 
         ipcRenderer.on('gif-overlay-clear', () => {
             currentGifPath = null;
+            hideAllMediaSurfaces();
             gifImage.src = '';
+            gifVideo.removeAttribute('src');
+            gifAudio.removeAttribute('src');
             gifContainer.classList.add('no-image');
         });
 

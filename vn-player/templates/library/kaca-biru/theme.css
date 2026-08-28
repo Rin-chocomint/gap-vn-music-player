@@ -1,0 +1,313 @@
+/* =============================================================
+ * KACA BIRU - panel bersayap, nama jadi tab.
+ *
+ * Preset ini MENYUSUN ULANG layar cerita tanpa memiliki satu peran pun:
+ * markup-nya tetap milik engine, jadi novelmu terus ikut update. Yang berubah
+ * hanya CSS di berkas ini.
+ *
+ * Empat perubahan susunan:
+ *   1. Kotak teks jadi panel KACA pendek di dasar layar - gradien biru,
+ *      tepi atas terang, dan tekstur gelembung tipis di dalamnya.
+ *   2. Nama pembicara jadi TAB yang menaiki tepi atas panel, di tengah.
+ *   3. Kontrol dibelah DUA SAYAP di sudut bawah panel. Pembagiannya bukan
+ *      selera: kiri = keluar dari cerita (Menu), kanan = menjalankan cerita
+ *      (Mundur/Auto/Riwayat). Dua maksud berbeda, dua sisi berbeda.
+ *   4. Tanda lanjut naik ke sudut kanan-ATAS panel supaya tak bertabrakan
+ *      dengan sayap kanan.
+ *
+ * DUA JEBAKAN yang sudah ditutup di sini, jangan dibuka lagi:
+ *   - `::after` milik kotak dialog SUDAH DIPAKAI engine untuk tanda lanjut.
+ *     Tekstur panel karena itu ditaruh di `::before`; memakai `::after` akan
+ *     menghapus tanda lanjut tanpa pesan apa pun.
+ *   - Engine menulis `bottom` tanda lanjut dengan bobot selektor 0-7-0, jauh
+ *     di atas aturan biasa di berkas ini. Ia dimatikan lewat VARIABEL
+ *     (`--vn-continue-bottom: auto`), lalu `top` ditulis di sini - properti
+ *     yang memang tak pernah disentuh engine.
+ *
+ * Semua selektor memakai `data-player-role` - bukan id. Itu kontraknya
+ * (Tahap 4): kotak dialog buatanmu sendiri tetap kena aturan ini asal ia
+ * membawa perannya.
+ * ============================================================= */
+
+:root {
+    /* --- Palet --- */
+    --kb-ink: #ffffff;
+    --kb-outline: #111c2f;
+    --kb-gold: #f4e0a2;
+    --kb-tab-a: #8264bc;
+    --kb-tab-b: #5e468f;
+    --kb-caret: #f8dcab;
+
+    /* Jarak sayap dari tepi layar. Dipakai kiri dan kanan - satu angka supaya
+       keduanya tetap simetris. */
+    --kb-wing: 8px;
+
+    /* --- Panel kaca (aturan 1) --- */
+    --vn-dialogue-width: 100%;
+    --vn-dialogue-radius: 0px;
+    --vn-dialogue-border: none;
+    --vn-dialogue-bg: rgba(43, 82, 132, 0.66);
+    --vn-dialogue-color: var(--kb-ink);
+    --vn-dialogue-margin-bottom: 0;
+    --vn-dialogue-padding: 18px 11% 40px 5.5%;
+
+    --vn-name-color: #f8ecff;
+    --vn-name-weight: 900;
+    --vn-name-margin: 0;
+
+    /* --- Tanda lanjut (aturan 4) --- */
+    --vn-continue-indicator: "\25C6";
+    --vn-continue-color: var(--kb-gold);
+    --vn-continue-opacity: 0.85;
+    --vn-continue-right: 14px;
+    --vn-continue-bottom: auto;        /* WAJIB - lihat catatan di kepala berkas */
+
+    --vn-typing-cursor: "\2595";
+}
+
+/* WAJIB untuk panel selebar layar. Engine TIDAK menyetel `border-box` di mana
+   pun, jadi `width: 100%` berarti 100% UNTUK ISI SAJA dan padding 11%/5.5%
+   ditambahkan DI LUARNYA - panel jadi ~1491px di layar 1280px, tergeser kiri
+   oleh `align-items: center` milik panggung, dan sisi kanannya terpotong.
+   Tak ada galat apa pun, hanya salah gambar. */
+[data-player-role="dialogue"],
+[data-player-role="btn-hub"],
+[data-player-role="btn-rollback"],
+[data-player-role="btn-auto"],
+[data-player-role="btn-history"] {
+    box-sizing: border-box;
+}
+
+/* --- 1. Panel kaca --- */
+[data-player-role="dialogue"] {
+    min-height: max(20.8vh, 120px);
+    border-top: 2px solid rgba(219, 239, 255, 0.92);
+    border-bottom: 1px solid rgba(216, 234, 252, 0.8);
+    background-image: linear-gradient(180deg,
+        rgba(35, 77, 132, 0.78) 0%,
+        rgba(61, 116, 174, 0.68) 42%,
+        rgba(104, 158, 202, 0.48) 100%);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.32),
+        inset 0 14px 28px rgba(29, 55, 102, 0.18),
+        inset 0 11px 0 -10px rgba(209, 236, 255, 0.23),
+        0 -7px 24px rgba(31, 61, 98, 0.18);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    /* `overflow: visible` WAJIB: tab nama menonjol KELUAR dari panel, dan nilai
+       `hidden` dari mana pun akan memotongnya tanpa pesan apa pun. */
+    overflow: visible;
+}
+
+/* Tekstur gelembung + serat diagonal. Ditaruh di ::before karena ::after sudah
+   milik engine (lihat catatan di kepala berkas). `overflow: visible` di atas
+   membuatnya perlu dikurung sendiri lewat inset + border-radius panel. */
+[data-player-role="dialogue"]::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    opacity: 0.54;
+    pointer-events: none;
+    background:
+        radial-gradient(circle at 13% 24%, rgba(211, 237, 255, 0.32) 0 2px, transparent 3px),
+        radial-gradient(circle at 28% 72%, rgba(218, 240, 255, 0.26) 0 4px, transparent 5px),
+        radial-gradient(circle at 51% 22%, rgba(211, 237, 255, 0.24) 0 3px, transparent 4px),
+        radial-gradient(circle at 72% 78%, rgba(211, 237, 255, 0.27) 0 2px, transparent 3px),
+        radial-gradient(circle at 91% 32%, rgba(211, 237, 255, 0.24) 0 5px, transparent 6px),
+        repeating-linear-gradient(165deg, transparent 0 45px, rgba(225, 244, 255, 0.035) 46px 47px, transparent 48px 92px);
+}
+
+/* --- 2. Nama jadi tab yang menaiki tepi atas panel ---
+ * Menumpang `position: relative` milik kotak dialog (dipasang engine demi
+ * z-index). Kalau suatu saat itu hilang, tab melompat ke tepi layar. */
+[data-player-role="speaker"] {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    z-index: 3;
+    min-width: 92px;
+    padding: 3px 14px 2px;
+    border: 1px solid rgba(234, 218, 255, 0.95);
+    border-bottom: 0;
+    border-radius: 8px 8px 0 0;
+    background: linear-gradient(180deg, var(--kb-tab-a), var(--kb-tab-b));
+    font-size: clamp(0.78rem, 1vw, 1rem);
+    line-height: 1.25;
+    text-align: center;
+    text-shadow: 1px 1px 0 #3d2b63;
+    transform: translate(-50%, -100%);
+}
+
+/* Baris narasi (tanpa pembicara) tak boleh menyisakan tab kosong menggantung.
+   `:empty` yang menjawabnya - nol JavaScript. */
+[data-player-role="speaker"]:empty { display: none; }
+
+[data-player-role="text"] {
+    position: relative;
+    z-index: 2;
+    font-weight: 900;
+    font-size: clamp(1.05rem, 1.7vw, 1.62rem);
+    line-height: 1.38;
+    letter-spacing: 0.008em;
+    text-shadow:
+        2px 2px 0 var(--kb-outline),
+        -1px -1px 0 var(--kb-outline),
+        1px -1px 0 var(--kb-outline),
+        -1px 1px 0 var(--kb-outline),
+        0 3px 4px rgba(17, 31, 52, 0.72);
+}
+
+[data-player-role="text"].typing::after {
+    color: var(--kb-caret);
+    text-shadow: none;
+}
+
+/* Aturan 4: `top` tak pernah ditulis engine, jadi 0-1-0 di sini sudah cukup. */
+[data-player-role="dialogue"]::after {
+    top: 12px;
+    z-index: 4;
+    font-size: 1.1rem;
+}
+
+/* --- 3. Sayap kanan: kontrol jalannya cerita ---
+ *
+ * Wadah tombolnya TAK punya peran sendiri (hanya anak-anaknya yang punya), jadi
+ * ia dijangkau lewat isinya: "div di dalam panggung yang memuat tombol auto".
+ * Itu tetap diturunkan dari peran - bukan dari id. */
+[data-player-role="stage"] > div:has(> [data-player-role="btn-auto"]) {
+    position: fixed;
+    top: auto;
+    right: var(--kb-wing);
+    bottom: var(--kb-wing);
+    left: auto;
+    z-index: 101;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0;
+}
+
+/* --- 3. Sayap kiri: keluar dari cerita --- */
+[data-player-role="btn-hub"] {
+    top: auto;
+    right: auto;
+    bottom: var(--kb-wing);
+    left: var(--kb-wing);
+    z-index: 101;
+    flex-direction: row-reverse;      /* penanda bundar tetap di sisi luar */
+}
+
+/* Satu bentuk untuk keempat baris kontrol. Isi asli tombol (ikon/emoji)
+   dikecilkan sampai nol lalu label ditulis di ::after - cara ini juga tahan
+   terhadap i18n yang menulis ulang teks tombol. */
+[data-player-role="btn-hub"],
+[data-player-role="btn-rollback"],
+[data-player-role="btn-auto"],
+[data-player-role="btn-history"] {
+    display: flex;
+    width: auto;
+    min-width: 88px;
+    height: 29px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 6px 0 5px;
+    border-radius: 0;
+    background: transparent;
+    color: #fffdf8;
+    cursor: pointer;
+    font-size: 0;
+    animation: none;                  /* cabut denyut bawaan tombol AUTO */
+    transition: color 150ms ease, transform 150ms ease, filter 150ms ease;
+}
+
+[data-player-role="btn-hub"]::after,
+[data-player-role="btn-rollback"]::after,
+[data-player-role="btn-auto"]::after,
+[data-player-role="btn-history"]::after {
+    font-size: clamp(0.74rem, 1vw, 0.96rem);
+    font-weight: 900;
+    line-height: 1;
+    text-shadow: 1px 1px 0 #1a2036, -1px -1px 0 #1a2036;
+}
+
+[data-player-role="btn-rollback"]::after { content: "Mundur"; }
+[data-player-role="btn-auto"]::after     { content: "Auto"; }
+[data-player-role="btn-history"]::after  { content: "Riwayat"; }
+[data-player-role="btn-hub"]::after      { content: "Menu"; }
+
+/* Penanda bundar separuh terisi - ciri khas rujukannya. */
+[data-player-role="btn-hub"]::before,
+[data-player-role="btn-rollback"]::before,
+[data-player-role="btn-auto"]::before,
+[data-player-role="btn-history"]::before {
+    content: "";
+    width: 14px;
+    height: 14px;
+    flex: 0 0 auto;
+    margin-left: 8px;
+    border: 2px solid var(--kb-gold);
+    border-radius: 50%;
+    background: linear-gradient(90deg, var(--kb-gold) 0 47%, transparent 48% 100%);
+    box-shadow: 1px 1px 0 #392e41, inset 1px 0 0 rgba(255, 255, 255, 0.58);
+}
+
+[data-player-role="btn-rollback"]:hover,
+[data-player-role="btn-auto"]:hover,
+[data-player-role="btn-history"]:hover {
+    background: transparent;
+    color: #dff5ff;
+    filter: brightness(1.18);
+    transform: translateX(-2px);      /* sayap kanan bergerak ke dalam */
+}
+
+[data-player-role="btn-hub"]:hover {
+    background: transparent;
+    color: #dff5ff;
+    filter: brightness(1.18);
+    transform: translateX(2px);       /* sayap kiri bergerak ke dalam */
+}
+
+[data-player-role="btn-auto"].active::before {
+    background: var(--kb-gold);
+}
+
+[data-player-role="btn-rollback"].disabled {
+    opacity: 0.32;
+    pointer-events: none;
+}
+
+/* CATATAN JUJUR: Simpan/Muat/Pengaturan TIDAK ikut sayap ini. Di markup engine
+   ketiganya tinggal DI DALAM overlay riwayat yang `display: none`, dan anak dari
+   elemen yang disembunyikan tak bisa ditampilkan lewat CSS mana pun. Jalurnya
+   tetap: Riwayat -> Save/Load/Setting. */
+
+/* --- Pilihan: kaca senada panel --- */
+:root {
+    --vn-choice-bg: rgba(35, 77, 132, 0.82);
+    --vn-choice-color: #ffffff;
+    --vn-choice-border: 2px solid rgba(219, 239, 255, 0.85);
+    --vn-choice-radius: 6px;
+    --vn-choice-hover-bg: rgba(244, 224, 162, 0.92);
+    --vn-choice-hover-color: #16304f;
+}
+
+/* --- Kosakata yang lahir dari CSS (D8) ---
+ * Panel ini pendek, jadi tokoh boleh berdiri lebih rendah dan lebih lebar
+ * daripada bawaan. Posisi di bawah langsung muncul di dropdown "Posisi Sprite"
+ * editor tanpa didaftarkan ke mana pun. */
+:root {
+    --vn-pos-kaca-kiri: 24%;
+    --vn-pos-kaca-kanan: 76%;
+    --vn-sprite-base-height: 82vh;
+}
+
+@keyframes kacaBiruMasuk {
+    from { opacity: 0; filter: blur(4px); }
+    to   { opacity: 1; filter: none; }
+}
+
+/* Awalan `anim-in-` = hanya diputar saat sprite benar-benar baru muncul. */
+.anim-in-kaca-jernih {
+    animation: kacaBiruMasuk 0.5s ease-out forwards;
+}

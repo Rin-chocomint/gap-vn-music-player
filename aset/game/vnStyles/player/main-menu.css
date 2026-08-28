@@ -1,0 +1,798 @@
+        /* ======================= Main Screen (Layar Utama) ========================== */
+        body {
+            background-color: black;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            position: relative;
+        }
+
+        .background-video {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: -1;
+            opacity: 0;
+            transition: opacity 1s ease;
+        }
+
+        /* ----------------------- Navbar ----------------------- */
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 60px;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 999;
+        }
+
+        .navbar h1 {
+            font-size: 1.5rem;
+            cursor: default;
+            margin-left: 20px;
+        }
+
+        .layout-switch {
+            position: absolute;
+            top: 50%;
+            left: calc(230px + 0.5rem);
+            transform: translateY(-50%);
+        }
+
+        #switchLayoutBtn {
+            background-color: transparent;
+            border: 1px solid white;
+            color: white;
+            padding: 5px 10px;
+            font-size: 0.7rem;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        #switchLayoutBtn:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .navbar .search-container {
+            display: flex;
+            align-items: center;
+        }
+
+        .navbar input[type="text"] {
+            padding: 6px 10px;
+            border: 1px solid #444;
+            border-radius: 5px;
+            background: #222;
+            color: #eee;
+            margin-right: 10px;
+            width: 200px;
+            transition: all 0.3s ease;
+        }
+
+        .navbar input[type="text"]:focus {
+            outline: none;
+            border-color: #00ffff;
+        }
+
+        .navbar button {
+            padding: 6px 12px;
+            background: #00ffff;
+            color: #000;
+            font-weight: 600;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .navbar button:hover {
+            background: #00cccc;
+        }
+
+        /* -------------------- End Navbar -------------------- */
+
+        .menu-container {
+            width: 100%;
+            max-width: 100%;
+            margin: 0 auto;
+            text-align: center;
+            padding: 60px 40px;
+            padding-bottom: 480px;
+            z-index: 0;
+            box-sizing: border-box;
+            /* Scroll pintar: hanya muncul saat diperlukan */
+            height: 100vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        /* Sembunyikan scroll saat carousel-layout aktif */
+        .menu-container:has(.carousel-layout) {
+            overflow: hidden;
+            padding-bottom: 0;
+        }
+
+        /* Styling scrollbar untuk tampilan yang lebih baik */
+        .menu-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .menu-container::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+
+        .menu-container::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+            transition: background 0.3s ease;
+        }
+
+        .menu-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .menu-title {
+            margin-bottom: 30px;
+            text-align: center;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
+        /* ----------------------- Story Grid & Card ----------------------- */
+        .story-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 30px;
+            width: 100%;
+            margin: 0 auto;
+            overflow: visible;
+            padding: 0 20px;
+        }
+
+        /* Responsive: Large Desktop (1600px and above) */
+        @media screen and (min-width: 1600px) {
+            .story-grid {
+                grid-template-columns: repeat(5, 1fr);
+                max-width: 1600px;
+                margin-left: auto;
+                margin-right: auto;
+            }
+        }
+
+        /* Responsive: Standard Desktop (1280px - 1599px) */
+        @media screen and (min-width: 1280px) and (max-width: 1599px) {
+            .story-grid {
+                grid-template-columns: repeat(4, 1fr);
+                max-width: 1400px;
+                margin-left: auto;
+                margin-right: auto;
+            }
+        }
+
+        /* Responsive: Compact Desktop (1024px - 1279px) */
+        @media screen and (min-width: 1024px) and (max-width: 1279px) {
+            .story-grid {
+                grid-template-columns: repeat(3, 1fr);
+                max-width: 1100px;
+                margin-left: auto;
+                margin-right: auto;
+            }
+
+            .menu-title {
+                font-size: 2em;
+            }
+
+            .menu-container {
+                padding: 50px 30px;
+            }
+        }
+
+        /* Novel tanpa berkas cover: dulu kartunya diberi `background-image` ke
+           `cover.jpg` yang tak ada (404 senyap). Sekarang renderer tak menebak lagi,
+           jadi kartu butuh latar penggantinya sendiri — tanpa ini ia jadi transparan. */
+        .story-card.no-cover {
+            background-image: linear-gradient(145deg, #2a2f3a 0%, #1b1f27 100%);
+        }
+
+        .story-card {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 3 / 4;
+            min-height: 320px;
+            max-height: 450px;
+            background-size: cover;
+            background-position: center;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            cursor: pointer;
+        }
+
+        /* Responsive story card height untuk berbagai ukuran desktop */
+        @media screen and (min-width: 1600px) {
+            .story-card {
+                max-height: 480px;
+            }
+        }
+
+        @media screen and (min-width: 1280px) and (max-width: 1599px) {
+            .story-card {
+                max-height: 420px;
+            }
+        }
+
+        @media screen and (min-width: 1024px) and (max-width: 1279px) {
+            .story-card {
+                max-height: 380px;
+                min-height: 300px;
+            }
+        }
+
+        .story-card:hover {
+            transform: scale(1.04);
+            box-shadow: 0 8px 20px rgba(0, 255, 255, 0.7);
+        }
+
+        .delete-novel-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(0, 0, 0, 0.6);
+            color: #ff4d4d;
+            border: 1px solid #ff4d4d;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0;
+            transition: all 0.2s ease;
+            z-index: 990;
+            font-size: 16px;
+        }
+
+        .story-card:hover .delete-novel-btn {
+            opacity: 1;
+        }
+
+        .delete-novel-btn:hover {
+            background-color: #ff4d4d;
+            color: white;
+            transform: scale(1.1);
+        }
+
+        /* Responsive hover effect */
+        @media screen and (min-width: 1600px) {
+            .story-card:hover {
+                transform: scale(1.06);
+                box-shadow: 0 8px 24px rgba(0, 255, 255, 0.8);
+            }
+        }
+
+        @media screen and (min-width: 1024px) and (max-width: 1279px) {
+            .story-card:hover {
+                transform: scale(1.03);
+                box-shadow: 0 6px 16px rgba(0, 255, 255, 0.6);
+            }
+        }
+
+        .grid-layout {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 20px;
+            width: 100%;
+            margin: 0 auto;
+            overflow: visible;
+            padding: 0 20px;
+        }
+
+        .carousel-layout {
+            position: relative;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            margin: 0 auto;
+            overflow: visible;
+            padding: 50px 40px;
+            transition: transform 0.5s ease;
+            box-sizing: border-box;
+        }
+
+        /* Responsive carousel gap dan padding */
+        @media screen and (min-width: 1600px) {
+            .carousel-layout {
+                gap: 30px;
+                padding: 50px 60px;
+            }
+        }
+
+        @media screen and (min-width: 1280px) and (max-width: 1599px) {
+            .carousel-layout {
+                gap: 25px;
+                padding: 50px 50px;
+            }
+        }
+
+        @media screen and (min-width: 1024px) and (max-width: 1279px) {
+            .carousel-layout {
+                gap: 20px;
+                padding: 40px 30px;
+            }
+        }
+
+        .carousel-layout .story-card {
+            flex: 0 0 auto;
+            width: 240px;
+            aspect-ratio: 3 / 4;
+            margin: 0;
+            transition: transform 0.3s ease;
+            overflow: hidden;
+            border-radius: 10px;
+        }
+
+        /* Responsive carousel card width */
+        @media screen and (min-width: 1600px) {
+            .carousel-layout .story-card {
+                width: 280px;
+            }
+        }
+
+        @media screen and (min-width: 1280px) and (max-width: 1599px) {
+            .carousel-layout .story-card {
+                width: 260px;
+            }
+        }
+
+        @media screen and (min-width: 1024px) and (max-width: 1279px) {
+            .carousel-layout .story-card {
+                width: 240px;
+            }
+        }
+
+        /* -------------- Tombol Arrow Carousel --------------- */
+        .carousel-arrow {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(0, 0, 0, 0.6);
+            border: none;
+            color: #fff;
+            font-size: 0.9em;
+            padding: 12px 16px;
+            cursor: pointer;
+            border-radius: 6px;
+            z-index: 1000;
+            transition: background 0.3s ease, transform 0.2s ease;
+            min-width: 44px;
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .carousel-arrow:hover {
+            background: rgba(0, 0, 0, 0.9);
+            transform: translateY(-50%) scale(1.1);
+        }
+
+        .carousel-arrow:active {
+            transform: translateY(-50%) scale(0.95);
+        }
+
+        .carousel-arrow.left {
+            left: 15px;
+        }
+
+        .carousel-arrow.right {
+            right: 15px;
+        }
+
+        /* Responsive carousel arrow positioning dan ukuran */
+        @media screen and (min-width: 1600px) {
+            .carousel-arrow {
+                font-size: 1em;
+                padding: 14px 18px;
+            }
+
+            .carousel-arrow.left {
+                left: 25px;
+            }
+
+            .carousel-arrow.right {
+                right: 25px;
+            }
+        }
+
+        @media screen and (min-width: 1280px) and (max-width: 1599px) {
+            .carousel-arrow {
+                font-size: 0.95em;
+                padding: 13px 17px;
+            }
+
+            .carousel-arrow.left {
+                left: 20px;
+            }
+
+            .carousel-arrow.right {
+                right: 20px;
+            }
+        }
+
+        @media screen and (min-width: 1024px) and (max-width: 1279px) {
+            .carousel-arrow {
+                font-size: 0.85em;
+                padding: 11px 15px;
+            }
+
+            .carousel-arrow.left {
+                left: 10px;
+            }
+
+            .carousel-arrow.right {
+                right: 10px;
+            }
+        }
+
+        /* -------------- End Tombol Arrow Carousel --------------- */
+
+        /* --------- Carousel Arrow Container --------- */
+        .carousel-arrow-container {
+            position: relative;
+            width: 100%;
+            height: 0;
+            pointer-events: none;
+        }
+
+        .carousel-arrow-container .carousel-arrow {
+            pointer-events: auto;
+        }
+
+        /* --------- End Carousel Arrow Container --------- */
+
+        /* -------------------- Efek Kartu Tengah -------------------- */
+        .story-card.centered {
+            transform: scale(1.08);
+            z-index: 2;
+            transition: transform 0.3s ease, z-index 0.3s ease;
+        }
+
+        /* Responsive centered card scale */
+        @media screen and (min-width: 1600px) {
+            .story-card.centered {
+                transform: scale(1.12);
+            }
+        }
+
+        @media screen and (min-width: 1024px) and (max-width: 1279px) {
+            .story-card.centered {
+                transform: scale(1.05);
+            }
+        }
+
+        .story-card .play-button {
+            display: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .story-card.centered .play-button {
+            display: inline-block;
+            opacity: 1;
+        }
+
+        .overlay {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.85), transparent 50%);
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            padding: 20px;
+            color: white;
+            text-align: center;
+            z-index: 1;
+            box-sizing: border-box;
+            /* Transisi halus untuk efek hover */
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        /* Grid layout: sembunyikan overlay secara default */
+        .story-grid:not(.carousel-layout) .story-card .overlay {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        /* Grid layout: tampilkan overlay saat hover */
+        .story-grid:not(.carousel-layout) .story-card:hover .overlay {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Carousel layout: overlay selalu terlihat */
+        .carousel-layout .story-card .overlay {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .story-title {
+            font-size: 1.1em;
+            margin-bottom: 8px;
+            line-height: 1.2;
+            font-weight: 600;
+        }
+
+        /* Responsive title sizing */
+        @media screen and (min-width: 1600px) {
+            .story-title {
+                font-size: 1.2em;
+                margin-bottom: 10px;
+            }
+        }
+
+        @media screen and (min-width: 1024px) and (max-width: 1279px) {
+            .story-title {
+                font-size: 1em;
+                margin-bottom: 6px;
+            }
+        }
+
+        .story-desc {
+            font-size: 0.85em;
+            color: #bdc3c7;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            line-height: 1.3;
+        }
+
+        /* Responsive description sizing */
+        @media screen and (min-width: 1600px) {
+            .story-desc {
+                font-size: 0.9em;
+            }
+        }
+
+        @media screen and (min-width: 1024px) and (max-width: 1279px) {
+            .story-desc {
+                font-size: 0.8em;
+                -webkit-line-clamp: 1;
+            }
+        }
+
+        /* ----------------------- Tombol Play ----------------------- */
+        .play-button {
+            display: inline-block;
+            position: relative;
+            padding: 8px 18px;
+            font-size: 0.95em;
+            color: white;
+            background: transparent;
+            border: 2px solid rgba(255, 255, 255, 0.6);
+            border-radius: 50px;
+            text-decoration: none;
+            margin-top: 8px;
+            overflow: hidden;
+            transition: color 0.3s ease, border-color 0.3s ease;
+            white-space: nowrap;
+        }
+
+        /* Responsive play button */
+        @media screen and (min-width: 1600px) {
+            .play-button {
+                padding: 10px 20px;
+                font-size: 1em;
+                margin-top: 10px;
+            }
+        }
+
+        @media screen and (min-width: 1024px) and (max-width: 1279px) {
+            .play-button {
+                padding: 7px 16px;
+                font-size: 0.9em;
+                margin-top: 6px;
+            }
+        }
+
+        .play-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 200%;
+            height: 100%;
+            background: linear-gradient(120deg, rgba(255, 255, 255, 0.8), transparent, rgba(255, 255, 255, 0.8));
+            z-index: -1;
+            opacity: 0;
+            transform: skewX(-20deg);
+            transition: opacity 0.3s ease;
+        }
+
+        .play-button:hover {
+            border-color: rgba(255, 255, 255, 0.8);
+        }
+
+        .play-button:hover::before {
+            opacity: 1;
+            animation: waveSwipe 1s ease-in-out forwards;
+        }
+
+        .play-button:active {
+            transform: scale(0.95);
+        }
+
+        @keyframes waveSwipe {
+            0% {
+                left: -100%;
+            }
+
+            50% {
+                left: 0;
+            }
+
+            100% {
+                left: 100%;
+            }
+        }
+
+        /* ----------------------- End Tombol Play ----------------------- */
+        .video-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.2);
+            pointer-events: none;
+            z-index: -1;
+            opacity: 0;
+            transition: opacity 1s ease;
+        }
+
+        /* ----------------------- Version Info ----------------------- */
+        #version-info {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            font-size: 1rem;
+            color: rgba(255, 255, 255, 0.8);
+            padding: 5px 10px;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        /* ----------------------- End Version Info ----------------------- */
+
+
+        /* ----------------------- End Exit Animations ----------------------- */
+        @keyframes moveTopLeft {
+            0% {
+                transform: translate(0, 0) scale(1);
+                opacity: 1;
+            }
+
+            100% {
+                transform: translate(-150%, -150%) scale(1.1);
+                opacity: 0;
+            }
+        }
+
+        @keyframes moveTopRight {
+            0% {
+                transform: translate(0, 0) scale(1);
+                opacity: 1;
+            }
+
+            100% {
+                transform: translate(150%, -150%) scale(1.1);
+                opacity: 0;
+            }
+        }
+
+        @keyframes moveBottomLeft {
+            0% {
+                transform: translate(0, 0) scale(1);
+                opacity: 1;
+            }
+
+            100% {
+                transform: translate(-150%, 150%) scale(1.1);
+                opacity: 0;
+            }
+        }
+
+        @keyframes moveBottomRight {
+            0% {
+                transform: translate(0, 0) scale(1);
+                opacity: 1;
+            }
+
+            100% {
+                transform: translate(150%, 150%) scale(1.1);
+                opacity: 0;
+            }
+        }
+
+        .story-card.move-top-left {
+            animation: moveTopLeft 0.6s ease forwards;
+        }
+
+        .story-card.move-top-right {
+            animation: moveTopRight 0.6s ease forwards;
+        }
+
+        .story-card.move-bottom-left {
+            animation: moveBottomLeft 0.6s ease forwards;
+        }
+
+        .story-card.move-bottom-right {
+            animation: moveBottomRight 0.6s ease forwards;
+        }
+
+        @keyframes zoomIn {
+            0% {
+                transform: scale(1);
+            }
+
+            100% {
+                transform: scale(1.15);
+            }
+        }
+
+        .story-card.focused {
+            animation: zoomIn 0.6s ease forwards;
+        }
+
+        @keyframes scaleFade {
+            0% {
+                transform: scale(1.15);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(1.3);
+                opacity: 0;
+            }
+        }
+
+        .story-card.fade-out {
+            animation: scaleFade 0.6s ease forwards;
+        }
+
+        @keyframes fadeOut {
+            0% {
+                opacity: 1;
+            }
+
+            100% {
+                opacity: 0;
+            }
+        }
+
+        .page-fade-out {
+            animation: fadeOut 0.6s ease forwards;
+        }
+
+        /* ----------------------- End Exit Animations ----------------------- */

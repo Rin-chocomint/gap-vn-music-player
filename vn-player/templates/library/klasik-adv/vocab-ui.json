@@ -1,0 +1,12 @@
+{
+  "_catatan": "Menamai kosakata milik template ini (§27). Peta ini PRESENTASI saja — ia tak menambah kosakata, hanya memberi label & grup untuk yang sudah dideklarasikan theme.css. Kunci berawalan _ diabaikan.",
+
+  "position": {
+    "panggung-kiri": { "label": "Panggung Kiri", "group": "Klasik ADV" },
+    "panggung-kanan": { "label": "Panggung Kanan", "group": "Klasik ADV" }
+  },
+
+  "anim": {
+    "anim-in-adv-melangkah": { "label": "Melangkah Masuk", "group": "Klasik ADV" }
+  }
+}

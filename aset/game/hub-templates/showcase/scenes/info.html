@@ -1,0 +1,18 @@
+<!-- ===== Scene: {{SCENE_NAME}} (info) =====
+     Info/sinopsis novel. Dicapai dari menu via goto, kembali via data-action="back".
+     Teks diisi otomatis dari Profil Novel lewat data-bind. -->
+    <section class="hub-scene sc-screen sc-info" data-scene-id="{{SCENE_ID}}" data-scene-type="info" data-scene-name="{{SCENE_NAME}}" data-hub-screen="info">
+      <div class="sc-screen-head">
+        <button type="button" class="sc-btn sc-back" data-node="back-btn" data-action="back">&larr; Kembali</button>
+        <h2 class="sc-screen-title" data-node="title" data-bind="title">Tentang Novel</h2>
+      </div>
+      <div class="sc-info-card" data-node="content">
+        <p class="sc-info-desc" data-node="desc" data-bind="description">Sinopsis novel tampil di sini dari Profil Novel.</p>
+        <dl class="sc-info-meta" data-node="meta">
+          <dt>Genre</dt><dd data-bind="genre">&mdash;</dd>
+          <dt>Penulis</dt><dd data-bind="author">&mdash;</dd>
+          <dt>Ilustrator</dt><dd data-bind="illustrator">&mdash;</dd>
+          <dt>VN Mapper</dt><dd data-bind="vnMapper">&mdash;</dd>
+        </dl>
+      </div>
+    </section>

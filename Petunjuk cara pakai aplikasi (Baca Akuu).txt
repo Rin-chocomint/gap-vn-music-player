@@ -1,0 +1,57 @@
+GAP VN & MUSIC PLAYER | versi: v0.0.0.9 Alpha
+---
+Terima kasih telah mencoba aplikasi kami :
+
+[ CARA MENJALANKAN ]
+1. Download dan Ekstrak seluruh isi file arsip rilis yang kamu unduh ke folder yang sudah kamu siapkan
+2. Jalankan file aplikasi (Gap.exe).
+3. Selamat menikmati!
+
+[ CARA MENAMBAH WALLPAPER ]
+1. Buka folder "resources" lalu buka lagi folder "app" lalu buka lagi folder "aset" lalu buka lagi folder "wallpaper".
+2. Buat folder baru disitu dengan nama yang kamu suka.
+3. Taruh file video/gambar yang ingin kamu jadikan wallpaper aplikasi.
+4. Setelah itu kamu bisa memilih menu dropdown wallpaper saat membuka aplikasi.
+
+Tips tentang wallpaper :
+Kamu bisa membuat video wallpaper kamu muncul di title screen dengan cara melakukan rename untuk menambahkan tanda seru "!"  ke bagian awal nama file video yang mau kamu munculkan ke title screen itu.
+
+Misalnya ada video yang namanya "myKisah.mp4" kamu mau munculkan video itu ke title screen? Tinggal rename saja seperti ini "!myKisah.mp4", ini hanya akan bekerja jika kamu tidak mengaktifkan fitur "skip scene".
+
+[ CARA MENAMBAH MUSIK LOKAL ]
+Untuk menambah musik lokal ikuti cara ini :
+1. Buka folder "resources" lalu buka lagi folder "app" lalu buka lagi folder "aset" lalu buka lagi folder "music".
+2. Buat folder baru disitu dengan nama yang kamu suka.
+3. Taruh file music misalnya .mp3 yang ingin kamu jadikan musik lokal aplikasi.
+4. Setelah itu kamu bisa memilih menu dropdown Playlist saat membuka aplikasi.
+
+Tips tentang musik lokal :
+Kamu bisa menyeting musik lokal kamu agar jadi default musik dengan cara yang mirip seperti tips wallpaper tadi, caranya yaitu melakukan rename untuk menambahkan tanda seru "!"  ke bagian awal nama file .mp3 yang mau kamu jadikan musik default/diputar pertama kali itu.
+
+misalnya dari "musikk.mp3" jadi "!musikk.mp3"
+
+[ CARA Mendengarkan musik online dari boot mode game]
+ini menu nya agak tersembunyi, kamu bisa expand saja musik playernya lalu arahkan kursor ke area sebelah
+kiri area Volume, nanti akan ada yang terexpand lagi dan disitu ada tombol untuk membuka webview/musik online.
+
+[ TENTANG PEMBARUAN ]
+Versi ini ada di jalur pra-rilis (alpha), jadi perbaikan datang bertahap.
+Aplikasi akan memeriksa pembaruan sendiri dan menawarkannya lewat jendela
+"Pembaruan Tersedia" — kamu tinggal klik Update, tidak perlu unduh ulang
+semuanya. Sesekali ada pembaruan besar yang tetap butuh unduh arsip penuh;
+kalau itu terjadi, jendelanya akan bilang dan mengarahkanmu ke halaman rilis.
+
+Karya buatanmu aman saat update: folder novel, musik, wallpaper, karakter,
+dan save game tidak pernah disentuh proses pembaruan.
+
+[ CATATAN ALPHA ]
+Ini rilis alpha. Masih mungkin ada bug, dan bentuk sebagian fitur bisa berubah
+di versi berikutnya. Kalau menemukan yang aneh, kabari kami lewat halaman repo
+supaya bisa diperbaiki di cicilan berikutnya.
+
+[ LISENSI ]
+Engine ini bersifat Open Source (ISC License, Modified).
+Lihat file LICENSE untuk detail penggunaan kode.
+
+============================================================
+(c) 2026 Rd Chocomint / Rin Chocomint.

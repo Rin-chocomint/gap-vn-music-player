@@ -1,0 +1,15 @@
+# Git TIDAK BOLEH menyentuh akhir baris di repo ini.
+#
+# Updater Tier-1 mengunduh berkas mentah dari raw.githubusercontent lalu
+# mencocokkan SHA-256-nya dengan hash di versions.json — dan hash itu dihitung
+# dari berkas seperti adanya di disk saat `npm run update-hashes` dijalankan.
+#
+# Kalau git mengonversi LF <-> CRLF (core.autocrlf aktif di mesin ini), byte di
+# disk dan byte yang disajikan raw jadi berbeda. Hash tidak akan pernah cocok,
+# dan applyUpdate membatalkan SELURUH pembaruan pada fase verifikasi — bukan
+# satu berkas, semuanya. Gejalanya: "Hash tidak cocok (file rusak/diubah di
+# server)" untuk berkas yang sebenarnya baik-baik saja.
+#
+# `-text` mematikan konversi untuk semua berkas, jadi disk == git == raw di
+# mesin mana pun, apa pun setelan core.autocrlf pemiliknya.
+* -text

@@ -1,0 +1,37 @@
+{
+    "_comment": "Contoh extension.json — manifest untuk extension VN Engine",
+    "_comment2": "Taruh file ini di folder extensions/ bersama file JS extension",
+
+    "name": "example-extensions",
+    "version": "1.0.0",
+    "description": "Contoh extension: custom effect (rainbow_flash), custom transition (fade_red), dan accessibility hooks",
+    "author": "Gap VN Engine Team",
+
+    "main": "custom-effect.js",
+    "files": [
+        "fade-red.js",
+        "settings-hook.js"
+    ],
+
+    "permissions": [
+        "effect",
+        "transition",
+        "hook",
+        "dom",
+        "audio",
+        "storage"
+    ],
+
+    "effects": [
+        "rainbow_flash"
+    ],
+
+    "transitions": [
+        "fade_red"
+    ],
+
+    "hooks": [
+        "player:settings-render",
+        "player:before-dialogue"
+    ]
+}

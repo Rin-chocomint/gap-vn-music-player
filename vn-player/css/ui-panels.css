@@ -1,0 +1,381 @@
+/* =============================================
+ * VN Player — UI Panels
+ * Backlog, settings modal, chapter end screen
+ * ============================================= */
+
+/* === BACKLOG OVERLAY === */
+#backlog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: var(--vn-backlog-bg);
+    z-index: 200;
+    color: white;
+    padding: 50px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#backlog-content {
+    width: 80%;
+    max-width: 800px;
+    height: 80%;
+    overflow-y: auto;
+    padding-right: 20px;
+    border-bottom: 1px solid #555;
+    margin-bottom: 20px;
+}
+
+#backlog-content p {
+    margin-bottom: 15px;
+    line-height: 1.6;
+}
+
+#backlog-content strong {
+    color: var(--vn-backlog-speaker-color);
+    display: block;
+    margin-bottom: 5px;
+}
+
+.backlog-controls {
+    display: flex;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.menu-button {
+    padding: 10px 30px;
+    font-size: 1rem;
+    border: 1px solid white;
+    background-color: transparent;
+    color: white;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: all 0.2s ease;
+}
+
+.menu-button:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
+}
+
+/* === LAYAR AKHIR CHAPTER (scene "end" milik player bawaan) ===
+   Dipatok ke KELAS `.vn-end-screen`, bukan ke `#chapter-end-screen`, dan
+   tombolnya ke `data-scene-action`, bukan ke id tetap. Sebabnya: selama gaya ini
+   menempel pada id milik engine, layar akhir tidak pernah benar-benar bisa
+   dimiliki player lain — mau tak mau markup engine harus ikut dibawa.
+   Sekarang ini gaya sebuah SCENE. Player mana pun boleh memakai kelas ini untuk
+   dapat tampilan bawaan, atau mengabaikannya dan menulis gayanya sendiri.
+
+   Posisi/opacity/z-index datang dari aturan `[data-player-scene]` milik
+   VNPlayer.scene — TIDAK diulang di sini supaya tak ada dua sumber kebenaran
+   soal kapan sebuah scene terlihat. */
+.vn-end-screen {
+    background-color: var(--vn-end-bg);
+    backdrop-filter: blur(var(--vn-end-blur));
+    -webkit-backdrop-filter: blur(var(--vn-end-blur));
+    color: white;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
+.vn-end-screen h2,
+.vn-end-screen button {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+
+.vn-end-screen.vn-scene-active h2,
+.vn-end-screen.vn-scene-active button {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Animasi masuk bertahap — urutannya mengikuti PERAN tombol (data-scene-action),
+   jadi ending buatan kreator yang memakai konvensi yang sama ikut mendapatkannya. */
+.vn-end-screen.vn-scene-active h2 { transition-delay: 0.5s; }
+.vn-end-screen.vn-scene-active [data-scene-action="next"] { transition-delay: 0.8s; }
+.vn-end-screen.vn-scene-active [data-scene-action="replay"] { transition-delay: 1.0s; }
+.vn-end-screen.vn-scene-active [data-scene-action="hub"] { transition-delay: 1.2s; }
+
+.vn-end-screen h2 {
+    font-size: var(--vn-end-title-size);
+    margin-bottom: 30px;
+}
+
+.vn-end-screen button {
+    padding: 15px 25px;
+    background-color: var(--vn-choice-bg);
+    color: white;
+    border: var(--vn-choice-border);
+    border-radius: var(--vn-choice-radius);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: var(--vn-choice-font-size);
+    width: var(--vn-end-button-width);
+    margin-top: 15px;
+}
+
+.vn-end-screen button:hover {
+    background-color: var(--vn-choice-hover-bg);
+    color: var(--vn-choice-hover-color);
+    transform: scale(var(--vn-choice-hover-scale));
+}
+
+/* === SETTINGS MODAL === */
+#settings-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--vn-settings-bg);
+    z-index: 350;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--vn-settings-text);
+    font-family: var(--vn-font-family);
+    backdrop-filter: blur(5px);
+}
+
+.settings-container {
+    background: var(--vn-settings-container-bg);
+    border-radius: 16px;
+    padding: 35px 45px;
+    min-width: 420px;
+    max-width: 500px;
+    border: 1px solid var(--vn-settings-border);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+.settings-title {
+    font-size: 1.6rem;
+    margin-bottom: 30px;
+    text-align: center;
+    color: var(--vn-settings-text);
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.settings-group {
+    margin-bottom: 25px;
+}
+
+.settings-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+    color: var(--vn-settings-text-secondary);
+    font-weight: 500;
+}
+
+.settings-label .volume-value {
+    background: var(--vn-settings-tertiary);
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    min-width: 45px;
+    text-align: center;
+    color: var(--vn-settings-text);
+    border: 1px solid var(--vn-settings-border);
+}
+
+/* Slider */
+.settings-slider {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--vn-settings-tertiary);
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+    cursor: pointer;
+    border: 1px solid var(--vn-settings-border);
+}
+
+.settings-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+    transition: transform 0.15s ease, box-shadow 0.2s;
+    border: 2px solid var(--vn-settings-container-bg);
+}
+
+.settings-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+
+/* Warna per slider */
+.settings-slider.bgm-slider::-webkit-slider-thumb { background: var(--vn-settings-bgm-color); box-shadow: none; }
+.settings-slider.bgm-slider { background: rgba(5, 217, 232, 0.1); }
+.settings-slider.voice-slider::-webkit-slider-thumb { background: var(--vn-settings-voice-color); box-shadow: none; }
+.settings-slider.voice-slider { background: rgba(255, 42, 109, 0.1); }
+.settings-slider.sfx-slider::-webkit-slider-thumb { background: var(--vn-settings-sfx-color); box-shadow: none; }
+.settings-slider.sfx-slider { background: rgba(255, 159, 28, 0.1); }
+
+.settings-divider {
+    height: 1px;
+    background: var(--vn-settings-border);
+    margin: 25px 0;
+}
+
+.settings-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 30px;
+}
+
+.settings-btn {
+    padding: 12px 30px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+
+.settings-btn.save-btn {
+    background: var(--vn-settings-accent);
+    color: white;
+    box-shadow: none;
+}
+
+.settings-btn.save-btn:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.settings-btn.close-btn {
+    background: rgba(255, 255, 255, 0.07);
+    color: var(--vn-settings-text-secondary);
+    border: 1px solid var(--vn-settings-border);
+}
+
+.settings-btn.close-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: var(--vn-settings-text);
+}
+
+/* Toggle Switch */
+.settings-toggle-wrapper {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+}
+
+.settings-toggle-label {
+    font-size: 0.95rem;
+    color: var(--vn-settings-text-secondary);
+}
+
+.toggle-switch {
+    position: relative;
+    width: 46px;
+    height: 24px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--vn-settings-tertiary);
+    transition: 0.3s;
+    border-radius: 24px;
+    border: 1px solid var(--vn-settings-border);
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 3px;
+    bottom: 3px;
+    background-color: var(--vn-settings-text-muted);
+    transition: 0.3s;
+    border-radius: 50%;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background-color: rgba(255, 107, 107, 0.2);
+    border-color: var(--vn-settings-accent);
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+    transform: translateX(22px);
+    background-color: var(--vn-settings-accent);
+    box-shadow: none;
+}
+
+.settings-section-title {
+    font-size: 0.75rem;
+    color: var(--vn-settings-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 12px;
+    margin-top: 5px;
+    font-weight: 600;
+}
+
+/* === TOAST NOTIFICATIONS === */
+#vn-toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+}
+
+.vn-toast {
+    pointer-events: auto;
+    padding: 10px 18px;
+    border-radius: 6px;
+    color: #fff;
+    font-size: 14px;
+    opacity: 0;
+    transform: translateX(40px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    max-width: 360px;
+    word-break: break-word;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+.vn-toast.visible {
+    opacity: 1;
+    transform: translateX(0);
+}
+.vn-toast.info    { background: rgba(50,120,200,0.92); }
+.vn-toast.success { background: rgba(40,160,80,0.92); }
+.vn-toast.error   { background: rgba(200,50,50,0.92); }
+.vn-toast.warn    { background: rgba(200,160,30,0.92); color: #222; }

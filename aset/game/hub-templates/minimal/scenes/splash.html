@@ -1,0 +1,12 @@
+<!-- ===== Scene: {{SCENE_NAME}} (splash) =====
+     Layar pembuka. Auto-lanjut sesuai data-duration (ms) atau klik untuk skip.
+     Judul duduk di KIRI BAWAH - sengaja bukan di tengah, supaya keluarga
+     left-rail templat ini sudah terbaca sejak frame pertama. -->
+    <section class="hub-scene hub-scene-boot m-splash" data-scene-id="{{SCENE_ID}}" data-scene-type="splash" data-scene-name="{{SCENE_NAME}}" data-duration="3000">
+      <div class="m-sheet" data-node="content">
+        <h1 class="m-title" data-node="title" data-bind="title">Visual Novel</h1>
+        <div class="m-splash-rule"></div>
+        <p class="m-tagline" data-node="tagline" data-bind="storyDesc"></p>
+      </div>
+      <p class="m-splash-skip" data-node="skip-hint">Klik untuk lanjut &rarr;</p>
+    </section>

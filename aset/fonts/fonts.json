@@ -1,0 +1,53 @@
+{
+  "_catatan": [
+    "Daftar font yang bisa dipilih sebagai FONT GLOBAL NOVEL (Profil Novel > Tampilan).",
+    "",
+    "`bundled` = font yang berkasnya IKUT DIKIRIM bersama aplikasi, jadi novel tampil",
+    "sama persis di komputer mana pun. Menambah satu font = taruh berkas .woff2 di",
+    "folder ini lalu tambahkan satu entri di bawah. TIDAK ada kode yang perlu diubah;",
+    "editor memindai berkas ini.",
+    "",
+    "`stacks` = tumpukan font yang mengandalkan font BAWAAN SISTEM pemain. Nol berkas,",
+    "tapi wujudnya bisa sedikit berbeda antar-komputer — tiap entri karena itu wajib",
+    "mengakhiri `stack`-nya dengan keluarga generik (serif/sans-serif/monospace) supaya",
+    "selalu ada yang tampil. Ini BUKAN 'ketik nama font sendiri': daftarnya kurasi,",
+    "dan tiap tumpukan sudah punya cadangan yang terdefinisi.",
+    "",
+    "`stack` dipakai apa adanya sebagai nilai CSS font-family."
+  ],
+
+  "bundled": [
+    {
+      "id": "lexend",
+      "label": "Lexend",
+      "catatan": "Font bawaan engine. Sans-serif dengan lebar huruf longgar, dirancang untuk keterbacaan teks panjang.",
+      "stack": "'Lexend', sans-serif",
+      "faces": [
+        { "file": "lexend-v26-latin-300.woff2", "weight": 300, "style": "normal" },
+        { "file": "lexend-v26-latin-regular.woff2", "weight": 400, "style": "normal" },
+        { "file": "lexend-v26-latin-700.woff2", "weight": 700, "style": "normal" }
+      ]
+    }
+  ],
+
+  "stacks": [
+    {
+      "id": "sistem-sans",
+      "label": "Sans Sistem",
+      "catatan": "Font antarmuka bawaan sistem operasi pemain. Paling netral dan paling ringan.",
+      "stack": "system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+    },
+    {
+      "id": "sistem-serif",
+      "label": "Serif Sistem",
+      "catatan": "Berkait, terasa seperti buku cetak. Cocok untuk novel bernuansa klasik atau historis.",
+      "stack": "Georgia, 'Times New Roman', Times, serif"
+    },
+    {
+      "id": "sistem-mono",
+      "label": "Monospace Sistem",
+      "catatan": "Lebar huruf seragam, terasa seperti terminal atau mesin tik. Cocok untuk fiksi teknologi atau found-footage.",
+      "stack": "'Cascadia Mono', Consolas, 'Courier New', monospace"
+    }
+  ]
+}

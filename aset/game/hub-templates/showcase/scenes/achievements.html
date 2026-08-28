@@ -1,0 +1,17 @@
+<!-- ===== Scene: {{SCENE_NAME}} (custom_code → Achievements) =====
+     Layar Extras: daftar achievement + status. Diisi hub.js via
+     VNHub.achievements.list() saat pertama dibuka — panggilan itu SEKALIGUS
+     men-sweep unlock otomatis (def ber-unlockFlag), jadi membuka layar ini
+     menghidupkan jalur unlockFlag. Dicapai dari menu (data-hub-nav="achievements"),
+     kembali via data-action="back". Achievement hidden yang belum terbuka
+     ditampilkan sebagai "???" (anti-spoiler). -->
+    <section class="hub-scene sc-screen sc-achievements" data-scene-id="{{SCENE_ID}}" data-scene-type="custom_code" data-scene-name="{{SCENE_NAME}}" data-hub-screen="achievements">
+      <div class="sc-screen-head">
+        <button type="button" class="sc-btn sc-back" data-node="back-btn" data-action="back">&larr; Kembali</button>
+        <h2 class="sc-screen-title" data-node="title">Achievements</h2>
+        <span class="sc-ach-count" data-node="count" data-hub-slot="achievement-count"></span>
+      </div>
+      <div class="sc-ach-list" data-node="list" data-hub-slot="achievement-list">
+        <p class="sc-empty">Memuat achievements&hellip;</p>
+      </div>
+    </section>

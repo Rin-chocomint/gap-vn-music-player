@@ -1,0 +1,12 @@
+<!-- ===== Scene: {{SCENE_NAME}} (splash) =====
+     Layar pembuka di atas artwork. Auto-lanjut sesuai data-duration (ms)
+     atau klik untuk skip. -->
+    <section class="hub-scene hub-scene-boot sp-splash" data-scene-id="{{SCENE_ID}}" data-scene-type="splash" data-scene-name="{{SCENE_NAME}}" data-duration="3000">
+      <img class="sp-art" data-node="artwork" data-bind-asset alt="">
+      <div class="sp-shade"></div>
+      <div class="sp-content" data-node="content">
+        <h1 class="sp-title" data-node="title" data-bind="title">Visual Novel</h1>
+        <p class="sp-tagline" data-node="tagline" data-bind="storyDesc"></p>
+      </div>
+      <p class="sp-skip" data-node="skip-hint">Klik untuk lanjut &rarr;</p>
+    </section>

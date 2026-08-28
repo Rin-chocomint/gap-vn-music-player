@@ -1,0 +1,19 @@
+/* =============================================================
+ * PALET "Hangat" — Merah muda hangat, nuansa romantis.
+ *
+ * Palet BUKAN template. Ia sekumpulan nilai bernama untuk kontrol yang sudah
+ * ada di picker (tab Berkas → Gaya). Menerapkannya hanya MENGGABUNGKAN var di
+ * bawah ke `theme.css` milikmu — `player.html` tak disentuh sama sekali.
+ *
+ * Karena itu ia bisa dibatalkan seperti suntingan biasa: buka theme.css dan
+ * ubah/hapus barisnya. Var yang TIDAK disebut di sini tak ikut terganggu.
+ *
+ * Mau paletmu sendiri? Salin berkas ini, ganti nilainya, simpan di folder yang
+ * sama. Editor memindai folder ini — tak ada daftar yang perlu didaftari.
+ * ============================================================= */
+
+:root {
+    --vn-dialogue-bg: rgba(40, 10, 20, 0.75);
+    --vn-name-color: #ff69b4;
+    --vn-choice-hover-bg: rgba(255, 105, 180, 0.2);
+}

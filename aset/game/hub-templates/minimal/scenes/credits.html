@@ -1,0 +1,18 @@
+<!-- ===== Scene: {{SCENE_NAME}} (credits) =====
+     Daftar kredit. Dicapai dari menu via goto, kembali via back. -->
+    <section class="hub-scene m-credits" data-scene-id="{{SCENE_ID}}" data-scene-type="credits" data-scene-name="{{SCENE_NAME}}">
+      <div class="m-sheet" data-node="content">
+        <header class="m-head">
+          <h1 class="m-title" data-node="title">Credits</h1>
+        </header>
+        <div class="m-credits-lines" data-node="lines">
+          <p>Cerita &amp; Naskah &mdash; <span data-bind="author">&mdash;</span></p>
+          <p>Ilustrasi &mdash; <span data-bind="illustrator">&mdash;</span></p>
+          <p>VN Mapper &mdash; <span data-bind="vnMapper">&mdash;</span></p>
+        </div>
+        <p class="m-credits-note">Dibuat dengan GAP VN Player</p>
+        <div class="m-back">
+          <button type="button" class="m-btn" data-node="back-btn" data-action="back">&larr; Kembali</button>
+        </div>
+      </div>
+    </section>

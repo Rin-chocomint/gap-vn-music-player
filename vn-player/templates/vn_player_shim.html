@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- ============================================================
+         PENANDA WAJIB — jangan hapus baris ini.
+         Inilah yang memberi tahu runtime bahwa file ini adalah SHIM
+         (memakai engine bersama), bukan custom player yang menggerakkan
+         dirinya sendiri. Tanpa penanda, chapter ini akan diperlakukan
+         sebagai custom player dan layar akan KOSONG — engine tak pernah
+         menerima perintah menggambar.
+         Lihat vn-engine/player-source-resolver.js
+         ============================================================ -->
+    <meta name="vn-player" content="engine-shim" />
+
+    <title>{NOVEL_TITLE} | {CHAPTER_NAME}</title>
+
+    <!-- ============================================================
+         GAYAMU SENDIRI — tulis di sini.
+         Blok ini otomatis dipindahkan ke AKHIR <head> setelah CSS engine
+         dimuat, jadi apa pun yang kamu tulis MENANG atas engine.
+         (Urutan cascade kanonik: lihat vn-player/js/extension-loader.js)
+         ============================================================ -->
+    <style id="creator-style">
+        /* Contoh:
+        :root { --vn-name-color: #ff6b6b; }
+        #dialogue-box { border-radius: 24px; }
+        */
+
+        /* --- PENJAGA PRA-GAMBAR — jangan hapus baris di bawah ini. ---
+               Layar OVERLAY di <body> sudah tergambar SEBELUM modul engine (dan
+               aturan scene dari VNPlayer.scene) sempat dimuat. Tanpa penjaga ini
+               semuanya tampil menumpuk sesaat di awal. Ini cuma keadaan AWAL;
+               aturan lengkapnya tetap datang dari VNPlayer.scene.
+
+               `:not([data-scene-mode="base"])` WAJIB: blok DASAR (layar cerita)
+               bukan overlay — menyembunyikannya di sini akan mematikan panggung
+               beserta permukaan kliknya. */
+        [data-player-scene]:not([data-scene-mode="base"]) {
+            position: absolute; inset: 0; opacity: 0; pointer-events: none;
+        }
+
+        /* --- Isi scene. Posisi/visibilitas overlay-nya diatur VNPlayer.scene
+               (CSS disuntik runtime); di sini hanya isinya. --- */
+        .vn-scene {
+            display: flex; flex-direction: column; gap: 14px;
+            align-items: center; justify-content: center; text-align: center;
+            padding: 40px; background: rgba(6, 6, 10, 0.9); color: #fff;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        .vn-scene h2 { font-size: 2rem; margin: 0; letter-spacing: 0.04em; }
+        .vn-scene p { margin: 0; opacity: 0.72; }
+        .vn-scene-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 10px; }
+        .vn-scene-actions button {
+            padding: 10px 18px; border-radius: 8px; cursor: pointer;
+            background: rgba(255, 255, 255, 0.08); color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.22); font-size: 0.95rem;
+        }
+        .vn-scene-actions button:hover { background: rgba(255, 255, 255, 0.16); }
+
+        /* --- Tiap scene MENYATAKAN SENDIRI apa yang ikut tampil di baliknya. ---
+               Scene itu overlay di atas permainan, jadi kotak dialog tetap ada di
+               bawahnya kecuali kamu bilang tidak. `data-vn-scene` dipasang di <body>
+               oleh VNPlayer.scene setiap kali sebuah scene menyala.
+
+               'end' = layar akhir, permainannya sudah usai → kotak dialog & pilihan
+               disembunyikan. Scene yang lewat di ATAS permainan yang masih berjalan
+               (mis. kartu judul) sebaiknya TIDAK menyembunyikannya. */
+        body[data-vn-scene="end"] #dialogue-box,
+        body[data-vn-scene="end"] #choices-container { display: none; }
+    </style>
+</head>
+
+<body data-dialogue-style="{DIALOGUE_STYLE}">
+    <!-- Markup engine DISUNTIK ke sini saat runtime — sengaja TIDAK disalin.
+         Menyalinnya berarti mengulang penyakit template lama: salinan yang
+         membeku dan menyimpang dari engine. Dengan disuntik, 240 baris body
+         dan 48 elemen ber-id tetap MILIK ENGINE dan selalu ikut update.
+         Player bawaan juga membawa scene 'end'-nya sendiri. Scene bernama sama di
+         FILE INI MENANG: loader di bawah membuang duplikatnya dari markup engine
+         supaya tidak ada dua layar dengan nama yang sama. -->
+
+    <!-- ============================================================
+         SCENE — tiap <section data-player-scene="..."> adalah satu layar.
+         Editor membaca atribut ini dari FILE INI dan menampilkannya di daftar
+         scene tab Code, jadi apa yang kamu tulis di sini langsung bisa
+         dinavigasi & dipratinjau dari editor.
+
+         Nama "end" ISTIMEWA: engine menyalakannya sendiri saat chapter usai.
+         Selebihnya bebas — panggil sendiri dengan VNPlayer.scene.show('<nama>').
+
+         Menghapus section di bawah TIDAK menghilangkan layar akhir: file ini
+         memuat player bawaan, jadi scene 'end' MILIK PLAYER BAWAAN yang dipakai
+         (sama seperti kotak dialog & tombol pilihan yang juga kamu warisi).
+         Untuk benar-benar meniadakannya, batalkan lewat hook:
+             VNRegistry.registerHook('player:end-screen', function () { return false; });
+         ============================================================ -->
+    <section data-player-scene="end" class="vn-scene">
+        <h2>Chapter Selesai</h2>
+        <p>Terima kasih sudah membaca.</p>
+        <div class="vn-scene-actions">
+            <!-- `data-scene-action` dikaitkan ENGINE — tak perlu menulis IPC
+                 sendiri. 'next' disembunyikan otomatis bila tak ada chapter
+                 berikutnya. Konvensi ini berlaku di scene mana pun. -->
+            <button type="button" data-scene-action="next">Chapter Selanjutnya</button>
+            <button type="button" data-scene-action="replay">Ulangi Chapter</button>
+            <button type="button" data-scene-action="hub">Kembali ke Menu</button>
+        </div>
+    </section>
+
+    <script>
+        (function () {
+            'use strict';
+            const path = require('path');
+            const fs = require('fs');
+
+            // Cari folder engine dengan MENELUSUR KE ATAS, bukan path relatif tetap.
+            // Alasannya: file ini sah dipakai di DUA level (audit D2) —
+            //   <novel>/<chapter>/player.html  → engine 5 tingkat di atas
+            //   <novel>/player.html            → engine 4 tingkat di atas
+            // Path tetap akan benar di satu level dan rusak di level lain. Menelusur
+            // membuat satu template melayani keduanya (dan tetap benar bila struktur
+            // folder berubah suatu saat).
+            const ENGINE_DIR = (function findEngine() {
+                let dir = __dirname;
+                for (let i = 0; i < 8; i++) {
+                    const cand = path.join(dir, 'vn-player');
+                    if (fs.existsSync(path.join(cand, 'player.html'))) return cand;
+                    const up = path.dirname(dir);
+                    if (up === dir) break;          // sudah di root drive
+                    dir = up;
+                }
+                return null;
+            })();
+            const toUrl = (p) => 'file:///' + p.replace(/\\/g, '/');
+
+            if (!ENGINE_DIR) {
+                document.body.innerHTML =
+                    '<pre style="color:#f66;font:14px monospace;padding:24px;white-space:pre-wrap">' +
+                    'SHIM GAGAL: folder vn-player/ tidak ditemukan dari\n' + __dirname +
+                    '\n\nFile ini harus berada di dalam struktur novel:\n' +
+                    'aset/game/visual_novels/&lt;Novel&gt;/player.html  (level novel), atau\n' +
+                    'aset/game/visual_novels/&lt;Novel&gt;/&lt;Chapter&gt;/player.html  (level chapter).' +
+                    '</pre>';
+                return;
+            }
+
+            let source;
+            try {
+                source = fs.readFileSync(path.join(ENGINE_DIR, 'player.html'), 'utf-8');
+            } catch (e) {
+                document.body.innerHTML =
+                    '<pre style="color:#f66;font:14px monospace;padding:24px;white-space:pre-wrap">' +
+                    'SHIM GAGAL: tidak bisa membaca engine di\n' + ENGINE_DIR +
+                    '\n\n' + e.message + '</pre>';
+                return;
+            }
+
+            // --- 1. CSS engine: ambil <link> dari <head> sumber, jadikan absolut ---
+            const headHtml = (source.match(/<head[^>]*>([\s\S]*?)<\/head>/i) || [, ''])[1];
+            const linkRe = /<link[^>]+href="([^"]+)"[^>]*>/gi;
+            let m;
+            while ((m = linkRe.exec(headHtml)) !== null) {
+                const href = m[1];
+                if (/^(https?:|file:|data:)/i.test(href)) continue;   // sudah absolut
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = toUrl(path.join(ENGINE_DIR, href));
+                document.head.appendChild(link);
+            }
+
+            // Gaya kreator dipindah ke akhir <head> agar tetap MENANG atas CSS engine
+            // (teknik normalisasi urutan yang sama dipakai handler hot-reload engine).
+            const creatorStyle = document.getElementById('creator-style');
+            if (creatorStyle) document.head.appendChild(creatorStyle);
+
+            // --- 2. Markup body: suntik, TANPA tag <script> (dimuat terpisah, terurut) ---
+            const bodyHtml = (source.match(/<body[^>]*>([\s\S]*?)<\/body>/i) || [, ''])[1];
+            const scriptSrcs = [];
+            const cleaned = bodyHtml.replace(/<script[^>]*src="([^"]+)"[^>]*>\s*<\/script>/gi,
+                (_, src) => { scriptSrcs.push(src); return ''; });
+
+            const host = document.createElement('div');
+            host.id = 'vn-engine-root';
+            host.innerHTML = cleaned;
+
+            // SCENE MILIKMU MENANG. Player bawaan membawa scene-nya sendiri (mis.
+            // 'end'); kalau file ini mendefinisikan nama yang sama, versi engine
+            // dibuang di sini. Tanpa langkah ini dokumen punya DUA section dengan
+            // nama sama dan keduanya menyala bersamaan saat scene itu ditampilkan.
+            const namaMilikku = Array.prototype.map.call(
+                document.querySelectorAll('[data-player-scene]'),
+                (el) => el.getAttribute('data-player-scene')
+            );
+            namaMilikku.forEach((nama) => {
+                const kembar = host.querySelector('[data-player-scene="' + nama + '"]');
+                if (kembar) kembar.remove();
+            });
+
+            document.body.insertBefore(host, document.body.firstChild);
+
+            // Gaya dialog dibawa sebagai ATRIBUT di <body> file ini — bukan lagi
+            // nilai JSON tersembunyi. Terlihat, bisa kamu ubah langsung di sini,
+            // dan ikut tersalin saat kamu menyalin file. Kelasnya sendiri sudah
+            // tersedia karena shim memuat dialogue-variants.css (E1).
+            const dlgStyle = document.body.getAttribute('data-dialogue-style');
+            if (dlgStyle) {
+                const gc = document.getElementById('game-container');
+                if (gc) gc.classList.add('dialogue-style-' + dlgStyle);
+            }
+
+            // --- 3. Script engine: urutan WAJIB dipertahankan ---
+            // Script yang disisipkan dinamis defaultnya async; `async = false`
+            // memaksa eksekusi berurutan sesuai urutan penyisipan.
+            let pending = scriptSrcs.length;
+            scriptSrcs.forEach((src) => {
+                const s = document.createElement('script');
+                s.async = false;
+                s.src = toUrl(path.join(ENGINE_DIR, src));
+                s.onload = s.onerror = () => {
+                    if (--pending === 0) {
+                        // Semua modul engine siap. Kaitanmu di sini (opsional).
+                        if (typeof window.onVNEngineReady === 'function') {
+                            try { window.onVNEngineReady(); } catch (e) { console.error(e); }
+                        }
+                        window.dispatchEvent(new CustomEvent('vn-engine-ready'));
+                    }
+                };
+                document.body.appendChild(s);
+            });
+        })();
+    </script>
+
+    <!-- ============================================================
+         LOGIKAMU SENDIRI — tulis di sini.
+         Dipanggil SETELAH seluruh modul engine siap (VNState, VNRegistry,
+         VNAudio, dst. sudah ada). Daftarkan transisi/efek/command kustom
+         di sini, atau taruh di <chapter>/extensions/*.js supaya editor
+         ikut menampilkannya di dropdown.
+         ============================================================ -->
+    <script>
+        window.onVNEngineReady = function () {
+            // Scene 'end' di atas TIDAK perlu dikaitkan di sini — engine sendiri
+            // yang menyalakannya saat chapter usai, dan mengaitkan tombol
+            // ber-`data-scene-action`. Blok ini murni untuk logikamu sendiri.
+            //
+            // Contoh yang bisa kamu buka:
+            //
+            // 1) Kartu judul — TAK PERLU JS lagi. Layarnya kini bawaan engine,
+            //    dan cara memanggilnya dari naskah:
+            //      { "type": "custom", "command": "kartu_judul",
+            //        "params": "{\"judul\":\"Bab 2\",\"sub\":\"tiga hari kemudian\"}" }
+            //    Pakai blok ini hanya kalau kamu ingin perilaku yang berbeda dari
+            //    command bawaan itu.
+            //
+            // 2) Memilih ending bercabang lewat hook (butuh scene tambahan):
+            //    CATATAN: `VNRegistry` adalah const top-level modul engine — ia
+            //    TIDAK menempel di `window` (beda dari VNPlayer), jadi periksa
+            //    dengan identifier telanjang.
+            //    if (typeof VNRegistry !== 'undefined') {
+            //        VNRegistry.registerHook('player:end-screen', function (ctx) {
+            //            if (!VNPlayer.storage.get('rute_sejati')) return ctx;  // pakai 'end' biasa
+            //            VNPlayer.scene.show('ending-sejati');
+            //            return false;                                          // batalkan yang baku
+            //        });
+            //    }
+            //
+            // 3) Transisi/efek kustom:
+            //    VNRegistry.register('transition', 'my_fade', function (renderCb, sfx, vol, delay, pan, data, doneCb) { ... });
+        };
+    </script>
+</body>
+
+</html>

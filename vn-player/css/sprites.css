@@ -1,0 +1,385 @@
+/* =============================================
+ * VN Player — Sprite System
+ * Layer karakter, positioning, animasi masuk/keluar/loop
+ * ============================================= */
+
+/* === CHARACTER SPRITES LAYER === */
+#char-sprites-layer {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.char-sprite-slot {
+    position: absolute;
+    bottom: 0;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    pointer-events: none;
+}
+
+/* === MULTI-LAYER SPRITE (2026-07-10, findings §10) ===
+ * `sprite` bernilai ARRAY = [dasar, ...overlay]: layer pertama img utama,
+ * sisanya ditumpuk di atasnya (sistem ekspresi tanpa ledakan file gambar).
+ * Frame overlay selalu mewarisi kotak render sprite dasar. Dengan begitu layer
+ * baru langsung memakai anchor dan ukuran dasar yang sama; offset/scale hanya
+ * menjadi penyesuaian eksplisit, bukan kompensasi perbedaan layout media. */
+.char-sprite-overlay {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    /* Posisi panggung milik container. Transform ini hanya offset layer;
+       scale/rotasi/flip ada di node tengah dan keyframe ada di surface dalam,
+       jadi ketiganya tidak pernah saling menimpa. */
+    transform: translate(var(--sprite-layer-offset-x, 0%), var(--sprite-layer-offset-y, 0%));
+    width: auto;
+    height: auto;
+    pointer-events: none;
+    transition: opacity .12s ease;
+}
+
+.char-sprite-overlay.is-delayed { opacity: 0; }
+
+.char-sprite-overlay-transform {
+    width: 100%;
+    height: 100%;
+    transform: scale(var(--sprite-layer-scale, 1)) rotate(var(--sprite-layer-rotation, 0deg)) scaleX(var(--sprite-layer-flip-x, 1));
+    transform-origin: bottom center;
+    opacity: var(--sprite-layer-opacity, 1);
+}
+
+.char-sprite-overlay-surface {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center bottom;
+}
+
+/* Sumber tersembunyi hanya dipakai canvas chroma key. Kanvas di depannya tetap
+   memakai `.char-sprite-img`, sehingga ukuran, fokus, dan animasi sprite berlaku
+   sama untuk gambar maupun video. */
+.char-sprite-chroma-source { display: none; }
+/* overlay mengikuti visibilitas layer dasar */
+.char-sprite-img:not(.visible) ~ .char-sprite-overlay,
+.char-sprite-img.hide ~ .char-sprite-overlay { display: none; }
+
+/* === POSITIONING MODES === */
+
+/* MODE AUTO: Flexbox auto-spacing */
+#char-sprites-layer.mode-auto {
+    display: flex;
+    justify-content: space-evenly;
+    align-items: flex-end;
+    padding: 0 3%;
+}
+
+#char-sprites-layer.mode-auto .char-sprite-slot {
+    position: relative !important;
+    flex: 0 1 auto;
+    bottom: auto !important;
+    left: auto !important;
+    right: auto !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    transform: none;
+}
+
+/* Order hint untuk mode auto */
+#char-sprites-layer.mode-auto .char-sprite-slot[data-slot="left"],
+#char-sprites-layer.mode-auto #char-sprite-slot-left { order: 1; }
+#char-sprites-layer.mode-auto .char-sprite-slot[data-slot="center"],
+#char-sprites-layer.mode-auto #char-sprite-slot-center { order: 2; }
+#char-sprites-layer.mode-auto .char-sprite-slot[data-slot="right"],
+#char-sprites-layer.mode-auto #char-sprite-slot-right { order: 3; }
+#char-sprites-layer.mode-auto .char-sprite-slot[data-slot="custom"] { order: 4; }
+
+/* MODE CUSTOM: Absolute positioning */
+#char-sprites-layer.mode-custom {
+    display: block;
+}
+
+#char-sprites-layer.mode-custom .char-sprite-slot {
+    position: absolute;
+    bottom: 0;
+}
+
+/* Legacy support: sprite containers */
+.sprite-container {
+    position: absolute;
+    bottom: 0;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    pointer-events: none;
+}
+
+/* Posisi preset */
+.char-sprite-slot[data-slot="left"],
+#char-sprite-slot-left {
+    left: var(--vn-sprite-padding-side);
+    justify-content: flex-start;
+    padding-left: 0;
+}
+
+.char-sprite-slot[data-slot="right"],
+#char-sprite-slot-right {
+    right: var(--vn-sprite-padding-side);
+    justify-content: flex-end;
+    padding-right: 0;
+}
+
+.char-sprite-slot[data-slot="center"],
+#char-sprite-slot-center {
+    left: 50%;
+    transform: translateX(-55%);
+    justify-content: center;
+}
+
+/* Legacy ID mappings */
+#sprite-container-left {
+    left: var(--vn-sprite-padding-side);
+    justify-content: flex-start;
+    padding-left: 0;
+}
+
+#sprite-container-right {
+    right: var(--vn-sprite-padding-side);
+    justify-content: flex-end;
+    padding-right: 0;
+}
+
+#sprite-container-center {
+    left: 50%;
+    transform: translateX(-55%);
+    justify-content: center;
+}
+
+/* Custom positioning — default sebelum JS menulis `left` inline (sprite-manager
+   menyetel posisi, bernama maupun persen). Dulu di sini tertulis
+   `var(--sprite-x, 50%)`, tapi tak ada satu pun penulis `--sprite-x` (JS menyetel
+   `--sprite-x-offset`), jadi nilainya SELALU 50% — var mati yang menyamar jadi
+   titik konfigurasi. Ditulis apa adanya 2026-07-30. */
+.char-sprite-slot[data-slot="custom"] {
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+/* === SPRITE IMAGES === */
+.char-sprite-img,
+#char-sprite-1,
+#char-sprite-2,
+#char-sprite-center,
+#character-sprite,
+#character-sprite-2,
+#character-sprite-center {
+    height: var(--vn-sprite-base-height);
+    max-height: var(--vn-sprite-max-height);
+    max-width: var(--vn-sprite-max-width);
+    width: auto;
+    object-fit: contain;
+    opacity: 0;
+    transition: opacity var(--vn-sprite-fade-duration) ease, height 0.3s ease;
+}
+
+/* State classes */
+.char-sprite-img.visible,
+#char-sprite-1.visible,
+#char-sprite-2.visible,
+#char-sprite-center.visible,
+#character-sprite.visible,
+#character-sprite-2.visible,
+#character-sprite-center.visible {
+    opacity: 1;
+}
+
+.char-sprite-img.hide,
+#char-sprite-1.hide,
+#char-sprite-2.hide,
+#char-sprite-center.hide,
+#character-sprite.hide,
+#character-sprite-2.hide,
+#character-sprite-center.hide {
+    opacity: 0;
+}
+
+/* Base tidak dibuang saat disembunyikan: ia masih menjadi anchor ukuran,
+   posisi, chroma, fokus, dan overlay. `visibility` hanya menyasar surface
+   dasar; sibling `.char-sprite-overlay` tetap independen. */
+.char-sprite-img.base-hidden { visibility: hidden; }
+
+/* === ANIMASI MASUK === */
+@keyframes slideFromBottom {
+    0% { opacity: 0; transform: translateY(8%); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideFromLeft {
+    0% { opacity: 0; transform: translateX(-15%); }
+    100% { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideFromRight {
+    0% { opacity: 0; transform: translateX(15%); }
+    100% { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes simpleFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.anim-in-slide-from-bottom { animation: slideFromBottom 0.6s ease-out forwards; }
+.anim-in-slide-from-left { animation: slideFromLeft 0.6s ease-out forwards; }
+.anim-in-slide-from-right { animation: slideFromRight 0.6s ease-out forwards; }
+.anim-in-fade { animation: simpleFadeIn 0.05s forwards; }
+
+/* === ANIMASI KELUAR === */
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+@keyframes slideToBottom {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(8%); }
+}
+
+@keyframes slideToLeft {
+    from { opacity: 1; transform: translateX(0); }
+    to { opacity: 0; transform: translateX(-15%); }
+}
+
+@keyframes slideToRight {
+    from { opacity: 1; transform: translateX(0); }
+    to { opacity: 0; transform: translateX(15%); }
+}
+
+.anim-out-fade { animation: fadeOut 0.5s ease-in forwards; }
+.anim-out-slide-to-bottom { animation: slideToBottom 0.5s ease-in forwards; }
+.anim-out-slide-to-left { animation: slideToLeft 0.5s ease-in forwards; }
+.anim-out-slide-to-right { animation: slideToRight 0.5s ease-in forwards; }
+
+/* === ANIMASI LOOP === */
+@keyframes shakeSprite {
+    0%, 100% { transform: translateX(0); opacity: 1; }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); opacity: 1; }
+    20%, 40%, 60%, 80% { transform: translateX(5px); opacity: 1; }
+}
+
+@keyframes jumpSprite {
+    0%, 100% { transform: translateY(0); opacity: 1; }
+    50% { transform: translateY(-20px); opacity: 1; }
+}
+
+@keyframes pulseSprite {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.05); opacity: 1; }
+}
+
+@keyframes pulseGlow {
+    0%, 100% { filter: brightness(1); opacity: 1; }
+    50% { filter: brightness(1.15) drop-shadow(0 0 5px rgba(255, 255, 255, 0.5)); opacity: 1; }
+}
+
+@keyframes gentleFloat {
+    0%, 100% { transform: translateY(0); opacity: 1; }
+    50% { transform: translateY(-8px); opacity: 1; }
+}
+
+/* Loop "bingung": scaleX(1)/-1 = menghadap kanan/kiri. Titik persentase SENGAJA
+   tak rata (bukan 0/50/100) supaya tak terasa berayun metronomik — CSS tetap satu
+   siklus tetap yang diulang (tak benar-benar acak), tapi jarak antar-flip yang
+   tak seragam menyamarkannya jadi "sesekali nengok". */
+@keyframes confusedFlip {
+    0%, 15%, 42%, 60%, 100% { transform: scaleX(1); opacity: 1; }
+    22%, 34% { transform: scaleX(-1); opacity: 1; }
+    68% { transform: scaleX(-1); opacity: 1; }
+}
+
+@keyframes flipRight {
+    0%, 100% { transform: translateX(0) scaleX(1); }
+    50% { transform: translateX(10px) scaleX(0); }
+}
+
+@keyframes flipLeft {
+    0%, 100% { transform: translateX(0) scaleX(1); }
+    50% { transform: translateX(-10px) scaleX(0); }
+}
+
+@keyframes flipUp {
+    0%, 100% { transform: translateY(0) scaleY(1); }
+    50% { transform: translateY(-10px) scaleY(0); }
+}
+
+@keyframes flipDown {
+    0%, 100% { transform: translateY(0) scaleY(1); }
+    50% { transform: translateY(10px) scaleY(0); }
+}
+
+/* Sekali eksekusi: mulai di luar panggung, melintas penuh, lalu berhenti di luar
+   layar. `vw/vh` sengaja dipakai (bukan persen ukuran sprite) agar sprite besar
+   maupun kecil benar-benar keluar dari viewport. */
+@keyframes passLeftToRight {
+    from { opacity: 1; transform: translateX(-160vw); }
+    to { opacity: 1; transform: translateX(160vw); }
+}
+
+@keyframes passRightToLeft {
+    from { opacity: 1; transform: translateX(160vw); }
+    to { opacity: 1; transform: translateX(-160vw); }
+}
+
+@keyframes passBottomToTop {
+    from { opacity: 1; transform: translateY(160vh); }
+    to { opacity: 1; transform: translateY(-160vh); }
+}
+
+@keyframes passTopToBottom {
+    from { opacity: 1; transform: translateY(-160vh); }
+    to { opacity: 1; transform: translateY(160vh); }
+}
+
+/* Getaran rapat seperti mesin motor saat langsam / dibawa berkendara. */
+@keyframes motorVibration {
+    0%, 100% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+    20% { transform: translate(-2px, 1px) rotate(-.6deg); opacity: 1; }
+    45% { transform: translate(2px, -1px) rotate(.6deg); opacity: 1; }
+    70% { transform: translate(-1px, 1px) rotate(-.35deg); opacity: 1; }
+}
+
+/* Bingung yang berbeda dari `flip-confused`: kepala/badan bergoyang tanpa
+   membalik seluruh sprite, cocok untuk pose yang arah hadapnya harus tetap. */
+@keyframes confusedWobble {
+    0%, 100% { transform: rotate(0deg) translateY(0); opacity: 1; }
+    24% { transform: rotate(-5deg) translateY(-2px); opacity: 1; }
+    50% { transform: rotate(4deg) translateY(1px); opacity: 1; }
+    76% { transform: rotate(-3deg) translateY(-1px); opacity: 1; }
+}
+
+.anim-loop-shake { animation: shakeSprite 0.5s linear infinite; }
+.anim-loop-pulse { animation: pulseSprite 1.5s ease-in-out infinite; }
+.anim-loop-pulse-glow { animation: pulseGlow 2s infinite alternate; }
+.anim-loop-gentle-float { animation: gentleFloat 3s ease-in-out infinite; }
+.anim-loop-motor-vibration { animation: motorVibration .16s linear infinite; }
+.anim-loop-confused { animation: confusedWobble 1.8s ease-in-out infinite; }
+.anim-loop-flip-confused { animation: confusedFlip 4.5s ease-in-out infinite; }
+
+/* One-shot animations */
+.anim-oneshot-shake { animation: shakeSprite 0.5s linear; }
+.anim-oneshot-jump { animation: jumpSprite 0.5s ease-in-out; }
+.anim-oneshot-flip-right { animation: flipRight 0.5s ease-in-out; }
+.anim-oneshot-flip-left { animation: flipLeft 0.5s ease-in-out; }
+.anim-oneshot-flip-up { animation: flipUp 0.5s ease-in-out; }
+.anim-oneshot-flip-down { animation: flipDown 0.5s ease-in-out; }
+.anim-oneshot-pass-left-to-right { animation: passLeftToRight 1.1s linear forwards; }
+.anim-oneshot-pass-right-to-left { animation: passRightToLeft 1.1s linear forwards; }
+.anim-oneshot-pass-bottom-to-top { animation: passBottomToTop 1.1s linear forwards; }
+.anim-oneshot-pass-top-to-bottom { animation: passTopToBottom 1.1s linear forwards; }

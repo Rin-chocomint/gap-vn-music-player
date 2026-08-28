@@ -1,0 +1,19 @@
+<!-- ===== Scene: {{SCENE_NAME}} (credits) =====
+     Kredit lengkap. Nilai terisi otomatis dari Profil Novel lewat data-bind;
+     baris tambahan bebas kamu tulis langsung di sini. -->
+    <section class="hub-scene dp-screen dp-credits" data-scene-id="{{SCENE_ID}}" data-scene-type="credits" data-scene-name="{{SCENE_NAME}}">
+      <div class="dp-screen-sheet">
+        <div class="dp-screen-head">
+          <button type="button" class="dp-back" data-node="back-btn" data-action="back">&larr; Kembali</button>
+          <h2 class="dp-screen-title" data-node="title">Credits</h2>
+        </div>
+        <dl class="dp-meta" data-node="meta">
+          <dt>Judul</dt><dd data-bind="title">&mdash;</dd>
+          <dt>Penulis</dt><dd data-bind="author">&mdash;</dd>
+          <dt>Ilustrator</dt><dd data-bind="illustrator">&mdash;</dd>
+          <dt>VN Mapper</dt><dd data-bind="vnMapper">&mdash;</dd>
+          <dt>Versi</dt><dd data-bind="version">&mdash;</dd>
+        </dl>
+        <p class="dp-credits-lines" data-node="lines">Terima kasih sudah membaca.</p>
+      </div>
+    </section>

@@ -1,0 +1,27 @@
+<!-- ===== Scene: {{SCENE_NAME}} (main_menu) =====
+     Menu utama (layar terminal). Judul rata KANAN di sepertiga atas; menu
+     berbaris MELINTANG sebagai pita di dekat dasar layar. Cover diisi engine
+     lewat data-bind-asset. Tombol ditangani engine via data-action. -->
+    <section class="hub-scene pn-menu-scene" data-scene-id="{{SCENE_ID}}" data-scene-type="main_menu" data-scene-name="{{SCENE_NAME}}">
+      <img class="pn-art" data-node="artwork" data-bind-asset alt="">
+      <div class="pn-shade"></div>
+
+      <div class="pn-meta" data-node="corner-meta">Menu Utama</div>
+
+      <section class="pn-title-block" data-node="stage">
+        <small class="pn-kicker">Visual Novel</small>
+        <h1 class="pn-title" data-node="title" data-bind="title">Visual Novel</h1>
+        <div class="pn-hairline"></div>
+        <p class="pn-tagline" data-node="tagline" data-bind="storyDesc"></p>
+      </section>
+
+      <nav class="pn-bar" data-node="actions">
+        <button type="button" class="pn-item" data-node="start-btn" data-action="start">Mulai</button>
+        <button type="button" class="pn-item" data-node="chapter-btn" data-action="chapter-select">Chapter</button>
+        <button type="button" class="pn-item" data-node="info-btn" data-action="goto" data-target="{{TARGET:info}}">Tentang</button>
+        <button type="button" class="pn-item" data-node="credits-btn" data-action="goto" data-target="{{TARGET:credits}}">Credits</button>
+        <button type="button" class="pn-item" data-node="exit-btn" data-action="exit">Keluar</button>
+      </nav>
+
+      <div class="pn-foot" data-node="foot"><span data-bind="version">&mdash;</span></div>
+    </section>

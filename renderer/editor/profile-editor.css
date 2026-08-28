@@ -1,0 +1,270 @@
+﻿/* ================================ Profile CSS Editor =============================== */
+.css-editor-toggle-btn {
+    width: 100%;
+    padding: 12px 20px;
+    background: rgba(30, 35, 45, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: #e0e0e0;
+    font-size: 0.95rem;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(4px);
+}
+
+.css-editor-toggle-btn:hover {
+    background: rgba(40, 45, 60, 0.8);
+    border-color: rgba(0, 255, 255, 0.4);
+    color: #00ffff;
+    box-shadow: 0 4px 15px rgba(0, 255, 255, 0.15);
+}
+
+.css-editor-toggle-btn .triangle-icon {
+    font-size: 0.8rem;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.css-editor-toggle-btn:hover .triangle-icon {
+    color: #00ffff;
+}
+
+.css-editor-toggle-btn.active .triangle-icon {
+    transform: rotate(90deg);
+}
+
+.css-editor-panel {
+    margin-top: 10px;
+    padding: 20px;
+    background: rgba(15, 18, 25, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    animation: slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(10px);
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.css-code-editor {
+    width: 100%;
+    padding: 15px;
+    background: #0d1117;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: #e6edf3;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    resize: vertical;
+    margin-top: 8px;
+    margin-bottom: 12px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.css-code-editor:focus {
+    outline: none;
+    border-color: rgba(0, 255, 255, 0.5);
+    box-shadow: 0 0 0 2px rgba(0, 255, 255, 0.1);
+    background: #0f141c;
+}
+
+.css-code-editor::placeholder {
+    color: rgba(255, 255, 255, 0.2);
+    font-style: italic;
+}
+
+/* Common button styles */
+.editor-button-positive,
+.editor-button-negative,
+.editor-button-info {
+    padding: 10px 24px;
+    border-radius: 6px;
+    font-family: 'Segoe UI', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: none;
+    flex-grow: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+
+.editor-button-positive:hover {
+    background: linear-gradient(135deg, #00d2ff 0%, #00a8e1 100%);
+    box-shadow: 0 6px 15px rgba(0, 180, 219, 0.4);
+}
+
+.editor-button-info {
+    background: linear-gradient(135deg, #8E2DE2 0%, #4A00E0 100%);
+}
+
+.editor-button-info:hover {
+    background: linear-gradient(135deg, #9b51e0 0%, #5f15f2 100%);
+    box-shadow: 0 6px 15px rgba(142, 45, 226, 0.4);
+}
+
+#profile-css-editor-panel .editor-button-positive,
+#profile-css-editor-panel .editor-button-info,
+#profile-css-editor-panel .editor-button-negative {
+    background: transparent;
+    box-shadow: none;
+    border-width: 1px;
+    border-style: solid;
+}
+
+#profile-css-editor-panel .editor-button-positive {
+    border-color: #00b4db;
+    color: #00b4db;
+}
+
+#profile-css-editor-panel .editor-button-positive:hover {
+    border-color: #00d2ff;
+    color: #00d2ff;
+    background: rgba(0, 180, 219, 0.1);
+}
+
+#profile-css-editor-panel .editor-button-info {
+    border-color: #8E2DE2;
+    color: #8E2DE2;
+}
+
+#profile-css-editor-panel .editor-button-info:hover {
+    border-color: #9b51e0;
+    color: #9b51e0;
+    background: rgba(142, 45, 226, 0.1);
+}
+
+#profile-css-editor-panel .editor-button-negative {
+    border-color: #FF416C;
+    color: #FF416C;
+}
+
+#profile-css-editor-panel .editor-button-negative:hover {
+    border-color: #ff5e81;
+    color: #ff5e81;
+    background: rgba(255, 65, 108, 0.1);
+}
+
+.editor-button-negative {
+    background: linear-gradient(135deg, #FF416C 0%, #FF4B2B 100%);
+}
+
+.editor-button-negative:hover {
+    background: linear-gradient(135deg, #ff5e81 0%, #ff6a4d 100%);
+    box-shadow: 0 6px 15px rgba(255, 65, 108, 0.4);
+}
+
+/* ================================ Rotating Texts Editor =============================== */
+.rotating-texts-editor-section {
+    margin-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 15px;
+}
+
+.rotating-texts-editor-section > label {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: 600;
+    color: #aaa;
+}
+
+.rotating-texts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+
+.rotating-texts-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.rotating-texts-list::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 3px;
+}
+
+.rotating-texts-list::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #00b4db 0%, #0083B0 100%);
+    border-radius: 3px;
+}
+
+.rotating-text-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.rotating-text-item input {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    padding: 8px 10px;
+    color: #fff;
+    font-size: 0.9rem;
+}
+
+.rotating-text-item input:focus {
+    outline: none;
+    border-color: #00b4db;
+    box-shadow: 0 0 5px rgba(0, 180, 219, 0.3);
+}
+
+.rotating-text-item .remove-rotating-text-btn {
+    background: transparent;
+    border: 1px solid #FF416C;
+    color: #FF416C;
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+}
+
+.rotating-text-item .remove-rotating-text-btn:hover {
+    background: rgba(255, 65, 108, 0.2);
+    border-color: #ff5e81;
+    color: #ff5e81;
+}
+
+.rotating-text-item .drag-handle {
+    cursor: grab;
+    color: #666;
+    font-size: 1.1rem;
+    user-select: none;
+}
+
+.rotating-text-item .drag-handle:active {
+    cursor: grabbing;
+}
+/* ================================ End Rotating Texts Editor =============================== */
+
+/* ================================ End Profile CSS Editor =============================== */

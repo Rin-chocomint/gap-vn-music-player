@@ -1,0 +1,12 @@
+<!-- ===== Scene: {{SCENE_NAME}} (custom_code → Muat Permainan) =====
+     Layar custom: diisi hub.js via VNHub.getSaveSlots(); klik slot → VNHub.loadGame().
+     Dicapai dari menu (data-hub-nav="load"), kembali via data-action="back". -->
+    <section class="hub-scene sc-screen sc-load" data-scene-id="{{SCENE_ID}}" data-scene-type="custom_code" data-scene-name="{{SCENE_NAME}}" data-hub-screen="load">
+      <div class="sc-screen-head">
+        <button type="button" class="sc-btn sc-back" data-node="back-btn" data-action="back">&larr; Kembali</button>
+        <h2 class="sc-screen-title" data-node="title">Muat Permainan</h2>
+      </div>
+      <div class="sc-slots" data-node="slots" data-hub-slot="save-slots">
+        <p class="sc-empty">Memuat slot&hellip;</p>
+      </div>
+    </section>

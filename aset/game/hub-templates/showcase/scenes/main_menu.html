@@ -1,0 +1,22 @@
+<!-- ===== Scene: {{SCENE_NAME}} (main_menu) =====
+     Menu utama (layar terminal). Tombol start / chapter-select / exit dan goto
+     ke Info/Credits ditangani RUNTIME bawaan (data-action). Tombol Galeri / Muat /
+     Pengaturan / Lanjutkan ditangani hub.js (data-hub-nav) + BGM menu. -->
+    <section class="hub-scene sc-menu" data-scene-id="{{SCENE_ID}}" data-scene-type="main_menu" data-scene-name="{{SCENE_NAME}}" data-hub-screen="menu">
+      <div class="sc-menu-inner" data-node="stage">
+        <h1 class="sc-menu-title" data-node="title" data-bind="title">Visual Novel</h1>
+        <p class="sc-menu-tagline" data-node="tagline" data-bind="storyDesc"></p>
+        <div class="sc-menu-actions" data-node="actions">
+          <button type="button" class="sc-btn sc-btn-primary" data-node="start-btn" data-action="start">Mulai Cerita</button>
+          <button type="button" class="sc-btn sc-resume" data-node="resume-btn" data-hub-nav="resume" hidden>Lanjutkan</button>
+          <button type="button" class="sc-btn" data-node="chapter-btn" data-action="chapter-select">Pilih Chapter</button>
+          <button type="button" class="sc-btn" data-node="load-btn" data-hub-nav="load">Muat Permainan</button>
+          <button type="button" class="sc-btn" data-node="gallery-btn" data-hub-nav="gallery">Galeri</button>
+          <button type="button" class="sc-btn" data-node="achievements-btn" data-hub-nav="achievements">Achievements</button>
+          <button type="button" class="sc-btn" data-node="settings-btn" data-hub-nav="settings">Pengaturan</button>
+          <button type="button" class="sc-btn" data-node="info-btn" data-action="goto" data-target="{{TARGET:info}}">Tentang</button>
+          <button type="button" class="sc-btn" data-node="credits-btn" data-action="goto" data-target="{{TARGET:credits}}">Credits</button>
+          <button type="button" class="sc-btn sc-btn-ghost" data-node="exit-btn" data-action="exit">Keluar</button>
+        </div>
+      </div>
+    </section>

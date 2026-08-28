@@ -1,0 +1,14 @@
+{
+    "id": "custom-layer",
+    "label": "Custom Layer",
+    "description": "Shim ramping PLUS contoh custom layer yang benar-benar berjalan: satu transisi & satu efek terdaftar lewat extensions/, posisi panggung & animasi buatan sendiri di theme.css, dan vocab-ui.json yang menamai semuanya. Terapkan ini kalau kamu ingin melihat — dan menyunting — bagaimana engine diperkaya TANPA mengganti player-nya.",
+    "category": "starter-kit",
+    "thumbnail": "preview.png",
+    "tags": [
+        "extensions",
+        "kosakata kustom"
+    ],
+    "dialogueStyle": "bottom-bar",
+    "materializeStory": false,
+    "themeCascade": "inherit"
+}

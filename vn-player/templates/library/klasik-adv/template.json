@@ -1,0 +1,16 @@
+{
+    "id": "klasik-adv",
+    "label": "Klasik ADV",
+    "description": "Susunan ADV klasik: kotak teks rata penuh menempel di dasar layar, plakat nama menonjol di tepi atasnya, dan tombol yang biasanya berkerumun di pojok kanan-atas turun jadi BARIS PERINTAH berlabel teks di bawah kotak. Semuanya lewat CSS di atas markup engine — nol peran dibekukan, jadi novelmu tetap ikut update.",
+    "category": "layout",
+    "layoutFamily": "klasik-adv",
+    "thumbnail": "preview.png",
+    "tags": [
+        "ADV",
+        "kotak rata penuh",
+        "plakat nama"
+    ],
+    "dialogueStyle": "bottom-bar",
+    "materializeStory": false,
+    "themeCascade": "replace-novel"
+}

@@ -1,0 +1,14 @@
+<!-- ===== Scene: {{SCENE_NAME}} (credits) =====
+     Daftar kredit. Dicapai dari menu via goto, kembali via back. -->
+    <section class="hub-scene sp-scene-read" data-scene-id="{{SCENE_ID}}" data-scene-type="credits" data-scene-name="{{SCENE_NAME}}">
+      <div class="sp-shade"></div>
+      <div class="sp-content sp-panel" data-node="content">
+        <h1 class="sp-title" data-node="title" style="font-size: clamp(1.6rem, 3vw, 2.6rem);">Credits</h1>
+        <div class="sp-credits" data-node="lines">
+          <p>Cerita &amp; Naskah &mdash; <span data-bind="author">&mdash;</span></p>
+          <p>Ilustrasi &mdash; <span data-bind="illustrator">&mdash;</span></p>
+          <p>VN Mapper &mdash; <span data-bind="vnMapper">&mdash;</span></p>
+        </div>
+        <button type="button" class="sp-btn" data-node="back-btn" data-action="back">&larr; Kembali</button>
+      </div>
+    </section>

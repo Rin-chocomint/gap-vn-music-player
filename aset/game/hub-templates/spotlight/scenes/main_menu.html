@@ -1,0 +1,27 @@
+<!-- ===== Scene: {{SCENE_NAME}} (main_menu) =====
+     Menu utama (layar terminal). Artwork memenuhi layar; judul & menu duduk di
+     sepertiga KIRI di atasnya. Cover diisi engine lewat data-bind-asset - tak
+     perlu hub.js. Tombol ditangani engine via data-action. -->
+    <section class="hub-scene sp-menu-scene" data-scene-id="{{SCENE_ID}}" data-scene-type="main_menu" data-scene-name="{{SCENE_NAME}}">
+      <img class="sp-art" data-node="artwork" data-bind-asset alt="">
+      <div class="sp-shade"></div>
+
+      <div class="sp-content" data-node="stage">
+        <h1 class="sp-title" data-node="title" data-bind="title">Visual Novel</h1>
+        <p class="sp-tagline" data-node="tagline" data-bind="storyDesc"></p>
+
+        <nav class="sp-menu" data-node="actions">
+          <button type="button" class="sp-item" data-node="start-btn" data-action="start">Mulai Cerita</button>
+          <button type="button" class="sp-item" data-node="chapter-btn" data-action="chapter-select">Pilih Chapter</button>
+          <button type="button" class="sp-item" data-node="info-btn" data-action="goto" data-target="{{TARGET:info}}">Tentang Novel</button>
+          <button type="button" class="sp-item" data-node="credits-btn" data-action="goto" data-target="{{TARGET:credits}}">Credits</button>
+          <button type="button" class="sp-item" data-node="exit-btn" data-action="exit">Keluar</button>
+        </nav>
+      </div>
+
+      <div class="sp-corner" data-node="corner">
+        <span class="sp-corner-label">Genre</span>
+        <b data-bind="genre">&mdash;</b>
+      </div>
+      <div class="sp-version" data-node="version"><span data-bind="version">&mdash;</span></div>
+    </section>

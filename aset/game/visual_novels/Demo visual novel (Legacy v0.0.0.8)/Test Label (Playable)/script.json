@@ -1,0 +1,94 @@
+[
+  {
+    "type": "phase",
+    "name": "Pembukaan",
+    "bgmVolume": 1,
+    "bgmDelay": 0,
+    "bgmPan": 0
+  },
+  {
+    "type": "dialogue",
+    "speaker": "Bela",
+    "text": "Kita mau tes program nih",
+    "spriteMode": "custom"
+  },
+  {
+    "type": "choice",
+    "speaker": "Bela",
+    "text": "Jadi kita mau kemana?",
+    "autoDialogue": "narrator",
+    "choices": [
+      {
+        "text": "1",
+        "jump": "1"
+      },
+      {
+        "text": "2",
+        "jump": "2"
+      },
+      {
+        "text": "Skipp Label",
+        "jump": "##SKIP_ALL_LABEL##"
+      }
+    ],
+    "spriteMode": "custom"
+  },
+  {
+    "type": "label",
+    "name": "1",
+    "bgmVolume": "1",
+    "bgmDelay": "0",
+    "bgmPan": "0",
+    "sfxVolume": "1",
+    "sfxDelay": "0",
+    "sfxPan": "0"
+  },
+  {
+    "type": "dialogue",
+    "speaker": "Bela",
+    "text": "sudah, Kita akan ke fase ending",
+    "spriteMode": "custom"
+  },
+  {
+    "type": "jump",
+    "target": "fase:Ending"
+  },
+  {
+    "type": "label",
+    "name": "2",
+    "bgmVolume": "1",
+    "bgmDelay": "0",
+    "bgmPan": "0",
+    "sfxVolume": "1",
+    "sfxDelay": "0",
+    "sfxPan": "0"
+  },
+  {
+    "type": "jump",
+    "target": "fase:Ending"
+  },
+  {
+    "type": "dialogue",
+    "speaker": "Bela",
+    "text": "Ini entri yang tidak ada di label manapun dalam satu fase",
+    "spriteMode": "custom"
+  },
+  {
+    "type": "jump",
+    "target": "fase:Ending"
+  },
+  {
+    "type": "phase",
+    "name": "Ending",
+    "bgmVolume": 1,
+    "bgmDelay": 0,
+    "bgmPan": 0,
+    "isEnding": true
+  },
+  {
+    "type": "dialogue",
+    "speaker": "Bela",
+    "text": "cerita end sampai sini, selesai yah",
+    "spriteMode": "custom"
+  }
+]

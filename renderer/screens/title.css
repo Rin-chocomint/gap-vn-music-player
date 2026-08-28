@@ -1,0 +1,195 @@
+﻿/* ============================ Title Screen ================================= */
+/*------------------- title animations -------------------------*/
+@keyframes fadeInLetter {
+    from {
+        opacity: 0;
+        filter: blur(10px);
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        filter: blur(0);
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeInBlur {
+    from {
+        opacity: 0;
+        filter: blur(10px);
+    }
+
+    to {
+        opacity: 1;
+        filter: blur(0);
+    }
+}
+
+@keyframes blink {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    80% {
+        opacity: 0.7;
+    }
+}
+
+@keyframes glowPulse {
+    from {
+        text-shadow:
+            0 0 5px #8ec9ff,
+            0 0 10px #8ec9ff,
+            0 0 20px #8ec9ff,
+            0 0 30px rgba(142, 201, 255, 0.8),
+            0 0 40px rgba(142, 201, 255, 0.6);
+    }
+
+    to {
+        text-shadow:
+            0 0 10px #8ec9ff,
+            0 0 20px #8ec9ff,
+            0 0 30px rgba(142, 201, 255, 0.9),
+            0 0 40px rgba(142, 201, 255, 0.7),
+            0 0 50px rgba(142, 201, 255, 0.5);
+    }
+}
+
+@keyframes revealAndHide {
+    0% {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+
+    10% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    90% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateY(-30px);
+    }
+}
+
+@keyframes fall {
+    0% {
+        transform: translateX(var(--start-x)) translateY(var(--start-y)) scale(1);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translateX(var(--end-x)) translateY(var(--end-y)) scale(0.7);
+        opacity: 0;
+    }
+}
+
+/*------------------- end title animations -------------------------*/
+
+/*------------------- title heading -------------------------*/
+#title-screen h1 {
+    font-size: 3rem;
+    font-weight: bold;
+    color: #ffffff;
+    text-align: center;
+    text-shadow:
+        0 0 5px #8ec9ff,
+        0 0 10px #8ec9ff,
+        0 0 20px #8ec9ff,
+        0 0 30px rgba(142, 201, 255, 0.8),
+        0 0 40px rgba(142, 201, 255, 0.6);
+    animation: glowPulse 2s infinite alternate;
+}
+
+#title-screen h1 span {
+    display: inline-block;
+    opacity: 0;
+    animation: fadeInLetter 0.5s ease forwards;
+}
+
+#title-screen h3 {
+    font-size: 2rem;
+    opacity: 0;
+    animation: fadeInBlur 1s ease-out forwards;
+    animation-delay: 2s;
+}
+
+#title-screen p {
+    font-size: 1.5rem;
+    opacity: 0;
+    animation: fadeIn 1s ease-out forwards, blink 0.5s infinite;
+    animation-delay: 0s;
+    position: relative;
+    top: 230px;
+}
+
+/*------------------- end title heading -------------------------*/
+
+/*------------------- rotating text -------------------------*/
+#rotating-text {
+    font-size: 1.5rem;
+    opacity: 0;
+    margin: 60px;
+    animation: fadeIn 2s ease-out forwards;
+    animation-delay: 6s;
+    position: relative;
+}
+
+#rotating-text.cycling {
+    animation: revealAndHide 4.8s linear infinite;
+}
+
+/*------------------- end rotating text -------------------------*/
+
+/*------------------- background video -------------------------*/
+#background-video {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    object-fit: cover;
+    opacity: 0;
+    z-index: -1;
+    transition: opacity 2s ease-in-out;
+    filter: brightness(70%);
+}
+
+/*------------------- end background video -------------------------*/
+
+/*------------------- falling stars -------------------------*/
+.star {
+    width: 3px;
+    height: 3px;
+    background: white;
+    border-radius: 50%;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+}
+
+.star-container {
+    position: absolute;
+    animation: fall linear infinite;
+}
+
+.star-container::before {
+    content: '';
+    position: absolute;
+    width: 200px;
+    height: 2px;
+    filter: blur(4px);
+    top: 50%;
+    left: -200px;
+    transform: translateY(-50%) rotate(0deg);
+    opacity: 0.8;
+}
+
+/*------------------- end falling stars -------------------------*/
+/* ============================ End Title Screen ================================= */

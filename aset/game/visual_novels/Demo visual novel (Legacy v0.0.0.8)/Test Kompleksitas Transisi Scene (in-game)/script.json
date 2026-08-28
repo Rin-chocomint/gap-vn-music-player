@@ -1,0 +1,90 @@
+[
+  {
+    "type": "phase",
+    "name": "Di kelas",
+    "bgmVolume": 1,
+    "bgmDelay": 0,
+    "bgmPan": 0
+  },
+  {
+    "type": "dialogue",
+    "speaker": "Bela",
+    "text": "Ehh kalian tau ngga sih? xixixix",
+    "spriteMode": "custom"
+  },
+  {
+    "type": "dialogue",
+    "speaker": "Bela",
+    "text": "Obrolan mereka di grup itu kayak gimana?",
+    "spriteMode": "custom"
+  },
+  {
+    "type": "choice",
+    "speaker": "Bela",
+    "text": "Mau tau ngga?",
+    "autoDialogue": "narrator",
+    "choices": [
+      {
+        "text": "Iya",
+        "jump": ""
+      },
+      {
+        "text": "...... (skip end story)",
+        "jump": "##SKIP_ALL_LABEL##"
+      }
+    ],
+    "spriteMode": "custom"
+  },
+  {
+    "type": "dialogue",
+    "speaker": "Bela",
+    "text": "nih-lihat nih yang ini dulu",
+    "spriteMode": "custom"
+  },
+  {
+    "type": "scene",
+    "sceneType": "video",
+    "transition": "fade_white",
+    "sfxInVolume": 1,
+    "sfxInDelay": 2800,
+    "sfxInPan": 1,
+    "videoMuted": true,
+    "mutePhaseBgm": false,
+    "persistBackground": false,
+    "duration": 13000,
+    "transitionOut": "fade_black",
+    "sfxOutVolume": 1,
+    "sfxOutDelay": 0,
+    "sfxOutPan": 0,
+    "bgmFade": 1,
+    "bgmLoop": true
+  },
+  {
+    "type": "scene",
+    "sceneType": "text_screen",
+    "transition": "fade_white",
+    "sfxInVolume": 1,
+    "sfxInDelay": 0,
+    "sfxInPan": 0,
+    "text": "Suatu?",
+    "duration": 3000,
+    "transitionOut": "fade_black",
+    "sfxOutVolume": 1,
+    "sfxOutDelay": 0,
+    "sfxOutPan": 0,
+    "bgmFade": 1,
+    "bgmLoop": true
+  },
+  {
+    "type": "dialogue",
+    "speaker": "Bela",
+    "text": "akwoakowkoaw",
+    "spriteMode": "custom"
+  },
+  {
+    "type": "dialogue",
+    "speaker": "Bela",
+    "text": "ya gitu deh",
+    "spriteMode": "custom"
+  }
+]

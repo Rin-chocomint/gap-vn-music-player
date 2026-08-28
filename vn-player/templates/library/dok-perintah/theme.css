@@ -1,0 +1,347 @@
+/* =============================================================
+ * DOK PERINTAH - kabut bertopeng di atas, dok gelap di bawah.
+ *
+ * Preset ini MENYUSUN ULANG layar cerita tanpa memiliki satu peran pun:
+ * markup-nya tetap milik engine, jadi novelmu terus ikut update. Yang berubah
+ * hanya CSS di berkas ini.
+ *
+ * Empat perubahan susunan:
+ *   1. Kotak teks dicabut. Yang menggantikannya sapuan kabut BERTOPENG
+ *      (`mask-image`) yang memudar di kiri & kanan - jadi tak pernah ada tepi
+ *      kotak yang kelihatan, tapi teks tetap punya latar yang menenangkan.
+ *   2. Nama pembicara jadi PITA merah bergaris diagonal, ikut memudar di kedua
+ *      ujungnya lewat topeng yang sama.
+ *   3. Seluruh kontrol turun ke DOK gelap setinggi --dp-dock di dasar layar,
+ *      tiap perintah berpasangan ikon + label. Sel terakhir (Menu) dipisah
+ *      garis dan diberi warna merah: ia satu-satunya yang MENINGGALKAN cerita.
+ *   4. Tanda lanjut jadi denyut merah di pojok kanan-bawah area teks.
+ *
+ * TIGA JEBAKAN yang sudah ditutup di sini:
+ *   - `::after` milik kotak dialog SUDAH DIPAKAI engine untuk tanda lanjut.
+ *     Kabutnya karena itu ditumpuk seluruhnya di `::before`.
+ *   - Bilah dok digambar lewat `::after` milik PANGGUNG, bukan elemen baru -
+ *     CSS tak bisa menambah elemen, dan wadah kontrol tak pernah selebar layar.
+ *   - Lebar sel Menu DIPATOK (`--dp-hub-w`) supaya posisi wadah kontrol di
+ *     sebelahnya bisa dihitung tepat. Kalau lebarnya dilepas, kedua kelompok
+ *     akan saling menabrak begitu label berganti bahasa.
+ *
+ * Semua selektor memakai `data-player-role` - bukan id. Itu kontraknya
+ * (Tahap 4): kotak dialog buatanmu sendiri tetap kena aturan ini asal ia
+ * membawa perannya.
+ * ============================================================= */
+
+:root {
+    /* --- Palet --- */
+    --dp-ink: #f7fbff;
+    --dp-cyan: #72c5d5;
+    --dp-red: #e35367;
+    --dp-red-deep: #a82a46;
+    --dp-pulse: #ff4d63;
+    --dp-stroke: rgba(2, 10, 19, 0.98);
+
+    /* Geometri dok. --dp-hub-w dipakai untuk MENGHITUNG posisi kelompok kontrol
+       di sebelahnya - lihat catatan di kepala berkas. */
+    --dp-dock: 35px;
+    --dp-edge: 24px;
+    --dp-hub-w: 78px;
+
+    /* --- 1. Kotak dicabut --- */
+    --vn-dialogue-width: 100%;
+    --vn-dialogue-bg: transparent;
+    --vn-dialogue-border: none;
+    --vn-dialogue-radius: 0px;
+    --vn-dialogue-color: var(--dp-ink);
+    --vn-dialogue-margin-bottom: var(--dp-dock);
+    --vn-dialogue-padding: 14px 10% 20px 14%;
+
+    --vn-name-color: #fff8f8;
+    --vn-name-weight: 700;
+    --vn-name-margin: 14px;
+
+    /* --- 4. Tanda lanjut jadi denyut merah --- */
+    --vn-continue-indicator: "\2301";
+    --vn-continue-color: var(--dp-pulse);
+    --vn-continue-opacity: 0.9;
+    --vn-continue-right: 20px;
+    --vn-continue-bottom: 10px;
+
+    --vn-typing-cursor: "\2595";
+}
+
+/* WAJIB untuk area teks selebar layar. Engine TIDAK menyetel `border-box` di
+   mana pun, jadi `width: 100%` berarti 100% UNTUK ISI SAJA dan padding 14%/10%
+   ditambahkan DI LUARNYA - areanya jadi ~1587px di layar 1280px, tergeser kiri
+   oleh `align-items: center` milik panggung, dan sisi kanannya terpotong.
+   Sel Menu ikut karena lebarnya dipatok lalu diberi padding kiri. */
+[data-player-role="dialogue"],
+[data-player-role="btn-hub"],
+[data-player-role="btn-rollback"],
+[data-player-role="btn-auto"],
+[data-player-role="btn-history"] {
+    box-sizing: border-box;
+}
+
+/* --- 1. Sapuan kabut bertopeng, bukan kotak --- */
+[data-player-role="dialogue"] {
+    min-height: max(24.5vh, 168px);
+    box-shadow: none;
+    /* `overflow: visible` menjaga pita nama tetap utuh saat topengnya melebar
+       keluar batas teks (inset negatif di ::before pita). */
+    overflow: visible;
+}
+
+/* Seluruh kabut ditumpuk di ::before karena ::after milik engine (lihat kepala
+   berkas). Topeng horizontal-lah yang membuat tepinya tak pernah terlihat. */
+[data-player-role="dialogue"]::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    opacity: 0.96;
+    pointer-events: none;
+    background:
+        repeating-linear-gradient(45deg, transparent 0 12px, rgba(155, 223, 232, 0.035) 12px 13px, transparent 13px 24px),
+        repeating-linear-gradient(-45deg, transparent 0 12px, rgba(155, 223, 232, 0.035) 12px 13px, transparent 13px 24px),
+        radial-gradient(ellipse 74% 92% at 50% 58%,
+            rgba(7, 48, 76, 0.88) 0%,
+            rgba(6, 40, 67, 0.78) 56%,
+            rgba(5, 32, 56, 0.18) 83%,
+            transparent 100%),
+        linear-gradient(180deg, transparent 0%, rgba(7, 39, 65, 0.6) 22%, rgba(4, 26, 48, 0.8) 80%, transparent 100%);
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 6%, #000 94%, transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0%, #000 6%, #000 94%, transparent 100%);
+}
+
+/* --- 2. Nama jadi pita merah yang memudar di kedua ujung ---
+ * `inline-flex` membuat pita menyusut mengikuti panjang nama, bukan melebar
+ * satu baris penuh seperti <p> biasa. `isolation: isolate` mengurung z-index
+ * anaknya supaya ::before pita tak jatuh ke belakang kabut panel. */
+[data-player-role="speaker"] {
+    position: relative;
+    z-index: 2;
+    display: inline-flex;
+    min-width: 220px;
+    height: 42px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 18px;
+    font-size: clamp(0.95rem, 1.45vw, 1.34rem);
+    line-height: 1;
+    text-shadow: 2px 2px 0 rgba(67, 20, 39, 0.82);
+    isolation: isolate;
+}
+
+[data-player-role="speaker"]::before {
+    content: "";
+    position: absolute;
+    inset: 0 -30px;
+    z-index: -1;
+    background:
+        repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0 4px, transparent 4px 9px),
+        linear-gradient(180deg, rgba(227, 83, 103, 0.88), rgba(168, 42, 70, 0.84));
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%);
+}
+
+/* Baris narasi (tanpa pembicara) tak boleh menyisakan pita merah kosong.
+   `:empty` yang menjawabnya - nol JavaScript. */
+[data-player-role="speaker"]:empty { display: none; }
+
+[data-player-role="text"] {
+    position: relative;
+    z-index: 2;
+    padding-left: 9.5%;
+    font-weight: 700;
+    font-size: clamp(1.05rem, 1.72vw, 1.6rem);
+    line-height: 1.52;
+    letter-spacing: 0.025em;
+    text-shadow:
+        3px 3px 0 var(--dp-stroke),
+        -2px -2px 0 var(--dp-stroke),
+        2px -2px 0 var(--dp-stroke),
+        -2px 2px 0 var(--dp-stroke),
+        0 3px 4px rgba(0, 0, 0, 0.66);
+}
+
+[data-player-role="text"].typing::after {
+    color: var(--dp-cyan);
+    text-shadow: none;
+}
+
+[data-player-role="dialogue"]::after {
+    z-index: 3;
+    font-size: 1.7rem;
+    line-height: 1;
+    text-shadow: 0 0 9px rgba(255, 77, 99, 0.38);
+}
+
+/* --- 3a. Bilah dok: digambar di ::after PANGGUNG ---
+ * CSS tak bisa menambah elemen, dan tak ada satu pun wadah kontrol yang selebar
+ * layar - jadi bilahnya dipinjam dari pseudo-element panggung. `pointer-events:
+ * none` wajib: bilah ini murni latar, tombolnya mengambang di atasnya. */
+[data-player-role="stage"]::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 4;
+    height: var(--dp-dock);
+    pointer-events: none;
+    border-top: 1px solid rgba(200, 221, 227, 0.2);
+    background: rgba(3, 7, 12, 0.92);
+    box-shadow: 0 -3px 10px rgba(0, 0, 0, 0.27);
+}
+
+/* --- 3b. Kelompok kontrol jalannya cerita, mendarat di dok ---
+ *
+ * Wadah tombolnya TAK punya peran sendiri (hanya anak-anaknya yang punya), jadi
+ * ia dijangkau lewat isinya: "div di dalam panggung yang memuat tombol auto".
+ * Posisinya dihitung dari lebar sel Menu supaya keduanya tak pernah menabrak. */
+[data-player-role="stage"] > div:has(> [data-player-role="btn-auto"]) {
+    position: fixed;
+    top: auto;
+    right: calc(var(--dp-edge) + var(--dp-hub-w) + 10px);
+    bottom: 0;
+    left: auto;
+    z-index: 105;
+    display: flex;
+    height: var(--dp-dock);
+    flex-direction: row;
+    align-items: center;
+    gap: 7px;
+    padding: 0;
+}
+
+/* --- 3c. Sel Menu: dipisah garis, diberi warna merah --- */
+[data-player-role="btn-hub"] {
+    top: auto;
+    right: var(--dp-edge);
+    bottom: 0;
+    left: auto;
+    z-index: 105;
+    width: var(--dp-hub-w);          /* DIPATOK - lihat kepala berkas */
+    height: var(--dp-dock);
+    justify-content: flex-start;
+    padding-left: 12px;
+    border-radius: 0;
+    border-left: 1px solid rgba(255, 255, 255, 0.18);
+    background: transparent;
+    color: #ff526b;
+}
+
+/* Satu bentuk untuk keempat sel. Isi asli tombol (ikon/emoji) dikecilkan sampai
+   nol lalu ikon + label ditulis di ::before/::after - cara ini juga tahan
+   terhadap i18n yang menulis ulang teks tombol. */
+[data-player-role="btn-hub"],
+[data-player-role="btn-rollback"],
+[data-player-role="btn-auto"],
+[data-player-role="btn-history"] {
+    display: inline-flex;
+    width: auto;
+    height: 26px;
+    align-items: center;
+    gap: 4px;
+    padding: 0 5px;
+    border-radius: 0;
+    background: transparent;
+    color: rgba(243, 247, 244, 0.76);
+    cursor: pointer;
+    font-size: 0;
+    white-space: nowrap;
+    animation: none;                 /* cabut denyut bawaan tombol AUTO */
+    transition: color 150ms ease, transform 150ms ease;
+}
+
+[data-player-role="btn-hub"] { height: var(--dp-dock); }
+
+[data-player-role="btn-hub"]::before,
+[data-player-role="btn-rollback"]::before,
+[data-player-role="btn-auto"]::before,
+[data-player-role="btn-history"]::before {
+    color: #d5d9cf;
+    font-size: 0.86rem;
+    line-height: 1;
+    text-shadow: 1px 1px 0 #000000;
+}
+
+[data-player-role="btn-hub"]::after,
+[data-player-role="btn-rollback"]::after,
+[data-player-role="btn-auto"]::after,
+[data-player-role="btn-history"]::after {
+    font-size: clamp(0.57rem, 0.72vw, 0.74rem);
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    text-shadow: 1px 1px 0 #000000;
+}
+
+[data-player-role="btn-rollback"]::before { content: "|\25C2"; }
+[data-player-role="btn-rollback"]::after  { content: "BACK"; }
+[data-player-role="btn-auto"]::before     { content: "\25B8"; }
+[data-player-role="btn-auto"]::after      { content: "AUTO"; }
+[data-player-role="btn-history"]::before  { content: "\21B6"; }
+[data-player-role="btn-history"]::after   { content: "LOG"; }
+[data-player-role="btn-hub"]::before      { content: "\25A1"; }
+[data-player-role="btn-hub"]::after       { content: "TITLE"; }
+
+[data-player-role="btn-hub"]::before { color: #ff526b; }
+
+[data-player-role="btn-rollback"]:hover,
+[data-player-role="btn-auto"]:hover,
+[data-player-role="btn-history"]:hover,
+[data-player-role="btn-hub"]:hover {
+    background: transparent;
+    color: #ffffff;
+    transform: translateY(-1px);     /* cabut scale/rotate bawaan */
+}
+
+[data-player-role="btn-auto"].active {
+    background: transparent;
+    color: var(--dp-cyan);
+}
+[data-player-role="btn-auto"].active::before { color: var(--dp-cyan); }
+
+[data-player-role="btn-rollback"].disabled {
+    opacity: 0.32;
+    pointer-events: none;
+}
+
+/* CATATAN JUJUR: SAVE/LOAD/CONFIG TIDAK ada di dok ini, meski rujukan gayanya
+   memilikinya. Di markup engine ketiganya tinggal DI DALAM overlay riwayat yang
+   `display: none`, dan anak dari elemen yang disembunyikan tak bisa ditampilkan
+   lewat CSS mana pun. Jalurnya tetap: LOG -> Save/Load/Setting. Menaikkan
+   ketiganya ke dok menuntut kepemilikan markup, bukan sekadar tema - itu paket
+   "Lengkap", bukan preset susunan seperti berkas ini. Dok berisi sel yang
+   benar-benar bekerja; sel hiasan yang tak menjalankan apa-apa justru kelas
+   cacat yang sedang dibersihkan dari aplikasi ini. */
+
+/* --- Pilihan: kartu gelap bertepi sian --- */
+:root {
+    --vn-choice-bg: rgba(4, 22, 40, 0.9);
+    --vn-choice-color: var(--dp-ink);
+    --vn-choice-border: 1px solid rgba(168, 220, 235, 0.8);
+    --vn-choice-radius: 2px;
+    --vn-choice-hover-bg: rgba(114, 197, 213, 0.92);
+    --vn-choice-hover-color: #041421;
+}
+
+/* --- Kosakata yang lahir dari CSS (D8) ---
+ * Area teks memakai sepertiga bawah layar penuh, jadi tokoh perlu berdiri
+ * sedikit lebih tinggi. Posisi di bawah langsung muncul di dropdown
+ * "Posisi Sprite" editor tanpa didaftarkan ke mana pun. */
+:root {
+    --vn-pos-dok-kiri: 26%;
+    --vn-pos-dok-kanan: 74%;
+    --vn-sprite-base-height: 78vh;
+}
+
+@keyframes dokPerintahMasuk {
+    from { opacity: 0; transform: translateY(1.5%); filter: saturate(0.6); }
+    to   { opacity: 1; transform: none; filter: none; }
+}
+
+/* Awalan `anim-in-` = hanya diputar saat sprite benar-benar baru muncul. */
+.anim-in-dok-siaga {
+    animation: dokPerintahMasuk 0.5s ease-out forwards;
+}

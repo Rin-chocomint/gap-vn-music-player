@@ -1,0 +1,18 @@
+{
+  "id": "cute",
+  "icon": "🍓",
+  "label": "Cute — Pastel & Bulat",
+  "description": "Pastel manis, sudut serba bulat, garis tebal lucu, dan sentuhan bayangan empuk. Ceria dan ramah.",
+  "order": 30,
+  "kind": "layout",
+  "layoutFamily": "center-stack",
+  "thumbnail": "preview.png",
+  "css": "hub.css",
+  "scenes": [
+    { "type": "splash",    "name": "Splash",     "file": "scenes/splash.html",    "duration": 3000 },
+    { "type": "warning",   "name": "Peringatan", "file": "scenes/warning.html" },
+    { "type": "main_menu", "name": "Main Menu",  "file": "scenes/main_menu.html" },
+    { "type": "info",      "name": "Info Novel", "file": "scenes/info.html" },
+    { "type": "credits",   "name": "Credits",    "file": "scenes/credits.html" }
+  ]
+}

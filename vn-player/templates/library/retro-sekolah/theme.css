@@ -1,0 +1,312 @@
+/* =============================================================
+ * RETRO SEKOLAH - panel mengambang, plakat, dan rel kontrol.
+ *
+ * Preset ini MENYUSUN ULANG layar cerita tanpa memiliki satu peran pun:
+ * markup-nya tetap milik engine, jadi novelmu terus ikut update. Yang berubah
+ * hanya CSS di berkas ini.
+ *
+ * Empat perubahan susunan:
+ *   1. Kotak teks MENGAMBANG - ada jarak ke keempat tepi layar, bertepi tebal,
+ *      dan bayangannya KERAS tanpa blur (`0 4px 0`). Itu yang memberi kesan
+ *      cetak/era-CD; menggantinya dengan bayangan berkabut membuang seluruh
+ *      wataknya.
+ *   2. Nama pembicara jadi PLAKAT terpisah yang berdiri di atas panel, digeser
+ *      ke kiri - bukan baris di dalam kotak.
+ *   3. Keempat kontrol berbaris jadi REL SEMPIT di tepi dalam kanan panel.
+ *   4. Tekstur garis pindai tipis di dalam panel.
+ *
+ * SATU JEBAKAN yang sudah ditutup: `::after` milik kotak dialog SUDAH DIPAKAI
+ * engine untuk tanda lanjut, jadi tekstur ditaruh di `::before`. Memakai
+ * `::after` akan menghapus tanda lanjut tanpa pesan apa pun.
+ *
+ * BATAS YANG DIAKUI: tinggi rel dipatok dari `--rs-h`, bukan dari tinggi kotak
+ * yang sebenarnya - CSS tak bisa membaca tinggi elemen lain. Untuk teks yang
+ * jauh lebih panjang daripada `min-height`, panel tumbuh ke atas sementara rel
+ * tetap. Itu selisih kosmetik, bukan kerusakan: rel tetap menempel di tepi
+ * kanan-bawah panel.
+ *
+ * Semua selektor memakai `data-player-role` - bukan id. Itu kontraknya
+ * (Tahap 4): kotak dialog buatanmu sendiri tetap kena aturan ini asal ia
+ * membawa perannya.
+ * ============================================================= */
+
+:root {
+    /* --- Palet --- */
+    --rs-ink: #fffef8;
+    --rs-outline: #221b25;
+    --rs-gold: #dcb389;
+    --rs-edge: rgba(226, 186, 152, 0.96);
+    --rs-caret: #f3d6b9;
+
+    /* Geometri panel mengambang. Keempat angka ini dipakai ulang oleh rel di
+       bawah - ubah di sini saja supaya panel dan rel tetap sejajar. */
+    --rs-side: 1.75vw;
+    --rs-bottom: 2.15vh;
+    --rs-h: max(18.5vh, 198px);
+    --rs-cell: 30px;
+    --rs-rail: 27px;
+
+    /* --- Panel (aturan 1) --- */
+    --vn-dialogue-width: calc(100% - (2 * var(--rs-side)));
+    --vn-dialogue-radius: 4px;
+    --vn-dialogue-border: 2px solid var(--rs-edge);
+    --vn-dialogue-bg: rgba(38, 47, 72, 0.7);
+    --vn-dialogue-color: var(--rs-ink);
+    --vn-dialogue-margin-bottom: var(--rs-bottom);
+    --vn-dialogue-padding: 24px calc(var(--rs-rail) + 34px) 22px 40px;
+
+    --vn-name-color: var(--rs-ink);
+    --vn-name-weight: 700;
+    --vn-name-margin: 0;
+
+    /* --- Tanda lanjut: di kiri rel, bukan di bawahnya --- */
+    --vn-continue-indicator: "\25BE";
+    --vn-continue-color: var(--rs-caret);
+    --vn-continue-opacity: 0.85;
+    --vn-continue-right: calc(var(--rs-rail) + 14px);
+    --vn-continue-bottom: 12px;
+
+    --vn-typing-cursor: "\2595";
+}
+
+/* WAJIB. Engine TIDAK menyetel `border-box` di mana pun, jadi lebar + padding +
+   tepi 2px dijumlahkan KE LUAR: panel yang seharusnya `100% - 2*1.75vw` justru
+   melebihi lebar layar, tergeser oleh `align-items: center` milik panggung, dan
+   jarak mengambang di kiri-kanan - ciri utama templat ini - hilang sama sekali.
+   Rel kontrol ikut karena posisinya dihitung dari geometri yang sama. */
+[data-player-role="dialogue"],
+[data-player-role="stage"] > div:has(> [data-player-role="btn-auto"]),
+[data-player-role="btn-hub"] {
+    box-sizing: border-box;
+}
+
+/* --- 1. Panel mengambang bertepi tebal --- */
+[data-player-role="dialogue"] {
+    min-height: var(--rs-h);
+    background-image: linear-gradient(90deg, rgba(80, 92, 128, 0.1), rgba(80, 92, 128, 0.22));
+    box-shadow:
+        inset 0 0 0 1px rgba(34, 27, 37, 0.72),
+        0 4px 0 rgba(32, 22, 30, 0.36);          /* keras, tanpa blur (aturan 1) */
+    /* `overflow: visible` WAJIB: plakat nama di bawah menonjol KELUAR dari
+       panel, dan nilai `hidden` dari mana pun akan memotongnya tanpa pesan. */
+    overflow: visible;
+}
+
+/* --- 4. Tekstur garis pindai. Di ::before, bukan ::after (lihat kepala berkas). --- */
+[data-player-role="dialogue"]::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+        repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 4px),
+        linear-gradient(125deg, transparent 0 28%, rgba(255, 255, 255, 0.05) 28.2% 28.5%, transparent 28.7% 100%);
+}
+
+/* --- 2. Nama jadi plakat yang berdiri di atas panel ---
+ * Menumpang `position: relative` milik kotak dialog (dipasang engine demi
+ * z-index). Kalau suatu saat itu hilang, plakat melompat ke tepi layar. */
+[data-player-role="speaker"] {
+    position: absolute;
+    top: 0;
+    left: 4px;
+    z-index: 3;
+    display: flex;
+    width: 190px;
+    height: 54px;
+    align-items: center;
+    padding: 0 22px;
+    border: 2px solid #e2ba98;
+    border-radius: 3px 3px 0 0;
+    background:
+        linear-gradient(180deg, rgba(140, 148, 178, 0.92), rgba(81, 89, 121, 0.88)),
+        repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 3px);
+    box-shadow:
+        inset 0 0 0 1px rgba(50, 35, 46, 0.7),
+        0 3px 0 rgba(23, 19, 28, 0.34);
+    font-size: clamp(1.2rem, 2vw, 1.85rem);
+    line-height: 1;
+    overflow: hidden;
+    text-shadow:
+        2px 2px 0 var(--rs-outline),
+        -1px -1px 0 var(--rs-outline),
+        1px -1px 0 var(--rs-outline),
+        -1px 1px 0 var(--rs-outline);
+    transform: translateY(calc(-100% - 10px));
+}
+
+/* Baris narasi (tanpa pembicara) tak boleh menyisakan plakat kosong
+   menggantung. `:empty` yang menjawabnya - nol JavaScript. */
+[data-player-role="speaker"]:empty { display: none; }
+
+[data-player-role="text"] {
+    position: relative;
+    z-index: 1;
+    font-weight: 700;
+    font-size: clamp(1.1rem, 2.28vw, 2rem);
+    line-height: 1.42;
+    letter-spacing: 0.02em;
+    text-shadow:
+        3px 3px 0 var(--rs-outline),
+        -2px -2px 0 var(--rs-outline),
+        2px -2px 0 var(--rs-outline),
+        -2px 2px 0 var(--rs-outline),
+        0 3px 4px rgba(0, 0, 0, 0.64);
+}
+
+[data-player-role="text"].typing::after {
+    color: var(--rs-caret);
+    text-shadow: none;
+}
+
+/* --- 3. Rel kontrol di tepi dalam kanan panel ---
+ *
+ * Wadah tombolnya TAK punya peran sendiri (hanya anak-anaknya yang punya), jadi
+ * ia dijangkau lewat isinya: "div di dalam panggung yang memuat tombol auto".
+ * Itu tetap diturunkan dari peran - bukan dari id.
+ *
+ * Rel dirakit dari DUA blok: wadah kontrol di atas, tombol hub sebagai sel
+ * paling bawah. CSS tak bisa memindahkan induk, jadi keduanya diberi lebar,
+ * latar, dan garis tepi yang sama supaya terbaca sebagai satu rel. */
+[data-player-role="stage"] > div:has(> [data-player-role="btn-auto"]) {
+    position: fixed;
+    top: auto;
+    right: calc(var(--rs-side) + 4px);
+    bottom: calc(var(--rs-bottom) + 4px + var(--rs-cell));
+    left: auto;
+    z-index: 101;
+    display: flex;
+    width: var(--rs-rail);
+    height: calc(var(--rs-h) - 8px - var(--rs-cell));
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0;
+    padding: 0;
+    border-left: 1px solid rgba(227, 188, 157, 0.75);
+    background: rgba(72, 46, 58, 0.42);
+}
+
+[data-player-role="btn-hub"] {
+    top: auto;
+    right: calc(var(--rs-side) + 4px);
+    bottom: calc(var(--rs-bottom) + 4px);
+    left: auto;
+    z-index: 101;
+    display: flex;
+    width: var(--rs-rail);
+    height: var(--rs-cell);
+    align-items: center;
+    justify-content: center;
+    border-radius: 0;
+    border-left: 1px solid rgba(227, 188, 157, 0.75);
+    background: rgba(72, 46, 58, 0.42);
+}
+
+/* Sel rel: kotak kecil bertepi, bukan bulatan. Isi asli tombol (ikon/emoji)
+   dikecilkan sampai nol lalu tanda ditulis di ::after - cara ini juga tahan
+   terhadap i18n yang menulis ulang teks tombol. Tanda dipakai APA ADANYA
+   sebagai simbol karena selnya cuma 22px; label kata ditaruh di `title`
+   bawaan engine (tooltip), bukan dipaksa masuk ke sel. */
+[data-player-role="btn-rollback"],
+[data-player-role="btn-auto"],
+[data-player-role="btn-history"] {
+    width: 22px;
+    height: 28px;
+    margin: 1px 0;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(224, 176, 145, 0.92);
+    border-radius: 1px;
+    background: linear-gradient(180deg, rgba(153, 99, 82, 0.92), rgba(83, 56, 67, 0.72));
+    color: #e7c0a5;
+    cursor: pointer;
+    font-size: 0;
+    animation: none;                    /* cabut denyut bawaan tombol AUTO */
+    transition: filter 150ms ease, color 150ms ease;
+}
+
+[data-player-role="btn-hub"] > * { font-size: 0; }
+
+[data-player-role="btn-hub"]::after,
+[data-player-role="btn-rollback"]::after,
+[data-player-role="btn-auto"]::after,
+[data-player-role="btn-history"]::after {
+    font-size: 0.78rem;
+    line-height: 1;
+    text-shadow: 1px 1px 0 rgba(32, 21, 28, 0.8);
+}
+
+/* Lambang dipilih yang KONVENSIONAL, bukan yang paling dekoratif: rel selebar
+   27px tak muat kata, dan dua dari empat tombol engine (Auto & Riwayat) tidak
+   membawa atribut `title`, jadi tak ada tooltip yang menolong kalau lambangnya
+   mengada-ada. Segitiga-kiri, huruf A, tiga garis, dan rumah sudah terbaca
+   tanpa penjelasan. */
+[data-player-role="btn-rollback"]::after { content: "\25C0"; }   /* mundur  */
+[data-player-role="btn-auto"]::after     { content: "A"; }       /* auto    */
+[data-player-role="btn-history"]::after  { content: "\2261"; }   /* riwayat */
+[data-player-role="btn-hub"]::after      { content: "\2302"; }   /* menu    */
+
+[data-player-role="btn-hub"] {
+    color: #e7c0a5;
+    font-size: 0;
+}
+
+[data-player-role="btn-hub"]:hover,
+[data-player-role="btn-rollback"]:hover,
+[data-player-role="btn-auto"]:hover,
+[data-player-role="btn-history"]:hover {
+    background: linear-gradient(180deg, rgba(153, 99, 82, 0.92), rgba(83, 56, 67, 0.72));
+    color: #fff3dd;
+    filter: brightness(1.32);
+    transform: none;                    /* cabut scale/rotate bawaan */
+}
+
+[data-player-role="btn-hub"]:hover { background: rgba(92, 61, 76, 0.3); }
+
+[data-player-role="btn-auto"].active {
+    background: linear-gradient(180deg, #d8a86a, #9b6f3f);
+    color: #2a1b12;
+}
+
+[data-player-role="btn-rollback"].disabled {
+    opacity: 0.32;
+    pointer-events: none;
+}
+
+/* CATATAN JUJUR: Simpan/Muat/Pengaturan TIDAK ikut rel ini. Di markup engine
+   ketiganya tinggal DI DALAM overlay riwayat yang `display: none`, dan anak dari
+   elemen yang disembunyikan tak bisa ditampilkan lewat CSS mana pun. Jalurnya
+   tetap: Riwayat -> Save/Load/Setting. */
+
+/* --- Pilihan: kartu bertepi tebal senada panel --- */
+:root {
+    --vn-choice-bg: rgba(38, 47, 72, 0.86);
+    --vn-choice-color: var(--rs-ink);
+    --vn-choice-border: 2px solid var(--rs-edge);
+    --vn-choice-radius: 3px;
+    --vn-choice-hover-bg: rgba(220, 179, 137, 0.94);
+    --vn-choice-hover-color: #241c20;
+}
+
+/* --- Kosakata yang lahir dari CSS (D8) ---
+ * Panel mengambang menyisakan pita kosong di kiri-kanan bawah, jadi tokoh boleh
+ * berdiri lebih ke tepi daripada bawaan. Posisi di bawah langsung muncul di
+ * dropdown "Posisi Sprite" editor tanpa didaftarkan ke mana pun. */
+:root {
+    --vn-pos-papan-kiri: 22%;
+    --vn-pos-papan-kanan: 78%;
+}
+
+@keyframes retroSekolahMasuk {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* Awalan `anim-in-` = hanya diputar saat sprite benar-benar baru muncul. */
+.anim-in-papan-naik {
+    animation: retroSekolahMasuk 0.42s steps(6, end) forwards;
+}

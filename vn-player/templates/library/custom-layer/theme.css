@@ -1,0 +1,36 @@
+/* =============================================================
+ * Custom Layer — theme.css
+ *
+ * Dua sumbu kosakata hidup di berkas ini dan langsung muncul di dropdown
+ * editor tanpa mendaftarkan apa pun (editor MEMINDAI CSS yang benar-benar
+ * dimuat player):
+ *   • posisi panggung  → `--vn-pos-<nama>`   dipakai "spriteX": "<nama>"
+ *   • animasi sprite   → `.anim-<nama>`      dipakai "spriteAnim": "anim-<nama>"
+ *
+ * Label manusiawinya diatur di `vocab-ui.json` sebelah.
+ * ============================================================= */
+
+:root {
+    /* Kosmetik dasar */
+    --vn-dialogue-bg: rgba(10, 10, 18, 0.88);
+    --vn-name-color: #9fd8ff;
+
+    /* --- Posisi panggung buatan template ini --- */
+    --vn-pos-bayang: 18%;
+    --vn-pos-sorot: 64%;
+
+    /* Redup fokus bicara sedikit lebih tegas dari bawaan (0.55). */
+    --vn-sprite-dim: 0.45;
+}
+
+/* --- Animasi sprite buatan template ini ---
+ * Awalan `anim-in-` memberi tahu engine ini animasi MASUK: hanya diputar saat
+ * sprite benar-benar baru muncul, bukan di tiap baris. */
+@keyframes customLayerMuncul {
+    from { opacity: 0; transform: translateY(6%) scale(0.98); }
+    to   { opacity: 1; transform: none; }
+}
+
+.anim-in-muncul-lembut {
+    animation: customLayerMuncul 0.45s ease-out forwards;
+}

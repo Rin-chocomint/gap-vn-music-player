@@ -1,0 +1,17 @@
+{
+  "id": "detail-page",
+  "icon": "☷",
+  "label": "Halaman Detail — Info & Chapter Sekaligus",
+  "description": "Bukan main menu, melainkan halaman detail: judul di atas, kolom kiri berisi info novel + sinopsis + daftar chapter berprogres, kolom kanan berisi cover, tombol Lanjutkan, dan ringkasan progres. Pemain melihat seluruh isi novel tanpa menekan apa pun. Cocok untuk novel bab-banyak yang pemainnya sering melompat antar-chapter.",
+  "order": 35,
+  "kind": "layout",
+  "layoutFamily": "detail-page",
+  "thumbnail": "preview.png",
+  "css": "hub.css",
+  "js": "hub.js",
+  "scenes": [
+    { "type": "main_menu",   "name": "Halaman Detail",  "file": "scenes/main_menu.html" },
+    { "type": "custom_code", "name": "Muat Permainan",  "file": "scenes/load_game.html" },
+    { "type": "credits",     "name": "Credits",         "file": "scenes/credits.html" }
+  ]
+}

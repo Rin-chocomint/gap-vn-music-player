@@ -1,0 +1,89 @@
+/* =============================================
+ * VN Player Theme — Light Romance
+ * Palette pastel, pink/warm, dan lembut
+ * ============================================= */
+
+.theme-light-romance {
+    /* === Dialogue Box === */
+    --vn-dialogue-bg: rgba(255, 240, 245, 0.92);
+    --vn-dialogue-border: 2px solid #e8a0b4;
+    --vn-dialogue-radius: 16px;
+    --vn-dialogue-padding: 14px 24px;
+    --vn-dialogue-width: 78%;
+    --vn-dialogue-margin-bottom: 12px;
+
+    /* === Typography === */
+    --vn-font-family: 'Lexend', 'Georgia', serif;
+    --vn-dialogue-color: #4a3040;
+    --vn-dialogue-size: 1em;
+    --vn-typing-cursor: '♡';
+
+    /* === Speaker Name === */
+    --vn-name-color: #d4507a;
+    --vn-name-weight: bold;
+    --vn-name-margin: 6px;
+
+    /* === Choices === */
+    --vn-choice-bg: rgba(255, 230, 240, 0.95);
+    --vn-choice-color: #4a3040;
+    --vn-choice-border: 2px solid #e8a0b4;
+    --vn-choice-radius: 20px;
+    --vn-choice-padding: 14px 28px;
+    --vn-choice-font-size: 1.05em;
+    --vn-choice-hover-bg: #d4507a;
+    --vn-choice-hover-color: #fff;
+    --vn-choice-hover-scale: 1.04;
+
+    /* === Sprites === */
+    --vn-sprite-base-height: 75vh;
+    --vn-sprite-max-height: 600px;
+    --vn-sprite-max-width: 45vw;
+    --vn-sprite-fade-duration: 0.5s;
+    --vn-sprite-padding-side: 50px;
+
+    /* === Transitions === */
+    --vn-transition-duration: 500ms;
+    --vn-fade-duration: 0.6s;
+    --vn-scene-fade-duration: 0.5s;
+    --vn-bg-transition: 0.6s ease-in-out;
+
+    /* === Controls === */
+    --vn-control-bg: rgba(255, 230, 240, 0.85);
+    --vn-control-color: #6a4058;
+    --vn-control-radius: 12px;
+    --vn-control-size: 44px;
+    --vn-auto-active-bg: #d4507a;
+    --vn-auto-active-color: #fff;
+
+    /* === Backlog === */
+    --vn-backlog-bg: rgba(255, 240, 248, 0.96);
+    --vn-backlog-speaker-color: #d4507a;
+
+    /* === End Screen === */
+    --vn-end-bg: rgba(255, 230, 240, 0.6);
+    --vn-end-blur: 10px;
+    --vn-end-title-size: 2.5rem;
+    --vn-end-button-width: 300px;
+
+    /* === Settings Modal === */
+    --vn-settings-bg: rgba(255, 240, 248, 0.97);
+    --vn-settings-container-bg: #fff0f5;
+    --vn-settings-text: #4a3040;
+    --vn-settings-text-secondary: #8a6878;
+    --vn-settings-text-muted: #b8a0ac;
+    --vn-settings-tertiary: #ffe8f0;
+    --vn-settings-border: rgba(212, 80, 122, 0.12);
+    --vn-settings-accent: #d4507a;
+    --vn-settings-bgm-color: #e87098;
+    --vn-settings-voice-color: #d4507a;
+    --vn-settings-sfx-color: #c0608a;
+
+    /* === Game Container === */
+    --vn-bg-color: #fef0f5;
+
+    /* === Debug HUD === */
+    --vn-debug-bg: rgba(255, 240, 248, 0.94);
+    --vn-debug-width: 320px;
+    --vn-debug-font: 'Consolas', monospace;
+    --vn-debug-font-size: 12px;
+}

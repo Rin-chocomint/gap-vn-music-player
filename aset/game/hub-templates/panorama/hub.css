@@ -1,0 +1,239 @@
+/* ===================================================================
+   Template: Panorama - Judul Kanan, Menu Melintang
+   Keluarga layout: cinematic-bottom
+
+   Ini satu-satunya templat bawaan yang menaruh menu MELINTANG. Tiga hal
+   yang membentuknya - dan yang akan merusaknya kalau dilepas:
+
+     1. Pita menu (.pn-bar) dipagari garis atas TEBAL dan garis bawah TIPIS.
+        Bedanya ketebalan itu yang membuat pita terbaca sebagai satu benda,
+        bukan sebagai lima tombol yang kebetulan sebaris.
+     2. Tiap item dipisah border-left, dan item PERTAMA mencabutnya lagi.
+        Tanpa pencabutan itu pita punya garis menggantung di ujung kiri.
+     3. Blok judul rata KANAN, menu rata KANAN juga. Tengah layar sengaja
+        dikosongkan supaya artwork punya ruang bernapas.
+   =================================================================== */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --pn-void: #26352e;
+  --pn-ink: #f4f0e5;
+  --pn-dim: rgba(244, 240, 229, 0.76);
+  --pn-faint: rgba(244, 240, 229, 0.5);
+  --pn-rule: rgba(244, 240, 229, 0.64);
+  --pn-rule-soft: rgba(244, 240, 229, 0.26);
+  --pn-serif: var(--vn-novel-font, Georgia, "Times New Roman", serif);
+  --pn-sans: var(--vn-novel-font, Arial, Helvetica, sans-serif);
+
+  --pn-side: 7%;
+}
+
+body {
+  font-family: var(--pn-serif);
+  background: var(--pn-void);
+  color: var(--pn-ink);
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+#hub-root { position: relative; width: 100vw; height: 100vh; }
+
+/* --- Sistem layar: satu scene aktif (WAJIB) --- */
+.hub-scene {
+  position: absolute; inset: 0;
+  overflow: hidden;
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity .45s ease, visibility .45s ease;
+}
+.hub-scene.active { opacity: 1; visibility: visible; pointer-events: auto; }
+
+/* --- Artwork + peneduh dua lapis (samping & dasar) --- */
+.pn-art {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+.pn-art:not([src]) { display: none; }
+/* Override "Background Scene" dari Inspector menyuntik background-image ke
+   <section> ini sendiri — yang secara DOM duduk DI BAWAH .pn-art. Tanpa baris
+   ini override itu tak pernah kelihatan, tertutup total oleh cover otomatis. */
+.hub-scene[style*="background-image"] .pn-art { display: none; }
+
+.pn-shade {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(5, 16, 17, 0.38), rgba(5, 16, 17, 0.04) 58%, rgba(5, 16, 17, 0.5)),
+    linear-gradient(0deg, rgba(5, 16, 17, 0.66), transparent 30%);
+}
+
+/* --- Sudut kiri atas: penanda kecil dengan garis pendek di depannya --- */
+.pn-meta {
+  position: absolute; top: 32px; left: 38px;
+  color: var(--pn-dim);
+  font-family: var(--pn-sans);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  line-height: 1.8;
+  text-transform: uppercase;
+}
+.pn-meta::before {
+  content: "";
+  display: inline-block;
+  width: 22px; height: 1px;
+  margin: 0 9px 3px 0;
+  background: currentColor;
+}
+
+/* --- Blok judul: rata kanan, sepertiga atas (aturan 3) --- */
+.pn-title-block {
+  position: absolute; top: 22%; right: 10%;
+  width: min(430px, 44vw);
+  text-align: right;
+}
+.pn-kicker {
+  display: block;
+  margin-bottom: 15px;
+  color: var(--pn-dim);
+  font-family: var(--pn-sans);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.pn-title {
+  font-size: clamp(2.2rem, 6vw, 5.4rem);
+  font-weight: 400;
+  letter-spacing: -0.07em;
+  line-height: 0.92;
+}
+.pn-hairline { width: 100%; height: 1px; margin: 24px 0 13px auto; background: var(--pn-rule); }
+.pn-tagline {
+  color: var(--pn-dim);
+  font-family: var(--pn-sans);
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+/* --- Pita menu melintang (aturan 1 & 2) --- */
+.pn-bar {
+  position: absolute;
+  right: var(--pn-side); bottom: 8.5%; left: var(--pn-side);
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  border-top: 1px solid var(--pn-rule);
+  border-bottom: 1px solid var(--pn-rule-soft);
+}
+.pn-item {
+  position: relative;
+  min-width: 112px;
+  padding: 16px 18px 15px;
+  border: 0;
+  border-left: 1px solid var(--pn-rule-soft);
+  background: transparent;
+  color: var(--pn-dim);
+  cursor: pointer;
+  font-family: var(--pn-sans);
+  font-size: 11px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  transition: background .18s ease, color .18s ease;
+}
+.pn-item:first-child { border-left: 0; }   /* aturan 2 */
+.pn-item:hover,
+.pn-item:focus-visible {
+  background: rgba(244, 240, 229, 0.1);
+  color: var(--pn-ink);
+  outline: none;
+}
+.pn-item::after {
+  content: "";
+  position: absolute; right: 18px; bottom: 9px; left: 18px;
+  height: 1px;
+  background: transparent;
+  transition: background .18s ease;
+}
+.pn-item:hover::after,
+.pn-item:focus-visible::after { background: var(--pn-ink); }
+
+.pn-foot {
+  position: absolute; right: var(--pn-side); bottom: 20px;
+  color: var(--pn-faint);
+  font-family: var(--pn-sans);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+}
+
+/* --- Layar teks (warning / info / credits): panel rata kanan --- */
+.pn-panel {
+  position: absolute; top: 50%; right: 10%;
+  width: min(560px, 56vw);
+  text-align: right;
+  transform: translateY(-50%);
+}
+.pn-panel .pn-title { font-size: clamp(1.5rem, 3vw, 2.6rem); }
+.pn-prose {
+  margin-top: 16px;
+  color: var(--pn-dim);
+  font-family: var(--pn-sans);
+  font-size: 12px;
+  line-height: 1.9;
+}
+.pn-dl {
+  display: grid; grid-template-columns: 1fr auto; gap: 7px 18px;
+  margin-top: 22px; padding-top: 16px;
+  border-top: 1px solid var(--pn-rule-soft);
+  font-family: var(--pn-sans);
+  font-size: 12px;
+}
+.pn-dl dt { color: var(--pn-faint); text-align: right; }
+.pn-dl dd { color: var(--pn-ink); text-align: right; }
+.pn-credits {
+  margin-top: 18px;
+  color: var(--pn-dim);
+  font-family: var(--pn-sans);
+  font-size: 12px;
+  line-height: 2.1;
+}
+.pn-credits span { color: var(--pn-ink); }
+
+.pn-btn {
+  margin-top: 26px;
+  padding: 12px 22px;
+  border: 1px solid var(--pn-rule);
+  background: transparent;
+  color: var(--pn-ink);
+  cursor: pointer;
+  font-family: var(--pn-sans);
+  font-size: 11px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  transition: background .18s ease;
+}
+.pn-btn:hover { background: rgba(244, 240, 229, 0.12); }
+
+/* --- Splash --- */
+.pn-splash { cursor: pointer; }
+.pn-splash .pn-title-block { top: 50%; transform: translateY(-50%); }
+.pn-skip {
+  position: absolute; right: var(--pn-side); bottom: 7vh;
+  color: var(--pn-faint);
+  font-family: var(--pn-sans);
+  font-size: 11px;
+}
+
+/* --- Layar sempit: pita menu boleh membungkus, judul melebar --- */
+@media (max-width: 760px) {
+  :root { --pn-side: 22px; }
+  .pn-title-block { top: 14%; right: 22px; left: 22px; width: auto; }
+  .pn-bar { flex-wrap: wrap; justify-content: flex-start; }
+  .pn-item { flex: 1 0 33%; min-width: 0; }
+  .pn-item:first-child { border-left: 0; }
+  .pn-panel { right: 22px; left: 22px; width: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hub-scene, .pn-item, .pn-item::after, .pn-btn { transition: none; }
+}

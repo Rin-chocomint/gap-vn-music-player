@@ -1,6 +1,44 @@
+# Dependensi & hasil build tidak masuk repo.
+# node_modules/electron/dist/electron.exe = 180 MB, di atas batas keras 100 MB
+# GitHub. Keduanya juga sudah ada di updater.excludePaths (versions.json),
+# jadi update-hashes tidak pernah meng-hash isinya -- manifest tetap identik
+# antara repo dan ZIP rilis.
 node_modules/
 dist/
+
+# Data pengguna, bukan aset instalasi. Berkas .txt di dalamnya adalah petunjuk
+# bawaan ("Buat Folder disni, lalu isi dengan musik.txt") -- itu ikut repo,
+# isinya yang tidak.
+aset/gif-storage/*
+!aset/gif-storage/.gitkeep
+aset/music/*
+!aset/music/*.txt
+aset/wallpaper/*
+!aset/wallpaper/*.txt
+aset/save/
+aset/character/
+
+# Konten personal panel About (profil, sejarah pengembangan, daftar pendukung).
+# Sengaja hanya ikut di paket rilis, tidak di repo — repositori ini berisi mesin
+# murni yang siap dikembangkan ulang orang lain. Pemuatnya menangani ketiadaan
+# berkas ini dengan wajar: lihat renderer/core/utils-ui.js -> loadAboutContent().
+aset/konten/about-chocomint.html
+
+# Novel: hanya Demo yang dibawa. Sisanya karya kerja/showcase.
+# Pola "Demo*" dipakai supaya folder demo boleh diganti nama tanpa diam-diam
+# terlempar keluar repo.
+aset/game/visual_novels/*
+!aset/game/visual_novels/Demo*/
+!aset/game/visual_novels/taruh folder berisi code novel ke sini.txt
+
+# Artefak pengembangan.
+logs/
+coverage/
+.agents/
 release-builds/
 *.log
+*.rar
+*.zip
+*.7z
 .DS_Store
 Thumbs.db

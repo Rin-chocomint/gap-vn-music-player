@@ -1,0 +1,134 @@
+        /* ================ Black Screen ======================== */
+        .black-scene {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: black;
+            z-index: 2000;
+        }
+
+        @keyframes swipeOut {
+            0% {
+                transform: translateX(0);
+            }
+
+            100% {
+                transform: translateX(-100%);
+            }
+        }
+
+        .black-scene.swipe-out {
+            animation: swipeOut 0.3s ease forwards;
+        }
+
+        /* ======================= End Black Screen ======================= */
+
+
+        /* ====================== Scene Intro ============================== */
+        .intro-scene {
+            display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, #FFA07A, #FFDAB9);
+            z-index: 1000;
+            overflow: hidden;
+            padding: 20px;
+        }
+
+        .tips-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 70%;
+            max-width: 800px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            padding: 30px;
+        }
+
+        .tips-header {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .tips-content {
+            font-size: 1.2rem;
+            color: #555;
+            text-align: center;
+            line-height: 1.5;
+        }
+
+        .continue-section {
+            position: absolute;
+            bottom: 60px;
+            right: 260px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            overflow: visible;
+        }
+
+        @keyframes jump-high {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-8px);
+            }
+        }
+
+        @keyframes jump-low {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-4px);
+            }
+        }
+
+        .character-image-small {
+            width: 260px;
+            height: 240px;
+            object-fit: contain;
+            margin-right: 10px;
+        }
+
+        .continue-text {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .character-image {
+            max-width: 30%;
+            height: auto;
+            object-fit: contain;
+        }
+
+        /*------ gambar karakter Responsif resolusi 720 ke bawah -------*/
+        @media screen and (max-width: 1280px) {
+            .character-image-small {
+                width: 150px;
+                height: 165px;
+            }
+        }
+
+        /*---- End gambar karakter Responsif resolusi 720 ke bawah -----*/
+
+        /* ======================= End Scene Intro ======================= */
+

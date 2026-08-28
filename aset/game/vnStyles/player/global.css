@@ -1,0 +1,208 @@
+        /* ================== Global Reset & Fonts ====================== */
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            /* Hanya berlaku untuk body dan html */
+            font-family: 'Lexend', sans-serif;
+        }
+
+        input,
+        textarea {
+            -webkit-user-select: auto;
+            user-select: auto;
+        }
+
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 300;
+            src: url('../../../fonts/lexend-v26-latin-300.woff2') format('woff2');
+        }
+
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 400;
+            src: url('../../../fonts/lexend-v26-latin-regular.woff2') format('woff2');
+        }
+
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 700;
+            src: url('../../../fonts/lexend-v26-latin-700.woff2') format('woff2');
+        }
+
+        /* ================== Custom Scrollbar Styling ================== */
+        /* Scrollbar untuk seluruh editor - tema gelap dengan accent cyan */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(30, 30, 30, 0.8);
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, #3a3a3a, #4a4a4a);
+            border-radius: 5px;
+            border: 2px solid rgba(30, 30, 30, 0.8);
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg, #4a4a4a, #5a5a5a);
+        }
+
+        ::-webkit-scrollbar-thumb:active {
+            background: linear-gradient(180deg, #00aaaa, #00cccc);
+        }
+
+        ::-webkit-scrollbar-corner {
+            background: rgba(30, 30, 30, 0.8);
+        }
+
+        /* ================== End Custom Scrollbar ================== */
+
+        /*------ Notifikasi ------*/
+        #notification-toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(200%);
+            padding: 15px 25px;
+            border-radius: 8px;
+            color: white;
+            font-weight: bold;
+            z-index: 9999;
+            opacity: 0;
+            transition: all 0.5s ease-in-out;
+            pointer-events: none;
+            background-color: #f3557a;
+            box-shadow: 0 4px 15px rgba(243, 85, 122, 0.4);
+        }
+
+        #notification-toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        #notification-toast.success {
+            background-color: #f3557a;
+            box-shadow: 0 4px 15px rgba(243, 85, 122, 0.4);
+        }
+
+        #notification-toast.error {
+            background-color: #f3557a;
+            box-shadow: 0 4px 15px rgba(243, 85, 122, 0.4);
+        }
+
+        /*------ End Notifikasi ------*/
+
+        /*------ confirmation ------*/
+        #confirmation-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            z-index: 9998;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+
+        #confirmation-modal-overlay.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #confirmation-modal-box {
+            background: #2c2c2c;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.4);
+            transform: scale(0.9);
+            transition: transform 0.2s ease;
+        }
+
+        #confirmation-modal-overlay.visible #confirmation-modal-box {
+            transform: scale(1);
+        }
+
+        #confirmation-modal-text {
+            margin: 0;
+            margin-bottom: 25px;
+            font-size: 1.2em;
+            color: #eee;
+            max-width: 400px;
+        }
+
+        .confirmation-modal-buttons button {
+            padding: 10px 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: bold;
+            margin: 0 10px;
+            transition: transform 0.1s ease;
+        }
+
+        .confirmation-modal-buttons button:active {
+            transform: scale(0.95);
+        }
+
+        #confirm-yes-btn {
+            background-color: #e74c3c;
+            color: white;
+        }
+
+        #confirm-no-btn {
+            background-color: #555;
+            color: #fff;
+        }
+
+        /*------ End confirmation ------*/
+
+        #drag-tooltip {
+            display: none;
+            position: fixed;
+            background-color: #c0392b;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 6px;
+            font-size: 0.9em;
+            font-weight: bold;
+            z-index: 99999999;
+            pointer-events: none;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            transform: translate(-50%, 25px);
+        }
+
+        body.invalid-drag-state #drag-tooltip {
+            display: block;
+        }
+
+        body.invalid-drag-state * {
+            cursor: not-allowed !important;
+        }
+
+        /* ================== End Global Reset & Fonts ====================== */
+
+

@@ -1,0 +1,14 @@
+{
+    "id": "lengkap",
+    "label": "Lengkap (membekukan)",
+    "description": "Mengirim SELURUH kerangka gameplay engine langsung ke player.html-mu — semua komponen ber-peran, siap disunting atau dipangkas. Cocok bila kamu mau menata ulang struktur UI. Komponen yang tak dipakai boleh dihapus lalu ditandai 'tak kupakai' di inspektur kontrak.",
+    "category": "starter-kit",
+    "thumbnail": "preview.png",
+    "tags": [
+        "kerangka penuh",
+        "kepemilikan markup"
+    ],
+    "dialogueStyle": "bottom-bar",
+    "materializeStory": true,
+    "themeCascade": "replace-novel"
+}

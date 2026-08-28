@@ -1,0 +1,20 @@
+{
+  "_catatan": "Menamai kosakata milik template ini (§27). Peta ini PRESENTASI saja — ia tak menambah kosakata, hanya memberi label & grup untuk yang sudah didaftarkan extensions/ dan theme.css. Kunci berawalan _ diabaikan.",
+
+  "transition": {
+    "larut_gambar": { "label": "Larut Lembut", "group": "Custom Layer", "dirs": ["in", "out"] }
+  },
+
+  "effect": {
+    "sobek_layar": { "label": "Sobek Layar", "group": "Custom Layer" }
+  },
+
+  "anim": {
+    "anim-in-muncul-lembut": { "label": "Muncul Lembut", "group": "Custom Layer" }
+  },
+
+  "position": {
+    "bayang": { "label": "Di Bayangan", "group": "Custom Layer" },
+    "sorot": { "label": "Di Sorotan", "group": "Custom Layer" }
+  }
+}

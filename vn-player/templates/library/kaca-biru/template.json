@@ -1,0 +1,12 @@
+{
+    "id": "kaca-biru",
+    "label": "Kaca Biru \u2014 Panel Bersayap",
+    "description": "Panel kaca biru bertekstur gelembung menempel di dasar layar, dengan nama pembicara jadi TAB yang menaiki tepi atasnya. Kontrol dibelah dua sayap di sudut bawah panel: tombol keluar sendirian di kiri, tiga kontrol jalannya cerita berkumpul di kanan \u2014 jadi \"pergi\" tak pernah tertukar dengan \"lanjut\". Semuanya lewat CSS di atas markup engine: nol peran dibekukan.",
+    "category": "layout",
+    "layoutFamily": "kaca-biru",
+    "thumbnail": "preview.png",
+    "tags": ["panel kaca", "tab nama", "kontrol dua sayap"],
+    "dialogueStyle": "bottom-bar",
+    "materializeStory": false,
+    "themeCascade": "replace-novel"
+}

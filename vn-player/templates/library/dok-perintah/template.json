@@ -1,0 +1,12 @@
+{
+    "id": "dok-perintah",
+    "label": "Dok Perintah \u2014 Bilah Gelap di Dasar",
+    "description": "Kotak dialognya dicabut dan diganti sapuan kabut bertopeng \u2014 teks mengambang di atas gambar tanpa tepi yang kelihatan. Nama pembicara jadi pita merah bergaris yang memudar di kedua ujungnya, dan seluruh kontrol turun ke DOK gelap setinggi 35px di dasar layar, tiap perintah berpasangan ikon + label. Tanda lanjut jadi denyut merah di pojok panel. Semuanya lewat CSS di atas markup engine: nol peran dibekukan.",
+    "category": "layout",
+    "layoutFamily": "dok-perintah",
+    "thumbnail": "preview.png",
+    "tags": ["dok perintah", "pita nama", "tanpa kotak", "gelap"],
+    "dialogueStyle": "bottom-bar",
+    "materializeStory": false,
+    "themeCascade": "replace-novel"
+}

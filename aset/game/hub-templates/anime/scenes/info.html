@@ -1,0 +1,15 @@
+<!-- ===== Scene: {{SCENE_NAME}} (info) =====
+     Info/sinopsis novel (layar terminal). Dicapai dari menu via goto, kembali via back. -->
+    <section class="hub-scene tpl-info" data-scene-id="{{SCENE_ID}}" data-scene-type="info" data-scene-name="{{SCENE_NAME}}">
+      <div class="tpl-info-card" data-node="content">
+        <h2 class="tpl-info-title" data-node="title" data-bind="title">Tentang Novel</h2>
+        <p class="tpl-info-desc" data-node="desc" data-bind="description">Sinopsis novel akan tampil di sini dari Profil Novel.</p>
+        <dl class="tpl-info-meta" data-node="meta">
+          <dt>Genre</dt><dd data-bind="genre">&mdash;</dd>
+          <dt>Penulis</dt><dd data-bind="author">&mdash;</dd>
+          <dt>Ilustrator</dt><dd data-bind="illustrator">&mdash;</dd>
+          <dt>VN Mapper</dt><dd data-bind="vnMapper">&mdash;</dd>
+        </dl>
+        <button type="button" class="tpl-btn" data-node="back-btn" data-action="back">&larr; Kembali</button>
+      </div>
+    </section>

@@ -1,0 +1,73 @@
+﻿/* ============================ WARNING SCREEN ============================ */
+/*------------------- warning screen -------------------------*/
+#warning-screen {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.5rem;
+    animation: fadeIn 1s forwards;
+    background-color: black;
+    padding: 20px;
+    cursor: pointer;
+}
+
+.warning-icon-svg {
+    width: 80px;
+    height: 80px;
+    overflow: visible;
+    color: #ffffff;
+    fill: none;
+    filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.3));
+}
+
+.warning-icon-svg .logo-line-1,
+.warning-icon-svg .logo-line-2,
+.warning-icon-svg .logo-curve {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.warning-main-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #eeeeee;
+    letter-spacing: 1px;
+    text-align: center;
+    font-family: 'Lexend', sans-serif;
+    margin: 0;
+}
+
+.warning-sub-text {
+    font-size: 1.1rem;
+    color: #aaaaaa;
+    text-align: center;
+    line-height: 1.6;
+    max-width: 800px;
+    font-weight: 300;
+    font-family: 'Lexend', sans-serif;
+}
+
+.warning-sub-text p {
+    margin: 5px 0;
+}
+
+.click-to-continue {
+    margin-top: 30px;
+    font-size: 1rem;
+    color: #888;
+    opacity: 0;
+    transition: opacity 1s ease-in-out;
+    pointer-events: none;
+}
+
+.click-to-continue.visible {
+    opacity: 1;
+}
+
+/*------------------- end warning screen -------------------------*/
+/* ========================== End WARNING SCREEN ========================== */

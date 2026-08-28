@@ -1,0 +1,23 @@
+{
+  "id": "showcase",
+  "icon": "✨",
+  "label": "Showcase — Fitur Lengkap (VNHub API)",
+  "description": "Hub kaya fitur & berfungsi: splash, peringatan, menu + BGM, info, galeri, muat permainan, pengaturan, dan kredit — contoh lengkap memakai VNHub API. Titik awal terbaik untuk belajar atau menyesuaikan via VS Code.",
+  "order": 5,
+  "kind": "advanced",
+  "layoutFamily": "center-stack",
+  "thumbnail": "preview.png",
+  "css": "hub.css",
+  "js": "hub.js",
+  "scenes": [
+    { "type": "splash",      "name": "Splash",          "file": "scenes/splash.html",    "duration": 3000 },
+    { "type": "warning",     "name": "Peringatan",      "file": "scenes/warning.html" },
+    { "type": "main_menu",   "name": "Main Menu",       "file": "scenes/main_menu.html" },
+    { "type": "info",        "name": "Info Novel",      "file": "scenes/info.html" },
+    { "type": "custom_code", "name": "Galeri",          "file": "scenes/gallery.html" },
+    { "type": "custom_code", "name": "Achievements",    "file": "scenes/achievements.html" },
+    { "type": "custom_code", "name": "Muat Permainan",  "file": "scenes/load_game.html" },
+    { "type": "custom_code", "name": "Pengaturan",      "file": "scenes/settings.html" },
+    { "type": "credits",     "name": "Credits",         "file": "scenes/credits.html" }
+  ]
+}

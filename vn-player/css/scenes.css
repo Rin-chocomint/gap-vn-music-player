@@ -1,0 +1,106 @@
+/* =============================================
+ * VN Player — Layar bawaan tambahan (kartu judul & galeri)
+ *
+ * Markup-nya ada di `player.html`; berkas ini yang membuatnya terlihat.
+ * Semua nilai yang mungkin ingin diubah kreator ditarik ke `--vn-*` di
+ * `variables.css`, jadi picker CSS var editor bisa menawarkannya — ia hanya
+ * memindai var yang BENAR-BENAR dikonsumsi CSS yang dimuat player.
+ *
+ * Selektornya memakai KELAS scene (`.scene-judul`), bukan id: scene adalah
+ * markup yang boleh disalin & diubah kreator, dan kelas tak menuntut keunikan.
+ * ============================================= */
+
+/* --- Layar judul --- */
+.scene-judul {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    inset: 0;
+    background: var(--vn-judul-bg);
+}
+
+.scene-judul .judul-latar {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 35%, var(--vn-judul-sorot), transparent 60%);
+}
+
+.scene-judul .judul-isi {
+    position: relative;
+    text-align: center;
+    animation: vnJudulMasuk var(--vn-judul-durasi) ease both;
+}
+
+.scene-judul .judul-teks {
+    margin: 0;
+    font-size: clamp(2rem, var(--vn-judul-ukuran), 4rem);
+    letter-spacing: var(--vn-judul-renggang);
+    color: var(--vn-judul-warna);
+    text-shadow: 0 0 28px var(--vn-judul-sorot);
+}
+
+.scene-judul .judul-sub {
+    margin: 14px 0 0;
+    font-size: 0.95rem;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--vn-judul-sub-warna);
+}
+
+/* Baris kecil tanpa isi tak boleh menyisakan celah — `:empty` yang menjawabnya,
+   nol JavaScript (pola yang sama dengan plakat nama di preset Klasik ADV). */
+.scene-judul .judul-sub:empty {
+    display: none;
+}
+
+@keyframes vnJudulMasuk {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* --- Galeri --- */
+.scene-galeri {
+    inset: 0;
+    padding: var(--vn-galeri-tepi);
+    background: var(--vn-galeri-bg);
+    overflow-y: auto;
+}
+
+.scene-galeri .galeri-judul {
+    margin: 0 0 24px;
+    font-size: 1.4rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--vn-galeri-warna);
+}
+
+.scene-galeri .galeri-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--vn-galeri-kolom), 1fr));
+    gap: var(--vn-galeri-sela);
+}
+
+/* Slot kosong sengaja terlihat: kreator tahu ada yang harus diisi. */
+.scene-galeri .galeri-slot {
+    aspect-ratio: var(--vn-galeri-rasio);
+    border: 1px dashed var(--vn-galeri-garis);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.02);
+    background-size: cover;
+    background-position: center;
+}
+
+.scene-galeri .galeri-tutup {
+    margin-top: 24px;
+    padding: 8px 22px;
+    background: transparent;
+    border: 1px solid var(--vn-galeri-garis);
+    border-radius: 4px;
+    color: var(--vn-galeri-warna);
+    letter-spacing: 0.14em;
+    cursor: pointer;
+}
+
+.scene-galeri .galeri-tutup:hover {
+    background: rgba(140, 170, 230, 0.12);
+}

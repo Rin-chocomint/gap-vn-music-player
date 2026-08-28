@@ -1,0 +1,207 @@
+/* =============================================================
+ * KLASIK ADV — susunan, bukan warna.
+ *
+ * Preset ini MENYUSUN ULANG layar cerita tanpa memiliki satu peran pun:
+ * markup-nya tetap milik engine, jadi novelmu terus ikut update. Yang berubah
+ * hanya CSS di berkas ini.
+ *
+ * Tiga perubahan susunan:
+ *   1. Kotak teks rata penuh, menempel di dasar layar, sudut siku.
+ *   2. Nama jadi PLAKAT yang menonjol di tepi atas kotak (bukan baris di dalamnya).
+ *   3. Tombol yang biasanya berkerumun di pojok kanan-atas turun jadi BARIS
+ *      PERINTAH berlabel teks, di dalam strip di bawah kotak.
+ *
+ * Semua selektor memakai `data-player-role` — bukan id. Itu kontraknya
+ * (Tahap 4): kotak dialog buatanmu sendiri tetap kena aturan ini asal ia
+ * membawa perannya.
+ * ============================================================= */
+
+:root {
+    /* --- Kotak teks --- */
+    --vn-dialogue-width: 100%;
+    --vn-dialogue-radius: 0px;
+    --vn-dialogue-bg: rgba(8, 10, 16, 0.92);
+    --vn-dialogue-color: #ecebe6;
+    --vn-dialogue-padding: 22px 42px 26px;
+    /* Strip untuk baris perintah di bawah kotak. Angka ini dan
+       --adv-tinggi-baris di bawah harus sejalan; kalau strip lebih pendek,
+       barisnya menimpa kotak. */
+    --vn-dialogue-margin-bottom: 46px;
+
+    /* --- Plakat nama --- */
+    --adv-plakat-bg: #b9432f;
+    --adv-plakat-warna: #fff6ee;
+    --adv-plakat-padding: 5px 20px;
+    --adv-plakat-geser: 42px;      /* sejajar dengan padding kiri kotak */
+
+    /* --- Baris perintah --- */
+    --adv-tinggi-baris: 46px;
+    --adv-perintah-warna: rgba(236, 235, 230, 0.72);
+    --adv-perintah-warna-aktif: #ffd9a0;
+    --adv-perintah-ukuran: 0.78rem;
+    --adv-perintah-sela: 26px;
+
+    /* --- Garis tepi atas kotak: penanda khas ADV --- */
+    --adv-garis: 2px solid rgba(185, 67, 47, 0.85);
+
+    /* Indikator lanjut digeser masuk: di kotak rata penuh, sudut 12px terasa
+       menempel di tepi layar. Ini jalur var yang dijanjikan engine — nol
+       selektor baru. */
+    --vn-continue-right: 30px;
+    --vn-continue-bottom: 14px;
+    --vn-continue-color: #ffd9a0;
+}
+
+/* --- 1. Kotak teks rata penuh --- */
+[data-player-role="dialogue"] {
+    /* WAJIB untuk kotak selebar layar. Engine TIDAK menyetel `border-box` di
+       mana pun (satu-satunya pemakai ada di ui-panels.css), jadi `width: 100%`
+       berarti 100% UNTUK ISI SAJA - padding 42px kiri-kanan ditambahkan di
+       luarnya. Akibatnya kotak jadi 1368px di layar 1280px: `align-items:
+       center` milik panggung menggesernya ke x = -44, padding kirinya terdorong
+       keluar layar (teks jadi menempel tepi, bukan masuk 42px), dan sisi
+       kanannya terpotong. Tak ada galat apa pun - hanya salah gambar. */
+    box-sizing: border-box;
+    border-top: var(--adv-garis);
+    box-shadow: 0 -12px 28px rgba(0, 0, 0, 0.45);
+    /* `overflow: visible` WAJIB: plakat nama di bawah menonjol KELUAR dari kotak,
+       dan nilai `hidden` dari mana pun akan memotongnya tanpa pesan apa pun. */
+    overflow: visible;
+}
+
+/* --- 2. Nama jadi plakat di tepi atas kotak ---
+ * Menumpang `position: relative` milik kotak dialog (dipasang engine demi
+ * z-index). Kalau suatu saat itu hilang, plakat melompat ke tepi layar. */
+[data-player-role="speaker"] {
+    position: absolute;
+    top: 0;
+    left: var(--adv-plakat-geser);
+    transform: translateY(-100%);
+    margin: 0;
+    padding: var(--adv-plakat-padding);
+    background: var(--adv-plakat-bg);
+    color: var(--adv-plakat-warna);
+    font-size: 0.9rem;
+    letter-spacing: 0.06em;
+    line-height: 1.4;
+}
+
+/* Baris tanpa pembicara (narasi) tak boleh menyisakan plakat kosong
+   menggantung. `:empty` yang menjawabnya — nol JavaScript. */
+[data-player-role="speaker"]:empty {
+    display: none;
+}
+
+[data-player-role="text"] {
+    line-height: 1.75;
+}
+
+/* --- 3. Kerumunan pojok jadi baris perintah ---
+ *
+ * Wadah tombolnya TAK punya peran sendiri (hanya anak-anaknya yang punya), jadi
+ * ia dijangkau lewat isinya: "div di dalam panggung yang memuat tombol auto".
+ * Itu tetap diturunkan dari peran — bukan dari id — sehingga aturan ini tak
+ * bergantung pada nama yang boleh saja diubah player lain. */
+[data-player-role="stage"] > div:has(> [data-player-role="btn-auto"]) {
+    position: fixed;
+    top: auto;
+    right: 0;
+    left: 0;
+    bottom: 0;
+    height: var(--adv-tinggi-baris);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--adv-perintah-sela);
+    padding: 0 42px;
+    background: rgba(8, 10, 16, 0.92);
+}
+
+/* Tombol kembali ke hub ikut turun ke baris yang sama, di ujung kiri. */
+[data-player-role="btn-hub"] {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 42px;
+    width: auto;
+    height: var(--adv-tinggi-baris);
+    border-radius: 0;
+    background: transparent;
+}
+
+[data-player-role="btn-hub"]:hover {
+    transform: none;
+    background: transparent;
+}
+
+/* Ganti ikon jadi label teks TANPA menyentuh markup: isi aslinya dikecilkan
+   sampai nol lalu label ditulis di ::after. Cara ini juga tahan terhadap i18n
+   yang menulis ulang teks tombol — yang ditimpa ukurannya, bukan isinya. */
+[data-player-role="btn-hub"],
+[data-player-role="btn-rollback"],
+[data-player-role="btn-auto"],
+[data-player-role="btn-history"] {
+    font-size: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--adv-perintah-warna);
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    transition: color 0.15s ease;
+}
+
+[data-player-role="btn-hub"]::after,
+[data-player-role="btn-rollback"]::after,
+[data-player-role="btn-auto"]::after,
+[data-player-role="btn-history"]::after {
+    font-size: var(--adv-perintah-ukuran);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+}
+
+[data-player-role="btn-hub"]::after      { content: 'Menu'; }
+[data-player-role="btn-rollback"]::after { content: 'Mundur'; }
+[data-player-role="btn-auto"]::after     { content: 'Auto'; }
+[data-player-role="btn-history"]::after  { content: 'Riwayat'; }
+
+[data-player-role="btn-hub"]:hover,
+[data-player-role="btn-rollback"]:hover,
+[data-player-role="btn-auto"]:hover,
+[data-player-role="btn-history"]:hover {
+    color: var(--adv-perintah-warna-aktif);
+}
+
+/* Engine menandai tombol mundur `.disabled` saat tak ada riwayat. Menghormati
+   penanda itu lebih baik daripada menyembunyikannya: barisnya tak berubah
+   panjang, jadi mata pemain tak perlu mencari ulang. */
+[data-player-role="btn-rollback"].disabled {
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+/* Tombol Simpan/Muat/Pengaturan TIDAK ikut baris ini — di markup engine
+   ketiganya tinggal DI DALAM overlay riwayat yang `display: none`, dan anak
+   dari elemen yang disembunyikan tak bisa ditampilkan lewat CSS mana pun.
+   Jalurnya tetap: Riwayat → Save/Load/Setting. Kalau suatu hari ketiganya
+   perlu naik ke baris perintah, itulah perubahan yang benar-benar menuntut
+   kepemilikan markup — bukan kotak dialognya. */
+
+/* --- Kosakata yang lahir dari CSS (D8) ---
+ * Kotak rata penuh mengubah komposisi: tokoh yang berdiri di 25%/75% bawaan
+ * akan terpotong tepi kotak. Dua posisi di bawah menggantikannya, dan langsung
+ * muncul di dropdown "Posisi Sprite" tanpa didaftarkan ke mana pun. */
+:root {
+    --vn-pos-panggung-kiri: 20%;
+    --vn-pos-panggung-kanan: 80%;
+}
+
+@keyframes klasikAdvMasuk {
+    from { opacity: 0; transform: translateY(3%); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* Awalan `anim-in-` = hanya diputar saat sprite benar-benar baru muncul. */
+.anim-in-adv-melangkah {
+    animation: klasikAdvMasuk 0.5s ease-out forwards;
+}

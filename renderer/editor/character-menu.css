@@ -1,0 +1,248 @@
+﻿/* ============================ Character Menu ================================= */
+
+/*------------------- animations -------------------------*/
+@keyframes swipeUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+#character-menu .main-container .image-preview {
+    opacity: 0;
+    animation: swipeUp 0.5s ease forwards;
+}
+
+#character-menu .main-container .image-preview:nth-child(1) {
+    animation-delay: 0.2s;
+}
+
+#character-menu .main-container .image-preview:nth-child(2) {
+    animation-delay: 0.4s;
+}
+
+#character-menu .main-container .image-preview:nth-child(3) {
+    animation-delay: 0.6s;
+}
+
+#character-menu .main-container .image-preview:nth-child(4) {
+    animation-delay: 0.8s;
+}
+
+#character-menu .main-container .image-preview:nth-child(5) {
+    animation-delay: 1s;
+}
+
+#character-menu .main-container .image-preview:nth-child(6) {
+    animation-delay: 1.2s;
+}
+
+#character-menu .main-container .image-preview:nth-child(7) {
+    animation-delay: 1.4s;
+}
+
+#character-menu.animating .image-preview {
+    pointer-events: none;
+}
+
+/*------------------- end animations -------------------------*/
+
+/*------------------- layout & styling -------------------------*/
+/* Di dalam #character-menu-preview-instance */
+#character-menu-preview-instance .image-preview {
+    flex: 1;
+    /* Agar kartu-kartu berbagi ruang */
+    height: 100%;
+    /* Mengambil tinggi penuh dari #character-menu-preview-instance */
+    position: relative;
+    overflow: hidden;
+    /* border-right: 1px solid #222; (dari JS atau CSS) */
+}
+
+#character-menu-preview-instance .image-preview .video,
+#character-menu-preview-instance .image-preview .character-image {
+    width: 100%;
+    height: 100%;
+    /* Pilih salah satu 'object-fit' sesuai kebutuhan: */
+    object-fit: cover;
+    /* Pilihan saat ini: mengisi dan memotong jika perlu */
+    /* object-fit: contain; */
+    /* Alternatif: menampilkan seluruh gambar/video, mungkin dengan spasi kosong */
+    display: block;
+    /* Untuk menghilangkan spasi ekstra di bawah elemen inline seperti img */
+}
+
+#character-menu {
+    opacity: 0;
+    display: none;
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background-color: black;
+}
+
+/* Back Main Menu */
+#back-to-main-menu {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    padding: 10px 20px;
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.3s ease;
+    z-index: 99;
+    font-family: 'Lexend', sans-serif;
+}
+
+#back-to-main-menu:hover {
+    background-color: rgba(0, 0, 0, 0.9);
+}
+
+#character-menu .main-container {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* Tiap Kartu Karakter */
+#character-menu .image-preview {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    transition: flex 0.4s ease-in-out;
+    cursor: pointer;
+
+    /* Garis tipis */
+    border-right: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Hilangkan garis di kartu paling akhir agar tidak dobel */
+#character-menu .image-preview:last-child {
+    border-right: none;
+}
+
+/* hover melebar sedikit */
+#character-menu .image-preview:hover {
+    flex: 1.5;
+}
+
+#character-menu .image-preview.dim {
+    flex: 0.8;
+    opacity: 0.5;
+}
+
+/* Video di dalam kartu */
+#character-menu .video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+#character-menu .image-preview:hover .video {
+    transform: scale(1.05);
+}
+
+/* Role Badges kalau mau */
+.role-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    margin: 0 3px;
+    font-size: 0.75rem;
+    border-radius: 12px;
+    text-transform: uppercase;
+    color: #fff;
+    background-color: #444;
+    box-shadow: 0 0 5px rgba(255, 255, 255, 0.2);
+}
+
+.overlay {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    height: 40%;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+
+    transform: translateY(100%);
+    opacity: 0;
+    transition: transform 0.4s ease, opacity 0.4s ease;
+}
+
+#character-menu .image-preview:hover .overlay {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.overlay .desc {
+    margin-top: auto;
+    color: white;
+}
+
+.overlay .desc h1 {
+    font-size: 1.1rem;
+    margin-bottom: 5px;
+}
+
+.overlay .desc p {
+    font-size: 0.85rem;
+    line-height: 1.4;
+    text-align: justify;
+    color: #ddd;
+}
+
+/* ----- Bagian konten tambahan (extended) untuk tombol “More” ----- */
+.extended-content {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.5s ease, opacity 0.5s ease;
+}
+
+.extended-content.show {
+    max-height: 500px;
+    /* Ubah sesuai kebutuhan */
+    opacity: 1;
+}
+
+/* Tombol “More” / “Less” */
+.more-button {
+    margin-top: 10px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.more-button:hover {
+    background-color: rgba(255, 255, 255, 0.4);
+}
+
+.character-image {
+    transition: transform 0.3s ease-in-out, filter 0.3s ease-in-out;
+}
+
+.image-preview:hover .character-image {
+    transform: scale(1.03);
+}
+
+/*------------------- end layout & styling -------------------------*/
+
+/* ============================ End Character Menu ================================= */

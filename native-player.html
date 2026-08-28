@@ -158,6 +158,44 @@
             display: block;
         }
 
+        .music-settings-tabs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin: -2px 0 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.13);
+        }
+
+        .music-settings-tab {
+            min-height: 34px;
+            padding: 7px 8px;
+            border: 1px solid #444;
+            border-radius: 6px;
+            background: #292929;
+            color: #bfc5cf;
+            cursor: pointer;
+            font: inherit;
+            font-size: 11px;
+            transition: background .18s ease, border-color .18s ease, color .18s ease;
+        }
+
+        .music-settings-tab:hover {
+            border-color: #5f8fb7;
+            color: #eef7ff;
+        }
+
+        .music-settings-tab.is-active {
+            border-color: #64c8ff;
+            background: rgba(55, 132, 183, .38);
+            color: #eefaff;
+            box-shadow: 0 0 10px rgba(100, 200, 255, .16);
+        }
+
+        .music-settings-tab-panel[hidden] {
+            display: none !important;
+        }
+
         .setting-item {
             margin-bottom: 15px;
         }
@@ -922,7 +960,7 @@
 
 <body>
     <div id="title-bar">
-        <div class="title"><img src="aset/ytmusic.png" alt="ytmusic"
+        <div class="title"><img id="site-favicon" alt="ytmusic"
                 style="height: 20px; margin-right: 8px; vertical-align: middle;"> GAP YTMusic Enhanced Plus >///</div>
         <div class="controls">
             <button class="control-btn" id="btn-settings" title="Settings">⚙️</button>
@@ -933,6 +971,14 @@
     </div>
 
     <div id="settings-panel">
+        <div class="music-settings-tabs" data-music-settings-tabs role="tablist" aria-label="Jenis pengaturan musik">
+            <button type="button" class="music-settings-tab is-active" role="tab" aria-selected="true"
+                aria-controls="native-global-settings-panel" data-music-settings-tab="global">Pengaturan Global</button>
+            <button type="button" class="music-settings-tab" role="tab" aria-selected="false"
+                aria-controls="native-profile-settings-panel" data-music-settings-tab="profile">Profil Lagu Aktif</button>
+        </div>
+        <section id="native-global-settings-panel" class="music-settings-tab-panel" role="tabpanel"
+            data-music-settings-panel="global">
         <div class="setting-item">
             <label><input type="checkbox" id="opt-adskipper"> Enable Ad Skipper</label>
             <div class="sub-setting">
@@ -952,6 +998,12 @@
             </div>
         </div>
         <div class="setting-item">
+            <label><input type="checkbox" id="opt-rhythm-overlay"> Rhythm Gamification Overlay</label>
+            <div class="sub-setting" id="opt-rhythm-overlay-sub" style="display:none;">
+                <label><input type="checkbox" id="opt-rhythm-hide-nowplaying"> Hide Now Playing panel</label>
+            </div>
+        </div>
+        <div class="setting-item">
             <label><input type="checkbox" id="opt-rpc"> Enable Discord RPC</label>
         </div>
         <div class="setting-item">
@@ -959,11 +1011,12 @@
             <div class="sub-setting" id="opt-dynamic-theme-sub" style="display:none;">
                 <label style="margin-bottom: 4px;">Mode</label>
                 <select id="opt-dynamic-theme-mode">
-                    <option value="default">Default</option>
-                    <option value="default-optimized">Default Optimized</option>
+                    <option value="default-optimized">Default Optimize</option>
                     <option value="seamless">Seamless (Full Transparency)</option>
                     <option value="overlay">Overlay (Seamless)</option>
                     <option value="harmony">Harmony (Cohesive)</option>
+                    <option value="aurora-uimod">Aurora (ui mod)</option>
+                    <option value="game-lobby-uimod">Game Lobby (ui mod)</option>
                 </select>
             </div>
         </div>
@@ -973,7 +1026,7 @@
         <div class="setting-item">
             <label style="display:flex; align-items:center; gap: 8px;">
                 <input type="checkbox" id="opt-gif-overlay">
-                Free GIF image Overlay
+                Free Media Overlay (GIF / Image / Video / Audio)
                 <span class="tips-trigger unique-decoration"
                     style="font-size: 10px; color: palevioletred; cursor: help; letter-spacing: 1px;">
                     >//
@@ -995,13 +1048,13 @@
 
                 <div id="gif-list-container">
                     <div class="gif-input-container" data-overlay-id="">
-                        <input type="text" class="gif-file-name" placeholder="Pilih file GIF..." readonly>
-                        <button class="gif-settings-btn" title="Pengaturan GIF">⚙️</button>
-                        <button class="gif-browse-btn" title="Pilih File">Browse</button>
-                        <button class="gif-clear-btn" title="Hapus Overlay">✕</button>
+                        <input type="text" class="gif-file-name" placeholder="Pilih file media..." readonly>
+                        <button class="gif-settings-btn" title="Pengaturan Media Overlay">⚙️</button>
+                        <button class="gif-browse-btn" title="Pilih Media">Browse</button>
+                        <button class="gif-clear-btn" title="Hapus Media Overlay">✕</button>
                     </div>
                 </div>
-                <button class="add-gif-btn" id="add-gif-btn" title="Tambah GIF Baru">+</button>
+                <button class="add-gif-btn" id="add-gif-btn" title="Tambah Media Baru">+</button>
 
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px;">
                     <div class="tips-trigger">
@@ -1031,10 +1084,30 @@
             </div>
         </div>
 
+        <div class="setting-item">
+            <label style="display:flex; align-items:center; gap: 8px; color: #fff;">
+                Playback Speed (Mod)
+            </label>
+            <div class="sub-setting">
+                <select id="opt-playback-speed" style="width: 100%; padding: 6px; background: #2a2a2a; border: 1px solid #444; color: #fff; border-radius: 4px; font-family: inherit;">
+                    <option value="0.75">Half Time (0.75x)</option>
+                    <option value="1.0" selected>Normal Speed (1.0x)</option>
+                    <option value="1.25">Double Time Light (1.25x)</option>
+                    <option value="1.5">Double Time (1.5x)</option>
+                    <option value="nightcore">Nightcore Pitched (1.5x + High Pitch)</option>
+                </select>
+            </div>
+        </div>
+
         <button id="remember-settings-toggle" type="button" aria-pressed="false">Remember this setting?</button>
         <button id="clear-remembered-settings" type="button">Clear saved settings</button>
         <button id="open-webview-devtools" type="button" style="margin-top: 8px; background: #2a5298; width: 100%;">
             Open Webview DevTools</button>
+        </section>
+        <section id="native-profile-settings-panel" class="music-settings-tab-panel" role="tabpanel"
+            data-music-settings-panel="profile" hidden>
+            <div id="music-profile-controls"></div>
+        </section>
     </div>
 
     <div id="webview-container">
@@ -1094,15 +1167,16 @@
         </div>
 
         <div class="gif-settings-box">
-            <h3>⚙️ Pengaturan GIF</h3>
+            <h3>⚙️ Pengaturan Media Overlay</h3>
 
             <div class="setting-row">
-                <label for="gif-condition-type">GIF ini HANYA akan tampil JIKA?? .... :</label>
+                <label for="gif-condition-type">Media ini HANYA akan tampil JIKA?? .... :</label>
                 <select id="gif-condition-type">
                     <option value="always">Selalu tampilkan dalam kondisi apapun</option>
                     <option value="music-playing">Hanya saat musik diputar</option>
                     <option value="music-paused">Hanya saat musik di-pause</option>
                     <option value="ad-playing">Hanya saat ada iklan</option>
+                    <option value="break-time">Hanya saat Break Time Rhythm</option>
                     <option value="music-title" data-default-text="Saat judul musik mengandung...">Saat judul musik
                         mengandung...</option>
                     <option value="music-artist" data-default-text="Saat artis musik mengandung...">Saat artis musik
@@ -1146,6 +1220,25 @@
                     <span id="gif-rotation-value">0°</span>
                     <span>360°</span>
                 </div>
+            </div>
+
+            <div class="setting-row"
+                style="display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.1); margin-top: 8px;">
+                <label for="gif-flip-horizontal" style="font-size: 13px; color: #ccc; cursor: pointer;">Balik horizontal
+                    (mirror)</label>
+                <label class="toggle-switch" style="margin-left: 8px;">
+                    <input type="checkbox" id="gif-flip-horizontal">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="setting-row"
+                style="display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.1);">
+                <label for="gif-flip-vertical" style="font-size: 13px; color: #ccc; cursor: pointer;">Balik vertikal</label>
+                <label class="toggle-switch" style="margin-left: 8px;">
+                    <input type="checkbox" id="gif-flip-vertical">
+                    <span class="slider"></span>
+                </label>
             </div>
 
             <div class="setting-row">
@@ -1271,6 +1364,59 @@
         const optDynamicThemeSub = document.getElementById('opt-dynamic-theme-sub');
         const optDynamicThemeMode = document.getElementById('opt-dynamic-theme-mode');
         const optProcessHints = document.getElementById('opt-process-hints');
+        const optRhythmOverlay = document.getElementById('opt-rhythm-overlay');
+        const optRhythmOverlaySub = document.getElementById('opt-rhythm-overlay-sub');
+        const optRhythmHideNowPlaying = document.getElementById('opt-rhythm-hide-nowplaying');
+
+        // Setup Speed Mod Logic di Native Host
+        const optPlaybackSpeed = document.getElementById('opt-playback-speed');
+        function applyNativePlaybackSpeed(value) {
+            const selectedValue = ['0.75', '1.0', '1.25', '1.5', 'nightcore'].includes(String(value))
+                ? String(value)
+                : '1.0';
+            const speed = selectedValue === 'nightcore' ? 1.5 : parseFloat(selectedValue);
+            const preservesPitch = selectedValue !== 'nightcore';
+            if (!webview) return;
+
+            // Injeksi JS secara remote ke dalam engine YouTube Music.
+            webview.executeJavaScript(`
+                    (function() {
+                        const v = document.querySelector('video');
+                        if (v) {
+                            v.playbackRate = ${speed};
+                            v.preservesPitch = ${preservesPitch};
+                            if (v.webkitPreservesPitch !== undefined) v.webkitPreservesPitch = ${preservesPitch};
+                            if (v.mozPreservesPitch !== undefined) v.mozPreservesPitch = ${preservesPitch};
+                        }
+                        
+                        // Buat patroli kecil agar YT Music tidak me-reset kecepatan saat pindah lagu
+                        if (!window.__tsSpeedModIntervalHost) {
+                            window.__tsSpeedModIntervalHost = setInterval(() => {
+                                const vid = document.querySelector('video');
+                                if (vid) {
+                                    if (vid.playbackRate !== window.__tsIntendedSpeedHost) {
+                                        vid.playbackRate = window.__tsIntendedSpeedHost;
+                                    }
+                                    if (vid.preservesPitch !== window.__tsIntendedPitchHost) {
+                                        vid.preservesPitch = window.__tsIntendedPitchHost;
+                                        if (vid.webkitPreservesPitch !== undefined) vid.webkitPreservesPitch = window.__tsIntendedPitchHost;
+                                        if (vid.mozPreservesPitch !== undefined) vid.mozPreservesPitch = window.__tsIntendedPitchHost;
+                                    }
+                                }
+                            }, 500);
+                        }
+                        window.__tsIntendedSpeedHost = ${speed};
+                        window.__tsIntendedPitchHost = ${preservesPitch};
+                    })();
+            `).catch(err => console.error('[Native Host] Gagal apply speed mod:', err));
+        }
+
+        if (optPlaybackSpeed) {
+            optPlaybackSpeed.addEventListener('change', (e) => {
+                applyNativePlaybackSpeed(e.target.value);
+                ipcRenderer.send('save-settings', { playbackSpeed: e.target.value });
+            });
+        }
 
         // Process Indicator Hint Elements
         const processIndicatorHint = document.getElementById('process-indicator-hint');
@@ -1307,7 +1453,8 @@
                 rpcEnabled: optRpc ? optRpc.checked : false,
                 overlayModeEnabled: optOverlay.checked,
                 dynamicThemeEnabled: optDynamicTheme.checked,
-                dynamicThemeMode: optDynamicThemeMode ? optDynamicThemeMode.value : 'default',
+                dynamicThemeMode: optDynamicThemeMode ? optDynamicThemeMode.value : 'default-optimized',
+                playbackSpeed: optPlaybackSpeed ? optPlaybackSpeed.value : '1.0',
                 gifOverlayEnabled: optGifOverlay ? optGifOverlay.checked : false,
                 gifOverlayLocked: gifInteractionLock ? gifInteractionLock.checked : false
             };
@@ -1550,8 +1697,9 @@
         let miniPlayerEnabled = false;
         let rpcEnabled = false;
         let dynamicThemeEnabled = false;
-        let dynamicThemeMode = 'default';
+        let dynamicThemeMode = 'default-optimized';
         let processHintsEnabled = true;
+        let rhythmOverlayEnabled = false;
 
         // === PROCESS INDICATOR HINT FUNCTIONS ===
         // minimum display time agar tidak hilang terlalu cepat
@@ -1620,6 +1768,95 @@
             }, 400); // Sama dengan durasi transisi CSS
         }
 
+        // ====================================================================
+        // === REF-COUNTED BUFFER STATE MACHINE (A) + WATCHDOG (B) ===
+        // Banyak sumber (media events, network, carousel, prefetch, navigasi)
+        // mengirim buffer-status-update secara INDEPENDEN. Daripada satu boolean
+        // yang gampang race/flicker, kita lacak proses aktif PER KATEGORI.
+        // Hint hanya hilang saat SEMUA kategori beres, dan teksnya diturunkan
+        // dari kategori dengan prioritas tertinggi yang sedang aktif.
+        // ====================================================================
+        const HINT_PROFILES = {
+            'user-facing': { text: 'Buffering…',                priority: 100 },
+            'network':     { text: 'Memuat data…',              priority: 60  },
+            'dom-loading': { text: 'Memuat pustaka…',           priority: 40  },
+            'prefetch':    { text: 'Menyiapkan lagu berikutnya', priority: 20 },
+            'preload':     { text: 'Menyiapkan konten…',         priority: 10 },
+        };
+        const DEFAULT_HINT_PROFILE = { text: 'Preparing content', priority: 0 };
+
+        // Watchdog (B): jika tidak ada refresh 'true' sebelum timeout, entry
+        // dibuang otomatis -> hint TIDAK PERNAH nyangkut walau event 'false' hilang.
+        const BUFFER_WATCHDOG_MS = {
+            'user-facing': 12000,
+            'network':     10000,
+            'dom-loading':  6000,
+            'prefetch':     6000,
+            'preload':     15000,
+        };
+        const DEFAULT_WATCHDOG_MS = 10000;
+        const HINT_HIDE_DEBOUNCE_MS = 250; // Cegah flicker saat transisi antar lagu
+
+        const activeBuffers = new Map(); // category -> { reason, since, watchdog }
+        let hintHideDebounce = null;
+
+        function bufferProfile(category) {
+            return HINT_PROFILES[category] || DEFAULT_HINT_PROFILE;
+        }
+
+        function recomputeProcessHint() {
+            if (activeBuffers.size === 0) {
+                // Tunda hide sebentar; kalau buffer baru masuk, dibatalkan.
+                clearTimeout(hintHideDebounce);
+                hintHideDebounce = setTimeout(() => hideProcessHint(), HINT_HIDE_DEBOUNCE_MS);
+                return;
+            }
+
+            clearTimeout(hintHideDebounce);
+
+            // Pilih kategori dengan prioritas tertinggi yang sedang aktif.
+            let topCat = null, topPriority = -1;
+            for (const cat of activeBuffers.keys()) {
+                const p = bufferProfile(cat).priority;
+                if (p > topPriority) { topPriority = p; topCat = cat; }
+            }
+            showProcessHint(bufferProfile(topCat).text);
+        }
+
+        function updateBufferState(buffering, category, reason) {
+            category = category || 'user-facing';
+
+            if (buffering) {
+                const existing = activeBuffers.get(category);
+                if (existing) clearTimeout(existing.watchdog);
+
+                const watchdog = setTimeout(() => {
+                    activeBuffers.delete(category);
+                    console.warn(`%c[Native Host] [WATCHDOG] '${category}' auto-expired (event 'false' hilang?)`, 'color: #e67e22; font-weight: bold;');
+                    recomputeProcessHint();
+                }, BUFFER_WATCHDOG_MS[category] || DEFAULT_WATCHDOG_MS);
+
+                activeBuffers.set(category, {
+                    reason: reason || '',
+                    since: existing ? existing.since : Date.now(),
+                    watchdog,
+                });
+            } else {
+                const existing = activeBuffers.get(category);
+                if (existing) clearTimeout(existing.watchdog);
+                activeBuffers.delete(category);
+            }
+
+            recomputeProcessHint();
+        }
+
+        // Buang semua state buffer (dipakai saat fitur hint dimatikan).
+        function clearAllBufferState() {
+            for (const s of activeBuffers.values()) clearTimeout(s.watchdog);
+            activeBuffers.clear();
+            clearTimeout(hintHideDebounce);
+        }
+
         // Atur status awal kotak centang
         optAdSkipper.checked = adSkipperEnabled;
         optAutoMute.checked = autoMuteEnabled;
@@ -1636,9 +1873,10 @@
             optDynamicThemeSub.style.display = optDynamicTheme.checked ? 'block' : 'none';
         }
 
-        function injectDynamicTheme(webview, themeMode = 'default') {
+        function injectDynamicTheme(webview, themeMode = 'default-optimized') {
             try {
                 if (themeMode === 'unified') themeMode = 'overlay';
+                if (themeMode !== 'game-lobby-uimod' && themeMode.endsWith('-lobby-uimod')) themeMode = 'game-lobby-uimod';
 
                 const vibrantPath = path.join(__dirname, 'aset/js/vibrant.min.js');
                 const stylingPath = path.join(__dirname, 'aset/js/dynamic-ytm-styling.js');
@@ -1700,18 +1938,26 @@
             }
         }
 
-        function applyDynamicThemeState() {
-            toggleDynamicThemeSubOptions();
+        function applyDynamicThemeState(runtimeSettings = null) {
+            const isProfileOverride = runtimeSettings && typeof runtimeSettings === 'object';
+            if (!isProfileOverride) toggleDynamicThemeSubOptions();
 
-            dynamicThemeEnabled = optDynamicTheme.checked;
-            dynamicThemeMode = optDynamicThemeMode ? optDynamicThemeMode.value : 'default';
+            dynamicThemeEnabled = isProfileOverride
+                ? runtimeSettings.dynamicThemeEnabled === true
+                : optDynamicTheme.checked;
+            dynamicThemeMode = isProfileOverride
+                ? (runtimeSettings.dynamicThemeMode || 'default-optimized')
+                : (optDynamicThemeMode ? optDynamicThemeMode.value : 'default-optimized');
             if (dynamicThemeMode === 'unified') dynamicThemeMode = 'overlay';
+            if (dynamicThemeMode !== 'game-lobby-uimod' && dynamicThemeMode.endsWith('-lobby-uimod')) dynamicThemeMode = 'game-lobby-uimod';
 
-            // Simpan pengaturan
-            ipcRenderer.send('save-settings', {
-                dynamicThemeEnabled: dynamicThemeEnabled,
-                dynamicThemeMode: dynamicThemeMode
-            });
+            // Profil lagu hanya berlaku saat runtime; jangan menimpa pengaturan global.
+            if (!isProfileOverride) {
+                ipcRenderer.send('save-settings', {
+                    dynamicThemeEnabled: dynamicThemeEnabled,
+                    dynamicThemeMode: dynamicThemeMode
+                });
+            }
 
             if (!webview) return;
 
@@ -1772,12 +2018,20 @@
             });
         }
 
+        window.applyMusicProfileDynamicTheme = (effective) => applyDynamicThemeState(effective);
+        window.applyMusicProfilePlaybackSpeed = (effective) => applyNativePlaybackSpeed(effective?.playbackSpeed);
+        window.addEventListener('gap-music-profile-effective-settings', (event) => {
+            const effective = event.detail || {};
+            window.applyMusicProfileDynamicTheme(effective);
+            window.applyMusicProfilePlaybackSpeed(effective);
+        });
+
         function updateSettings() {
             adSkipperEnabled = optAdSkipper.checked;
             autoMuteEnabled = optAutoMute.checked;
             autoSkipEnabled = optAutoSkip.checked;
             dynamicThemeEnabled = optDynamicTheme.checked;
-            dynamicThemeMode = optDynamicThemeMode ? optDynamicThemeMode.value : 'default';
+            dynamicThemeMode = optDynamicThemeMode ? optDynamicThemeMode.value : 'default-optimized';
 
             optAutoMute.disabled = !adSkipperEnabled;
             optAutoSkip.disabled = !adSkipperEnabled;
@@ -1881,6 +2135,28 @@
             };
         }
 
+        // Rhythm Overlay onchange handler
+        if (optRhythmOverlay) {
+            optRhythmOverlay.onchange = () => {
+                rhythmOverlayEnabled = optRhythmOverlay.checked;
+                ipcRenderer.send('toggle-rhythm-overlay', rhythmOverlayEnabled);
+                ipcRenderer.send('save-settings', { rhythmOverlayEnabled: rhythmOverlayEnabled });
+                // Sub-setting hanya relevan saat overlay aktif
+                if (optRhythmOverlaySub) {
+                    optRhythmOverlaySub.style.display = optRhythmOverlay.checked ? 'block' : 'none';
+                }
+            };
+        }
+
+        // Sub-setting: sembunyikan panel Now Playing pada rhythm overlay
+        if (optRhythmHideNowPlaying) {
+            optRhythmHideNowPlaying.onchange = () => {
+                const hidden = optRhythmHideNowPlaying.checked;
+                ipcRenderer.send('set-rhythm-hide-nowplaying', hidden);
+                ipcRenderer.send('save-settings', { rhythmHideNowPlaying: hidden });
+            };
+        }
+
         if (optRpc) {
             optRpc.onchange = () => {
                 rpcEnabled = optRpc.checked;
@@ -1894,8 +2170,9 @@
                 processHintsEnabled = optProcessHints.checked;
                 ipcRenderer.send('save-settings', { processHintsEnabled: processHintsEnabled });
 
-                // Jika dimatikan, sembunyikan hint yang sedang tampil
+                // Jika dimatikan, buang semua state buffer + sembunyikan hint.
                 if (!processHintsEnabled) {
+                    clearAllBufferState();
                     hideProcessHint();
                 }
             };
@@ -1928,11 +2205,34 @@
                 optOverlay.checked = settings.overlayModeEnabled === true;
                 optDynamicTheme.checked = settings.dynamicThemeEnabled === true;
                 if (optDynamicThemeMode) {
-                    optDynamicThemeMode.value = settings.dynamicThemeMode || 'default';
+                    let loadedMode = settings.dynamicThemeMode || 'default-optimized';
+                    if (loadedMode === 'default') loadedMode = 'default-optimized';
+                    if (loadedMode === 'unified') loadedMode = 'overlay';
+                    if (loadedMode !== 'game-lobby-uimod' && loadedMode.endsWith('-lobby-uimod')) loadedMode = 'game-lobby-uimod';
+                    optDynamicThemeMode.value = loadedMode;
+                }
+                if (optPlaybackSpeed) {
+                    optPlaybackSpeed.value = ['0.75', '1.0', '1.25', '1.5', 'nightcore'].includes(String(settings.playbackSpeed))
+                        ? String(settings.playbackSpeed)
+                        : '1.0';
+                    applyNativePlaybackSpeed(optPlaybackSpeed.value);
                 }
                 if (optProcessHints) {
                     optProcessHints.checked = settings.processHintsEnabled === true;
                     processHintsEnabled = settings.processHintsEnabled === true;
+                }
+
+                // Muat state Rhythm Overlay
+                if (optRhythmOverlay) {
+                    optRhythmOverlay.checked = settings.rhythmOverlayEnabled === true;
+                    rhythmOverlayEnabled = settings.rhythmOverlayEnabled === true;
+                }
+                if (optRhythmHideNowPlaying) {
+                    optRhythmHideNowPlaying.checked = settings.rhythmHideNowPlaying === true;
+                }
+                // Tampilkan sub-setting rhythm overlay hanya saat overlay aktif
+                if (optRhythmOverlaySub) {
+                    optRhythmOverlaySub.style.display = optRhythmOverlay.checked ? 'block' : 'none';
                 }
 
                 // Simpan GIF settings untuk diproses nanti setelah GIF UI siap
@@ -2050,8 +2350,12 @@
                     processedData.push(Math.max(0, Math.min(1, normalizedFactor)));
                 }
 
-                // 3. Kirim Data Ternormalisasi (0.0 - 1.0)
-                ipcRenderer.send('analyser-data', { data: processedData, isPlaying: isPlaying });
+                // 3. Kirim Data Ternormalisasi (0.0 - 1.0) dan Raw Data untuk analitik lebih lanjut
+                ipcRenderer.send('analyser-data', { 
+                    data: processedData, 
+                    rawData: Array.from(relevantDataSlice),
+                    isPlaying: isPlaying 
+                });
 
             } else if (channel === 'ad-status-update') {
                 // Buat data untuk main.js guna menangani koordinat klik
@@ -2062,6 +2366,10 @@
                     webviewBounds: { x: 0, y: 32, width: window.innerWidth, height: window.innerHeight - 32 } // Perkiraan batas webview
                 };
                 ipcRenderer.send('ad-status-update', payload);
+
+            } else if (channel === 'subtitle-update') {
+                // Caption hanya diteruskan bila user telah menyalakan CC di YouTube Music.
+                ipcRenderer.send('subtitle-update', data || { text: '' });
 
             } else if (channel === 'request-auto-skip-instant') {
                 // Tangani Klik Otomatis
@@ -2077,38 +2385,57 @@
                     webview.sendInputEvent({ type: 'mouseUp', x: scaledX, y: scaledY, button: 'left', clickCount: 1 });
                 }, 50);
                 console.log('[Native Host] Auto-clicked skip button at', scaledX, scaledY, 'Zoom:', zoomFactor);
+            } else if (channel === 'webview-favicon-updated') {
+                const faviconImg = document.getElementById('site-favicon');
+                if (faviconImg) {
+                    faviconImg.src = data || 'aset/ytmusic.png';
+                }
             } else if (channel === 'buffer-status-update') {
-                // === HANDLER UNTUK PROCESS INDICATOR HINT ===
-                // Menampilkan "Preparing content" secara universal untuk semua proses penerimaan data dari server
+                // === HANDLER UNTUK PROCESS INDICATOR HINT (ref-counted) ===
+                // Tidak lagi show/hide langsung. Semua status disetorkan ke state
+                // machine per kategori (updateBufferState); hint hanya hilang saat
+                // SEMUA kategori beres, teks mengikuti kategori prioritas tertinggi.
                 if (!data) return;
 
-                // Kategori untuk eksperimen
                 const category = data.category || 'user-facing';
                 const isPrefetchOrPreload = category === 'prefetch' || category === 'preload';
 
-                // Universal hint text - satu teks untuk semua jenis buffering
-                const universalHintText = 'Preparing content';
+                updateBufferState(data.buffering === true, category, data.reason);
 
-                if (data.buffering === true) {
-                    // Proses loading - tampilkan hint tanpa auto-hide
-                    showProcessHint(universalHintText);
+                const label = data.buffering === true ? 'Buffering' : 'Complete';
+                const color = isPrefetchOrPreload ? 'color: orange;' : 'color: green;';
+                console.log(`%c[Native Host] [${category.toUpperCase()}] ${label}: ${data.reason} | aktif: ${activeBuffers.size}`, color);
+            }
+        });
 
-                    // Log dengan highlight untuk eksperimen
-                    if (isPrefetchOrPreload) {
-                        console.log(`%c[Native Host] [${category.toUpperCase()}] Buffering: ${data.reason}`, 'color: orange; font-weight: bold;');
-                    } else {
-                        console.log(`%c[Native Host] [${category.toUpperCase()}] Buffering: ${data.reason}`, 'color: green;');
-                    }
-                } else {
-                    // Proses selesai - sembunyikan hint
-                    hideProcessHint();
-
-                    if (isPrefetchOrPreload) {
-                        console.log(`%c[Native Host] [${category.toUpperCase()}] Complete: ${data.reason}`, 'color: orange;');
-                    } else {
-                        console.log(`%c[Native Host] [${category.toUpperCase()}] Complete: ${data.reason}`, 'color: green;');
-                    }
-                }
+        // ====================================================================
+        // [LOGIN-LOG] Log diagnosa login -> DevTools host (tanpa panel GUI).
+        // Persisten lintas navigasi webview karena dicetak di console HOST
+        // (native-player.html), bukan di console webview yang ter-reset.
+        // Buka dengan Ctrl+Shift+I untuk membacanya.
+        // ====================================================================
+        // (a) Dari main process: log navigasi webview + deadline login.
+        ipcRenderer.on('login-debug-log', (event, d) => {
+            if (!d) return;
+            if (d.level === 'warn') console.warn(d.line); else console.log(d.line);
+        });
+        // (b) Dari main process: anomali (klik tak bereaksi / lambat / gagal).
+        ipcRenderer.on('login-network-anomaly', (event, info) => {
+            info = info || {};
+            let extra = info.target ? ' target=' + info.target : (info.url ? ' ' + info.url : '');
+            if (info.errorDesc) extra += ' (' + info.errorCode + ' ' + info.errorDesc + ')';
+            console.warn('[ANOMALI] ' + (info.kind || '?') + extra);
+        });
+        // (c) Dari preload webview (login-flow-*). Listener terpisah agar tidak
+        // mengganggu handler ipc-message utama di atas.
+        webview.addEventListener('ipc-message', (event) => {
+            const a = event.args[0] || {};
+            if (event.channel === 'login-flow-log') {
+                console.log('[Login] ' + (a.msg || ''), a);
+            } else if (event.channel === 'login-flow-start') {
+                console.log('[Login] Alur login dimulai (' + (a.from || '') + ') target=' + (a.target || ''));
+            } else if (event.channel === 'login-flow-anomaly') {
+                console.warn('[Login] ANOMALI: ' + (a.kind || '') + ' ' + (a.url || ''));
             }
         });
 
@@ -2141,6 +2468,8 @@
         const gifRotation = document.getElementById('gif-rotation');
         const gifRotationValue = document.getElementById('gif-rotation-value');
         const gifHideOnCursor = document.getElementById('gif-hide-on-cursor');
+        const gifFlipHorizontal = document.getElementById('gif-flip-horizontal');
+        const gifFlipVertical = document.getElementById('gif-flip-vertical');
         const gifSettingsCancel = document.getElementById('gif-settings-cancel');
         const gifSettingsSave = document.getElementById('gif-settings-save');
         // Animation Elements
@@ -2330,20 +2659,37 @@
                         }
 
                         const internalPath = importResult.internalPath;
+                        const mediaType = importResult.mediaType || 'gif';
                         const existingId = row.dataset.overlayId;
                         const fileName = internalPath.split(/[\\/]/).pop();
 
                         if (existingId) {
-                            // Update overlay existing
+                            // Update overlay existing — sertakan sourcePath & mediaType agar
+                            // video/audio/gambar terdeteksi benar dan tersinkron dengan Studio.
                             ipcRenderer.send('set-gif-overlay-image-by-id', {
                                 id: parseInt(existingId),
-                                path: internalPath
+                                path: internalPath,
+                                sourcePath: internalPath,
+                                mediaType
                             });
+                            // Simpan mediaType ke settings map agar tidak hilang saat disimpan
+                            const savedForExisting = gifSettingsMap.get(existingId) || gifSettingsMap.get(existingId.toString()) || {};
+                            savedForExisting.mediaType = mediaType;
+                            gifSettingsMap.set(existingId.toString(), savedForExisting);
                             input.value = fileName;
                         } else {
-                            // Create new overlay
-                            const newId = await ipcRenderer.invoke('create-new-gif-overlay', internalPath);
-                            row.dataset.overlayId = newId;
+                            // Create new overlay — kirim payload lengkap (bukan sekadar string path)
+                            // supaya main process tahu mediaType-nya sejak awal.
+                            const newId = await ipcRenderer.invoke('create-new-gif-overlay', {
+                                path: internalPath,
+                                sourcePath: internalPath,
+                                mediaType,
+                                settings: { mediaType }
+                            });
+                            row.dataset.overlayId = newId.toString();
+                            gifSettingsMap.set(newId.toString(), {
+                                condition: 'always', value: '', opacity: 1, rotation: 0, hideOnCursor: false, mediaType
+                            });
                             input.value = fileName;
                         }
                     }
@@ -2492,6 +2838,10 @@
                 gifHideOnCursor.checked = existingSettings.hideOnCursor === true;
             }
 
+            // Balik (flip) horizontal / vertikal
+            if (gifFlipHorizontal) gifFlipHorizontal.checked = existingSettings.flipHorizontal === true;
+            if (gifFlipVertical) gifFlipVertical.checked = existingSettings.flipVertical === true;
+
             // Animation settings
             const animSettings = existingSettings.animation || { type: 'none', speed: 2, enabled: true };
             if (gifAnimationType) {
@@ -2553,13 +2903,23 @@
                 console.log(`[Native Host] Retaining saved condition value: "${conditionValue}"`);
             }
 
+            // PENTING (sinkronisasi dengan Studio standalone):
+            // Gabungkan (merge) field yang diedit di atas settings tersimpan, JANGAN menimpa total.
+            // Tanpa ini, field kaya dari standalone (flipHorizontal/Vertical, hidden, layer,
+            // effects chroma/sprite/crop/objectFit, audio volume/trim, mediaType, group) akan
+            // hilang begitu user menyimpan dari modal sederhana ini.
             const settings = {
+                ...savedSettings,
                 condition: conditionType,
                 value: conditionValue,
+                rules: { condition: conditionType, value: conditionValue },
                 opacity: parseFloat(gifOpacity.value),
                 rotation: parseInt(gifRotation.value) || 0,
                 hideOnCursor: gifHideOnCursor ? gifHideOnCursor.checked : false,
+                flipHorizontal: gifFlipHorizontal ? gifFlipHorizontal.checked : (savedSettings.flipHorizontal === true),
+                flipVertical: gifFlipVertical ? gifFlipVertical.checked : (savedSettings.flipVertical === true),
                 animation: {
+                    ...(savedSettings.animation || {}),
                     type: gifAnimationType ? gifAnimationType.value : 'none',
                     speed: gifAnimationSpeed ? parseInt(gifAnimationSpeed.value) : 2,
                     enabled: true
@@ -2814,11 +3174,20 @@
             }
 
             if (settings.dynamicThemeMode !== undefined && optDynamicThemeMode) {
-                const mode = (settings.dynamicThemeMode === 'unified') ? 'overlay' : settings.dynamicThemeMode;
+                let mode = (settings.dynamicThemeMode === 'unified') ? 'overlay' : settings.dynamicThemeMode;
+                if (mode === 'default') mode = 'default-optimized';
+                if (mode !== 'game-lobby-uimod' && mode.endsWith('-lobby-uimod')) mode = 'game-lobby-uimod';
                 optDynamicThemeMode.value = mode;
                 dynamicThemeMode = mode;
                 toggleDynamicThemeSubOptions();
                 applyDynamicThemeState();
+            }
+
+            if (settings.playbackSpeed !== undefined && optPlaybackSpeed) {
+                optPlaybackSpeed.value = ['0.75', '1.0', '1.25', '1.5', 'nightcore'].includes(String(settings.playbackSpeed))
+                    ? String(settings.playbackSpeed)
+                    : '1.0';
+                applyNativePlaybackSpeed(optPlaybackSpeed.value);
             }
 
             if (settings.overlayModeEnabled !== undefined) {
@@ -3013,6 +3382,7 @@
             }
         });
     </script>
+    <script src="./renderer/musik/music-profiles.js"></script>
 </body>
 
 </html>

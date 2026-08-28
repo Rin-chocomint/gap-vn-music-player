@@ -1,0 +1,19 @@
+<!-- ===== Scene: {{SCENE_NAME}} (info) =====
+     Info/sinopsis novel (layar terminal). Peneduh dibuat lebih rata lewat
+     kelas sp-scene-read supaya paragraf panjang tetap terbaca di atas artwork. -->
+    <section class="hub-scene sp-scene-read" data-scene-id="{{SCENE_ID}}" data-scene-type="info" data-scene-name="{{SCENE_NAME}}">
+      <img class="sp-art" data-node="artwork" data-bind-asset alt="">
+      <div class="sp-shade"></div>
+      <div class="sp-content sp-panel" data-node="content">
+        <h1 class="sp-title" data-node="title" data-bind="title" style="font-size: clamp(1.6rem, 3vw, 2.6rem);">Tentang Novel</h1>
+        <p class="sp-prose" data-node="desc" data-bind="description">Sinopsis novel akan tampil di sini dari Profil Novel.</p>
+        <dl class="sp-dl" data-node="meta">
+          <dt>Genre</dt><dd data-bind="genre">&mdash;</dd>
+          <dt>Penulis</dt><dd data-bind="author">&mdash;</dd>
+          <dt>Ilustrator</dt><dd data-bind="illustrator">&mdash;</dd>
+          <dt>VN Mapper</dt><dd data-bind="vnMapper">&mdash;</dd>
+          <dt>Versi</dt><dd data-bind="version">&mdash;</dd>
+        </dl>
+        <button type="button" class="sp-btn" data-node="back-btn" data-action="back">&larr; Kembali</button>
+      </div>
+    </section>

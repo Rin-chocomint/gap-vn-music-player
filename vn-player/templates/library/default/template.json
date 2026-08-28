@@ -1,0 +1,14 @@
+{
+    "id": "default",
+    "label": "Polos",
+    "description": "Tampilan bawaan engine netral, cocok untuk semua genre.",
+    "category": "layout",
+    "layoutFamily": "default",
+    "thumbnail": "preview.png",
+    "tags": [
+        "netral",
+        "bawaan engine"
+    ],
+    "dialogueStyle": "bottom-bar",
+    "themeCascade": "replace-novel"
+}

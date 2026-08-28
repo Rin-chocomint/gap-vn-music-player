@@ -1,0 +1,96 @@
+[
+  {
+    "type": "phase",
+    "name": "Label kah",
+    "bgmVolume": 0.02,
+    "bgmDelay": 0,
+    "bgmPan": 0
+  },
+  {
+    "type": "dialogue",
+    "speaker": "Bela",
+    "text": "Mulai",
+    "spriteMode": "custom"
+  },
+  {
+    "type": "label",
+    "name": "Label beranak",
+    "transition": "fade_white",
+    "bgmVolume": "1",
+    "bgmDelay": "0",
+    "bgmPan": "0",
+    "sfxVolume": "1",
+    "sfxDelay": "0",
+    "sfxPan": "0"
+  },
+  {
+    "type": "dialogue",
+    "speaker": "Bela",
+    "text": "dibawah entri ini ada sub-Label, coba masuk ya",
+    "spriteMode": "custom"
+  },
+  {
+    "type": "label",
+    "name": "Label beranak.Sub-Label 1"
+  },
+  {
+    "type": "choice",
+    "speaker": "Bela",
+    "text": "Entri choice ini ada di sub label 1, jadi mau ke mana?",
+    "choices": [
+      {
+        "text": "U",
+        "jump": ""
+      },
+      {
+        "text": "Loop Sub Label 1",
+        "jump": "Label beranak.Sub-Label 1"
+      },
+      {
+        "text": "Loop Label beranak",
+        "jump": "Label beranak"
+      }
+    ],
+    "spriteMode": "custom"
+  },
+  {
+    "type": "dialogue",
+    "speaker": "Bela",
+    "text": "Masih di Sub-Label 1",
+    "spriteMode": "custom"
+  },
+  {
+    "type": "dialogue",
+    "speaker": "Bela",
+    "text": "Kita keluar aja ya",
+    "spriteMode": "custom"
+  },
+  {
+    "type": "jump",
+    "target": "##CONTINUE_PARENT_FLOW##"
+  },
+  {
+    "type": "label",
+    "name": "Label beranak.Sub-Label 2"
+  },
+  {
+    "type": "dialogue",
+    "speaker": "Bela",
+    "text": "Masih Kosong",
+    "spriteMode": "custom"
+  },
+  {
+    "type": "jump",
+    "target": "##EXIT_SUB_LABEL##"
+  },
+  {
+    "type": "dialogue",
+    "speaker": "Bela",
+    "text": "Haloo, ini Entri yang berada di luar Sub-Label manapun",
+    "spriteMode": "custom"
+  },
+  {
+    "type": "jump",
+    "target": "##EXIT_LABEL##"
+  }
+]

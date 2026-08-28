@@ -1,0 +1,18 @@
+{
+  "id": "panorama",
+  "icon": "\u25a5",
+  "label": "Panorama \u2014 Judul Kanan, Menu Melintang",
+  "description": "Susunan sinematik: blok judul serif rata kanan di sepertiga atas, dan menu berbaris MELINTANG di dekat dasar layar sebagai pita bergaris \u2014 bukan tumpukan tombol. Cocok untuk novel bernuansa tenang yang ingin artwork-nya bernapas di tengah layar.",
+  "order": 25,
+  "kind": "layout",
+  "layoutFamily": "cinematic-bottom",
+  "thumbnail": "preview.png",
+  "css": "hub.css",
+  "scenes": [
+    { "type": "splash",    "name": "Splash",     "file": "scenes/splash.html",    "duration": 3000 },
+    { "type": "warning",   "name": "Peringatan", "file": "scenes/warning.html" },
+    { "type": "main_menu", "name": "Main Menu",  "file": "scenes/main_menu.html" },
+    { "type": "info",      "name": "Info Novel", "file": "scenes/info.html" },
+    { "type": "credits",   "name": "Credits",    "file": "scenes/credits.html" }
+  ]
+}

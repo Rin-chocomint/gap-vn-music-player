@@ -1,0 +1,138 @@
+/* =====================================================================
+   GUI Theme: "Idol Home"
+   ---------------------------------------------------------------------
+   Menata ulang #main-menu menyerupai home-screen game idol/gacha:
+   - Panel profil tetap di kiri-atas (kartu).
+   - #menu-options berubah dari list vertikal tengah -> bilah navigasi bawah.
+     Isi bilah: Start Game (CTA menonjol) + Options + Quit.
+   - Game Editor & Character DIKECUALIKAN dari bilah: dipindah jadi tombol
+     akses sekunder kecil di pojok kanan-atas (handler klik tetap jalan).
+   - Kontrol musik & wallpaper dinaikkan sedikit agar tak tertutup bilah.
+
+   Aktif hanya bila #main-menu punya kelas .theme-idol-home (di-toggle oleh
+   applyGuiTheme() di settings.js). Tema 'default' = tanpa kelas -> file ini
+   tidak berpengaruh apa pun.
+   ===================================================================== */
+
+/* ---------- Panel profil (kiri-atas, gaya kartu ala referensi) ---------- */
+#main-menu.theme-idol-home #profile-section {
+    transform: scale(0.85);
+    transform-origin: top left;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.16), rgba(0, 180, 255, 0.24));
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 22px;
+    padding: 12px 20px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35), 0 0 18px rgba(0, 204, 255, 0.25);
+}
+
+#main-menu.theme-idol-home #level-bar {
+    height: 18px;
+    border-color: rgba(255, 255, 255, 0.55);
+}
+
+/* ---------- #menu-options -> bilah navigasi bawah ---------- */
+#main-menu.theme-idol-home #menu-options {
+    position: fixed;
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    transform: none;
+    z-index: 30;
+    pointer-events: none; /* biar area kosong bilah tak menghalangi klik latar */
+}
+
+#main-menu.theme-idol-home #menu-options ul {
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    gap: 12px;
+    margin: 0;
+    padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px));
+    font-size: 1rem;
+    /* Catatan: JANGAN pakai backdrop-filter/filter/transform di sini — properti itu
+       membentuk containing block baru sehingga #game-editor & #character-menu-button
+       (position:fixed) akan terikat ke bilah ini, bukan viewport. */
+    background: linear-gradient(180deg, rgba(8, 16, 34, 0) 0%, rgba(8, 16, 34, 0.86) 45%);
+    pointer-events: auto;
+}
+
+#main-menu.theme-idol-home #menu-options li {
+    margin: 0;
+    padding: 12px 30px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(0, 229, 255, 0.4);
+    color: #eaf6ff;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+    transition: transform 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+
+#main-menu.theme-idol-home #menu-options li:hover {
+    transform: translateY(-4px) scale(1.04);
+    color: #ffffff;
+    background: rgba(0, 229, 255, 0.2);
+}
+
+/* Start Game = CTA utama menonjol (ala tombol Lesson kanan-bawah referensi) */
+#main-menu.theme-idol-home #menu-options #start-game {
+    background: linear-gradient(45deg, #f3557a, #ff9a3d, #ffe14d);
+    color: #23103a;
+    border: none;
+    font-size: 1.15rem;
+    font-weight: 800;
+    padding: 12px 46px;
+    box-shadow: 0 6px 22px rgba(243, 85, 122, 0.5);
+}
+
+#main-menu.theme-idol-home #menu-options #start-game:hover {
+    color: #23103a;
+    filter: brightness(1.06);
+}
+
+/* ---------- Game Editor & Character: dikecualikan dari bilah ---------- */
+/* Dipindah jadi tombol akses sekunder kecil di pojok kanan-atas,
+   di bawah #connection-status (fixed top:20 right:20). */
+#main-menu.theme-idol-home #menu-options #game-editor,
+#main-menu.theme-idol-home #menu-options #character-menu-button {
+    position: fixed;
+    right: 20px;
+    margin: 0;
+    padding: 8px 16px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    border-radius: 20px;
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    color: #dfefff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    z-index: 31;
+}
+
+#main-menu.theme-idol-home #menu-options #game-editor {
+    top: 72px;
+}
+
+#main-menu.theme-idol-home #menu-options #character-menu-button {
+    top: 116px;
+}
+
+#main-menu.theme-idol-home #menu-options #game-editor:hover,
+#main-menu.theme-idol-home #menu-options #character-menu-button:hover {
+    transform: none;
+    background: rgba(0, 229, 255, 0.22);
+    color: #ffffff;
+}
+
+/* ---------- Naikkan kontrol musik & wallpaper agar tak tertutup bilah ---------- */
+#main-menu.theme-idol-home #music-control {
+    bottom: 96px;
+}
+
+#main-menu.theme-idol-home #wallpaper-control {
+    bottom: 216px;
+}

@@ -1,0 +1,204 @@
+/* ===================================================================
+   Template: Minimal - Menu di Kiri
+   Keluarga layout: left-rail
+
+   Gaya dokumen, bukan poster. Tiga aturan yang memberi templat ini
+   wajahnya, dan yang perlu kamu jaga kalau menyuntingnya:
+
+     1. NOL gradien, NOL bayangan, NOL sudut membulat. Pemisah antar
+        bagian hanya garis 1px. Begitu satu box-shadow masuk, seluruh
+        kesan "dokumen" hilang.
+     2. Kolom isi DIJANGKARKAN KE KIRI, bukan margin auto. Menaruhnya di
+        tengah membuat templat ini kembali jadi Center Stack seperti yang
+        lain - itu justru masalah yang ingin dihindari.
+     3. Menu adalah DAFTAR BARIS bergaris, bukan tumpukan tombol. Tiap
+        baris punya label + keterangan kecil, jadi pemain tahu apa yang
+        akan terjadi sebelum mengklik.
+   =================================================================== */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --m-bg: #eeeeee;
+  --m-ink: #222222;
+  --m-muted: #666666;
+  --m-faint: #888888;
+  --m-rule: #bbbbbb;
+  --m-rule-strong: #777777;
+  --m-hover: #dddddd;
+  --m-press: #cfcfcf;
+  --m-sans: var(--vn-novel-font, Arial, Helvetica, sans-serif);
+
+  /* Jarak kolom isi dari tepi kiri layar. Ini satu-satunya angka yang
+     menentukan "seberapa ke kiri" templat ini terasa. */
+  --m-gutter: clamp(28px, 6vw, 92px);
+
+  /* Lebar lembar isi. Angka ini SENGAJA besar: versi pertama memakai 820px dan
+     menyisakan sepertiga layar kanan kosong pada 16:9 — lembar terasa seperti
+     kartu kecil yang tersesat, bukan halaman. Sekarang ia mengisi ruang di
+     antara kedua gutter, dan pagunya baru bekerja di layar sangat lebar (ultra-
+     wide), supaya baris menu tak memanjang sampai tak terbaca ujungnya.
+
+     Yang TIDAK berubah: `margin: 0` di bawah. Lembar melebar ke KANAN, bukan
+     ke tengah — menu tetap dijangkarkan ke kiri. */
+  --m-sheet: 1180px;
+}
+
+body {
+  font-family: var(--m-sans);
+  background: var(--m-bg);
+  color: var(--m-ink);
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+#hub-root { position: relative; width: 100vw; height: 100vh; }
+
+/* --- Sistem layar: satu scene aktif (WAJIB) ---
+   Tanpa dua aturan ini tidak ada scene yang pernah tampil. */
+.hub-scene {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: clamp(24px, 5vh, 56px) var(--m-gutter);
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity .28s linear, visibility .28s linear;
+}
+.hub-scene.active { opacity: 1; visibility: visible; pointer-events: auto; }
+
+/* Lembar isi: dijangkarkan kiri (lihat aturan 2 di atas). */
+.m-sheet {
+  width: 100%;
+  max-width: var(--m-sheet);
+  margin: 0;                 /* JANGAN diganti `auto` */
+}
+
+/* --- Kepala: judul + tagline, dipisah garis tegas --- */
+.m-head {
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--m-rule-strong);
+}
+.m-title {
+  font-size: clamp(2rem, 4vw, 3.4rem);
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  line-height: 1.12;
+}
+.m-tagline {
+  margin-top: 10px;
+  color: var(--m-muted);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+/* --- Badan: menu kiri, ringkasan kanan --- */
+.m-body {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 48px;
+  margin-top: 32px;
+}
+.m-colhead {
+  margin-bottom: 14px;
+  color: var(--m-muted);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* Menu = daftar baris bergaris (aturan 3). */
+.m-menu {
+  display: block;
+  border-top: 1px solid var(--m-rule);
+}
+.m-item {
+  display: block;
+  width: 100%;
+  padding: 17px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--m-rule);
+  background: transparent;
+  color: var(--m-ink);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+.m-item:hover,
+.m-item:focus-visible { background: var(--m-hover); outline: none; }
+.m-item:active { background: var(--m-press); }
+.m-item-name { display: block; font-size: 17px; }
+.m-item-note { display: block; margin-top: 5px; color: var(--m-faint); font-size: 12px; }
+
+/* Baris keluar diredupkan: ia satu-satunya yang membuang sesi berjalan. */
+.m-item-quit .m-item-name { color: var(--m-muted); }
+
+/* Kolom kanan: ringkasan metadata, terisi otomatis dari Profil Novel. */
+.m-aside { padding-top: 2px; border-top: 1px solid var(--m-rule-strong); }
+.m-meta { margin-top: 15px; font-size: 13px; line-height: 1.6; }
+.m-meta dt { color: var(--m-faint); font-size: 12px; }
+.m-meta dd { margin-bottom: 13px; color: var(--m-ink); }
+
+/* --- Kaki halaman --- */
+.m-foot {
+  margin-top: 40px;
+  padding-top: 12px;
+  border-top: 1px solid var(--m-rule);
+  color: var(--m-faint);
+  font-size: 12px;
+}
+
+/* --- Tombol sekunder (Kembali, Saya Mengerti) --- */
+.m-btn {
+  padding: 11px 22px;
+  border: 1px solid #444444;
+  background: var(--m-hover);
+  color: var(--m-ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+}
+.m-btn:hover { background: var(--m-press); }
+
+/* --- Splash: judul kiri-bawah, bukan di tengah --- */
+.m-splash { justify-content: flex-end; cursor: pointer; background: var(--m-bg); }
+.m-splash .m-title { font-size: clamp(2.4rem, 7vw, 5.2rem); }
+.m-splash-rule { width: 120px; height: 1px; margin: 22px 0 14px; background: var(--m-rule-strong); }
+.m-splash-skip {
+  position: absolute; right: var(--m-gutter); bottom: clamp(24px, 5vh, 56px);
+  color: var(--m-faint); font-size: 11px;
+}
+
+/* --- Warning --- */
+.m-warning-text {
+  max-width: 62ch; margin-top: 22px;
+  color: var(--m-muted); font-size: 15px; line-height: 1.75;
+}
+.m-warning-actions { margin-top: 28px; }
+
+/* --- Info & Credits: dua kolom definisi, tetap rata kiri ---
+   Paragraf DIBATASI `ch`, bukan ikut melebar bersama lembar: baris sepanjang
+   1100px menyakitkan dibaca. Yang boleh mengisi ruang adalah daftar & menu,
+   bukan prosa. */
+.m-prose { max-width: 66ch; margin-top: 20px; color: var(--m-ink); font-size: 15px; line-height: 1.75; }
+.m-dl {
+  display: grid; grid-template-columns: 150px 1fr; gap: 10px 20px;
+  margin-top: 26px; padding-top: 20px;
+  border-top: 1px solid var(--m-rule);
+  max-width: 66ch;
+  font-size: 13px;
+}
+.m-dl dt { color: var(--m-faint); }
+.m-back { margin-top: 30px; }
+
+.m-credits-lines { margin-top: 22px; font-size: 15px; line-height: 2; color: var(--m-muted); }
+.m-credits-lines span { color: var(--m-ink); }
+.m-credits-note { margin-top: 18px; color: var(--m-faint); font-size: 12px; }
+
+/* --- Layar sempit: kolom kanan turun ke bawah menu --- */
+@media (max-width: 860px) {
+  .m-body { grid-template-columns: 1fr; gap: 24px; }
+  .m-aside { border-top: 1px solid var(--m-rule); padding-top: 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hub-scene { transition: none; }
+}

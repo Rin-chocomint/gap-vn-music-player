@@ -1,0 +1,197 @@
+/* =============================================
+ * VN Player — CSS Variables
+ * Pusat kustomisasi visual: semua nilai yang bisa di-override.
+ *
+ * URUTAN CASCADE LENGKAP (audit B2 — dulu komentar di sini tak menyebut
+ * customCSS sama sekali, sehingga pembaca tak akan menemukan bug B1):
+ *   variables.css → css/*.css → themes/default → themes/<tema>
+ *     → <novel>/novel-font.css → <novel>/theme.css → <chapter>/theme.css ★MENANG
+ *
+ * Acuan tunggal & implementasinya: vn-player/js/extension-loader.js
+ * (fungsi loadAll → loadCSSCascade → applyCustomCSS).
+ * ============================================= */
+
+:root {
+    /* === Dialogue Box === */
+    --vn-dialogue-bg: rgba(0, 0, 0, 0.7);
+    --vn-dialogue-border: 2px solid #fff;
+    --vn-dialogue-radius: 10px;
+    --vn-dialogue-padding: 10px 20px;
+    --vn-dialogue-width: 80%;
+    --vn-dialogue-margin-bottom: 10px;
+    --vn-dialogue-z: 5;
+
+    /* === Typography === */
+    /* Font global novel (Profil Novel > Tampilan) menyetel `--vn-novel-font` di
+       `<novel>/novel-font.css`. Membacanya lewat var() di sini membuat kontraknya
+       SAMA di Player dan di Hub — tiap hub.css template juga memakai
+       `var(--vn-novel-font, <bawaannya>)`. Novel yang belum memilih font jatuh ke
+       Lexend, jadi nol perubahan bagi novel lama. */
+    --vn-font-family: var(--vn-novel-font, 'Lexend', sans-serif);
+    --vn-dialogue-color: #fff;
+    --vn-dialogue-size: 1em;
+    --vn-typing-cursor: '...';
+
+    /* === Indikator lanjut (page advance) ===
+     * Kembalikan dari `--vn-typing-cursor`: kursor tampil SELAGI mengetik,
+     * indikator ini tampil justru SESUDAH baris selesai — tanda "klik untuk
+     * lanjut". Keduanya berbagi slot ::after yang sama dan saling eksklusif.
+     * Kosongkan (`--vn-continue-indicator: '';`) untuk mematikannya; itu jalur
+     * resmi bagi preset yang ingin menaruh indikatornya sendiri di tempat lain. */
+    --vn-continue-indicator: '\25B8';   /* ▸ */
+    --vn-continue-color: currentColor;
+    --vn-continue-opacity: 0.7;
+    --vn-continue-anim: vnContinuePulse 1.6s ease-in-out infinite;
+    /* Posisi di dalam kotak dialog. Sengaja var: menggeser sudut adalah hal
+       pertama yang ingin diubah kreator, dan itu tak boleh menuntut menulis
+       selektor. Nilainya relatif terhadap padding kotak (`--vn-dialogue-padding`
+       baku `10px 20px`), jadi tanda duduk sedikit di dalam tepi teks. */
+    --vn-continue-right: 12px;
+    --vn-continue-bottom: 6px;
+
+    /* === Layar bawaan tambahan (kartu judul & galeri) ===
+     * Dikonsumsi `css/scenes.css`. Nilainya sengaja netral-gelap supaya cocok
+     * dengan baseline engine; palet & theme.css kreator bebas menimpanya. */
+    --vn-judul-bg: #05060a;
+    --vn-judul-sorot: rgba(120, 160, 255, 0.18);
+    --vn-judul-warna: #eaf0ff;
+    --vn-judul-ukuran: 6vw;
+    --vn-judul-renggang: 0.16em;
+    --vn-judul-sub-warna: rgba(190, 205, 240, 0.55);
+    --vn-judul-durasi: 900ms;
+
+    --vn-galeri-bg: rgba(6, 8, 14, 0.96);
+    --vn-galeri-warna: #cfe0ff;
+    --vn-galeri-garis: rgba(140, 170, 230, 0.35);
+    --vn-galeri-kolom: 180px;
+    --vn-galeri-rasio: 16 / 9;
+    --vn-galeri-sela: 14px;
+    --vn-galeri-tepi: 6vh 6vw;
+
+    /* === Speaker Name === */
+    --vn-name-color: #FFD700;
+    --vn-name-weight: bold;
+    --vn-name-margin: 5px;
+
+    /* === Choices === */
+    --vn-choice-bg: rgba(0, 0, 0, 0.8);
+    --vn-choice-color: white;
+    --vn-choice-border: 2px solid white;
+    --vn-choice-radius: 10px;
+    --vn-choice-padding: 15px 25px;
+    --vn-choice-font-size: 1.1em;
+    --vn-choice-hover-bg: white;
+    --vn-choice-hover-color: black;
+    --vn-choice-hover-scale: 1.03;
+
+    /* === Sprites === */
+    --vn-sprite-base-height: 75vh;
+    --vn-sprite-max-height: 600px;
+    --vn-sprite-max-width: 45vw;
+    --vn-sprite-fade-duration: 0.4s;
+    --vn-sprite-padding-side: 50px;
+    /* Fokus bicara (G2 irisan b): slot yang TIDAK fokus diredupkan sebanyak ini.
+       Entri boleh menimpa per-baris lewat `spriteDim`; var ini = default tema,
+       jadi kreator bisa menyetel selera panggungnya sekali di theme.css. */
+    --vn-sprite-dim: 0.55;
+    --vn-sprite-focus-dur: 0.25s;
+
+    /* === Posisi panggung BERNAMA (G2 irisan a, sumbu D8 ke-6) ===
+       Kosakata posisi hidup DI SINI, bukan sebagai tabel di JS: runtime menulis
+       `left: var(--vn-pos-<nama>, 50%)` → browser yang me-resolve, dan editor
+       MEMINDAI nama yang sama untuk mengisi dropdown. Satu kebenaran, tiga konsumen.
+
+       Akibatnya: kreator yang menulis `--vn-pos-jendela: 88%` di `theme.css`-nya
+       mendapat posisi itu di dropdown editor tanpa menyentuh kode apa pun — dan
+       menimpa `--vn-pos-right` menggeser SEMUA entri yang memakai nama itu sekaligus
+       (itulah gunanya nama: "kanan" jadi SATU nilai, bukan 72 di satu entri dan 70
+       di entri lain). Entri lama yang memakai ANGKA tetap persen, nol migrasi. */
+    --vn-pos-far-left: 12%;
+    --vn-pos-left: 25%;
+    --vn-pos-center: 50%;
+    --vn-pos-right: 75%;
+    --vn-pos-far-right: 88%;
+
+    /* === Transitions === */
+    /* CATATAN (audit A3/A4): durasi TRANSISI (fade_black dst.) TIDAK dikendalikan
+       CSS — itu state JS `state.transitionDuration` + field per-entry
+       `transitionDuration`. Var di bawah dibiarkan agar tema lama yang meng-override
+       tidak error, tetapi HANYA --vn-fade-duration yang dikonsumsi (dialogue.css,
+       opacity kotak dialog). --vn-transition-duration & --vn-scene-fade-duration
+       sengaja disimpan sebagai reserved (belum ada konsumen). */
+    --vn-transition-duration: 500ms;
+    --vn-fade-duration: 0.5s;
+    --vn-scene-fade-duration: 0.4s;
+    --vn-bg-transition: 0.5s ease-in-out;
+
+    /* === Controls === */
+    --vn-control-bg: rgba(0, 0, 0, 0.7);
+    --vn-control-color: white;
+    --vn-control-radius: 8px;
+    --vn-control-size: 44px;
+    --vn-auto-active-bg: #FFD700;
+    --vn-auto-active-color: black;
+
+    /* === Backlog === */
+    --vn-backlog-bg: rgba(0, 0, 0, 0.9);
+    --vn-backlog-speaker-color: #FFD700;
+
+    /* === End Screen === */
+    --vn-end-bg: rgba(0, 0, 0, 0.5);
+    --vn-end-blur: 8px;
+    --vn-end-title-size: 2.5rem;
+    --vn-end-button-width: 300px;
+
+    /* === Settings Modal === */
+    --vn-settings-bg: rgba(5, 6, 8, 0.95);
+    --vn-settings-container-bg: #0d0e12;
+    --vn-settings-text: #f5f7fa;
+    --vn-settings-text-secondary: #a4abb6;
+    --vn-settings-text-muted: #5f6368;
+    --vn-settings-tertiary: #16181d;
+    --vn-settings-border: rgba(255, 255, 255, 0.05);
+    --vn-settings-accent: #ff6b6b;
+    --vn-settings-bgm-color: #05d9e8;
+    --vn-settings-voice-color: #ff2a6d;
+    --vn-settings-sfx-color: #ff9f1c;
+
+    /* === Game Container === */
+    --vn-container-width: 100vw;
+    --vn-container-height: 100vh;
+    --vn-bg-color: black;
+
+    /* === Debug HUD === */
+    --vn-debug-bg: rgba(20, 20, 20, 0.9);
+    --vn-debug-width: 320px;
+    --vn-debug-font: 'Consolas', monospace;
+    --vn-debug-font-size: 12px;
+}
+
+/* Responsif: viewport kecil */
+@media screen and (max-height: 800px) {
+    :root {
+        --vn-sprite-base-height: 70vh;
+        --vn-sprite-max-height: 520px;
+    }
+}
+
+@media screen and (max-height: 650px) {
+    :root {
+        --vn-sprite-base-height: 65vh;
+        --vn-sprite-max-height: 420px;
+    }
+}
+
+@media screen and (max-height: 500px) {
+    :root {
+        --vn-sprite-base-height: 60vh;
+        --vn-sprite-max-height: 300px;
+    }
+}
+
+@media screen and (max-height: 400px) {
+    :root {
+        --vn-sprite-base-height: 55vh;
+        --vn-sprite-max-height: 220px;
+    }
+}

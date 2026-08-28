@@ -1,0 +1,25 @@
+<!-- ===== Scene: {{SCENE_NAME}} (custom_code → Pengaturan) =====
+     Layar custom: hub.js mengisi nilai dari VNHub.settings.getAll() dan menyimpan
+     perubahan via VNHub.settings.set(). Setting ini berlaku saat play berikutnya.
+     Dicapai dari menu (data-hub-nav="settings"), kembali via data-action="back". -->
+    <section class="hub-scene sc-screen sc-settings" data-scene-id="{{SCENE_ID}}" data-scene-type="custom_code" data-scene-name="{{SCENE_NAME}}" data-hub-screen="settings">
+      <div class="sc-screen-head">
+        <button type="button" class="sc-btn sc-back" data-node="back-btn" data-action="back">&larr; Kembali</button>
+        <h2 class="sc-screen-title" data-node="title">Pengaturan</h2>
+      </div>
+      <div class="sc-settings-body" data-node="body" data-hub-slot="settings-body">
+        <label class="sc-set-row"><span>Volume BGM</span>
+          <input type="range" min="0" max="100" data-hub-set="bgm"><b class="sc-set-val" data-hub-val="bgm">&mdash;</b></label>
+        <label class="sc-set-row"><span>Volume Voice</span>
+          <input type="range" min="0" max="100" data-hub-set="voice"><b class="sc-set-val" data-hub-val="voice">&mdash;</b></label>
+        <label class="sc-set-row"><span>Volume SFX</span>
+          <input type="range" min="0" max="100" data-hub-set="sfx"><b class="sc-set-val" data-hub-val="sfx">&mdash;</b></label>
+        <label class="sc-set-row"><span>Kecepatan Teks</span>
+          <input type="range" min="10" max="100" data-hub-set="textSpeed"><b class="sc-set-val" data-hub-val="textSpeed">&mdash;</b></label>
+        <label class="sc-set-row"><span>Jeda Auto</span>
+          <input type="range" min="500" max="5000" step="100" data-hub-set="autoDelay"><b class="sc-set-val" data-hub-val="autoDelay">&mdash;</b></label>
+        <label class="sc-set-toggle"><span>Layar Penuh</span>
+          <input type="checkbox" data-hub-set="fullscreen"></label>
+        <button type="button" class="sc-btn" data-hub-nav="advanced-settings">Pengaturan Lanjutan&hellip;</button>
+      </div>
+    </section>

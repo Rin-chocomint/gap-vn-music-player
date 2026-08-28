@@ -1,0 +1,103 @@
+/* =============================================
+ * VN Player — Dialogue Variants
+ *
+ * Menimpa CSS Variable di variables.css berdasarkan gaya dialog yang dipilih.
+ *
+ * ⚠ KENAPA `:root:where(.dialogue-style-…)` DAN BUKAN `.dialogue-style-…`
+ *
+ * Dulu kelas ini menempel di `#game-container`, dan aturannya ditulis polos.
+ * Untuk CUSTOM PROPERTY, nilai yang dipakai sebuah elemen datang dari ANCESTOR
+ * TERDEKAT yang mendeklarasikannya — urutan berkas dan specificity tak berarti
+ * apa-apa antar-elemen. `#game-container` jauh lebih dekat ke kotak dialog
+ * daripada `:root`, jadi setiap `--vn-dialogue-*` yang ditulis kreator di
+ * `:root` theme.css-nya KALAH TELAK, tanpa satu pun peringatan.
+ *
+ * Akibatnya terukur: `retro` menulis `--vn-dialogue-bg: rgba(0,0,80,.9)` dan
+ * `--vn-dialogue-radius: 0` di `:root`, tapi yang tergambar tetap nilai varian.
+ * Lima preset shipped menulis `--vn-dialogue-bg` di `:root` dan tak satu pun
+ * pernah terlihat — dan picker "Background Dialog" di editor, yang juga menulis
+ * ke `:root`, ikut mati untuk novel ber-shim.
+ *
+ * Perbaikannya menuntut DUA hal sekaligus, bukan satu:
+ *   1. Kelasnya pindah ke `<html>` (dilakukan `state.js`) sehingga varian dan
+ *      `:root` kreator mendeklarasikan di ELEMEN YANG SAMA — barulah cascade
+ *      biasa yang menentukan, bukan kedekatan ancestor.
+ *   2. `:where()` menahan specificity kelas itu di NOL, sehingga selektornya
+ *      berbobot 0-1-0 — sama persis dengan `:root`. Dengan bobot yang sama,
+ *      yang menang tinggal URUTAN SUMBER:
+ *          variables.css  →  BERKAS INI  →  theme.css kreator
+ *      Tanpa `:where()`, `:root.dialogue-style-x` (0-2-0) akan mengalahkan
+ *      kreator lagi; dengan `:where()` saja tanpa `:root` (0-0-0), ia justru
+ *      kalah dari `variables.css` dan variannya tak pernah berlaku.
+ *
+ * Kelas yang tertinggal di `#game-container` (salinan shim lama) kini tidak
+ * cocok dengan selektor mana pun di sini — jadi ia tak lagi mendeklarasikan
+ * apa-apa, dan tak perlu dicabut dari berkas novel siapa pun.
+ * ============================================= */
+
+/* 1. Bottom Bar (Bawaan variables.css, eksplisit untuk fallback) */
+:root:where(.dialogue-style-bottom-bar) {
+    --vn-dialogue-width: 80%;
+    --vn-dialogue-margin-bottom: 10px;
+    --vn-dialogue-padding: 10px 20px;
+    --vn-dialogue-bg: rgba(0, 0, 0, 0.7);
+    --vn-dialogue-radius: 10px;
+    --vn-name-margin: 5px;
+}
+
+/* 2. Center Box (Gaya dialog tipikal RPG klasik, di tengah layar bawah) */
+:root:where(.dialogue-style-center-box) {
+    --vn-dialogue-width: 50%;
+    --vn-dialogue-margin-bottom: 15vh;
+    --vn-dialogue-padding: 20px 30px;
+    --vn-dialogue-bg: rgba(10, 20, 40, 0.85); /* Agak kebiruan */
+    --vn-dialogue-radius: 4px; /* Lebih kotak */
+    --vn-dialogue-border: 3px double #FFD700;
+}
+/* Selektor turunan diterjemahkan id → PERAN (Tahap 4): kotak dialog buatan
+   kreator jarang memakai id engine, dan aturan ini dulu diam-diam melewatinya. */
+:root:where(.dialogue-style-center-box) [data-player-role="speaker"] {
+    text-align: center;
+    border-bottom: 1px solid rgba(255, 215, 0, 0.3);
+    padding-bottom: 5px;
+    margin-bottom: 10px;
+}
+
+/* 3. ADV Fullscreen (Teks dominan, menutupi sebagian besar layar seperti Novel) */
+:root:where(.dialogue-style-adv-fullscreen) {
+    --vn-dialogue-width: 90vw;
+    --vn-dialogue-margin-bottom: 5vh;
+    --vn-dialogue-padding: 40px 60px;
+    --vn-dialogue-bg: rgba(0, 0, 0, 0.85); /* Lebih pekat */
+    --vn-dialogue-radius: 0px;
+    --vn-dialogue-border: none;
+}
+:root:where(.dialogue-style-adv-fullscreen) [data-player-role="dialogue"] {
+    height: 85vh; /* Ambil tinggi dominan */
+    display: flex;
+    flex-direction: column;
+}
+:root:where(.dialogue-style-adv-fullscreen) [data-player-role="text"] {
+    flex-grow: 1;
+    font-size: 1.15em;
+    line-height: 1.8;
+}
+
+/* 4. Speech Bubble (Gaya kotak dialog melayang ala komik modern) */
+:root:where(.dialogue-style-bubble) {
+    --vn-dialogue-width: auto;
+    --vn-dialogue-margin-bottom: 30vh;
+    --vn-dialogue-padding: 15px 25px;
+    --vn-dialogue-bg: #ffffff; /* Latar putih */
+    --vn-dialogue-color: #111111; /* Teks hitam */
+    --vn-dialogue-border: 3px solid #333;
+    --vn-dialogue-radius: 25px;
+}
+:root:where(.dialogue-style-bubble) [data-player-role="speaker"] {
+    color: #e74c3c; /* Aksen warna nama */
+    font-size: 0.9em;
+    padding: 2px 8px;
+    background: #ffeeee;
+    border-radius: 12px;
+    display: inline-block;
+}

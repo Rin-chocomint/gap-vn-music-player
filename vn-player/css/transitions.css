@@ -1,0 +1,36 @@
+/* =============================================
+ * VN Player — Transition Styles
+ * Overlay transisi antar scene + efek layar
+ * ============================================= */
+
+/* Transition Overlay — layer untuk fade/swipe antar scene */
+#transition-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 50;
+    opacity: 0;
+    pointer-events: none;
+}
+
+#transition-overlay.black {
+    background-color: black;
+}
+
+#transition-overlay.white {
+    background-color: white;
+}
+
+#transition-overlay.active {
+    opacity: 1;
+}
+
+/* Screen Shake Effect */
+@keyframes shake {
+    10%, 90% { transform: translate3d(-1px, 0, 0); }
+    20%, 80% { transform: translate3d(2px, 0, 0); }
+    30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+    40%, 60% { transform: translate3d(4px, 0, 0); }
+}

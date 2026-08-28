@@ -1,0 +1,134 @@
+/* ============================================================
+   Showcase Hub — tema lengkap. Bebas diubah/diganti total.
+   PENTING: sistem visibilitas .hub-scene / .hub-scene.active WAJIB ada —
+   tanpa itu tidak ada scene yang tampil (runtime hanya menambah/menghapus
+   class .active pada <section class="hub-scene">).
+   ============================================================ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --accent: #ff4d7d;
+  --accent-2: #05d9e8;
+  --bg: #0c0d14;
+  --panel: rgba(255, 255, 255, 0.05);
+  --panel-border: rgba(255, 255, 255, 0.12);
+  --text: #f3f4fb;
+  --muted: #9aa0b4;
+}
+body {
+  font-family: var(--vn-novel-font, 'Lexend', 'Segoe UI', system-ui, sans-serif);
+  background: radial-gradient(120% 120% at 50% 0%, #161827 0%, var(--bg) 60%);
+  color: var(--text);
+  min-height: 100vh;
+  overflow: hidden;
+}
+#hub-root { position: relative; width: 100vw; height: 100vh; }
+
+/* ---- Sistem scene ---- */
+.hub-scene {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity .4s ease, visibility .4s ease;
+}
+.hub-scene.active { opacity: 1; visibility: visible; pointer-events: auto; }
+
+/* ---- Tombol ---- */
+.sc-btn {
+  min-width: 240px; padding: 13px 26px; margin: 5px;
+  font: inherit; font-size: 1.02rem; color: var(--text); cursor: pointer;
+  background: var(--panel); border: 1px solid var(--panel-border);
+  border-radius: 10px; backdrop-filter: blur(6px);
+  transition: transform .15s ease, background .2s ease, border-color .2s ease;
+}
+.sc-btn:hover { background: rgba(255, 77, 125, 0.18); border-color: var(--accent); transform: translateY(-2px); }
+.sc-btn-primary { background: linear-gradient(45deg, var(--accent), #ff7ba0); border-color: transparent; font-weight: 600; }
+.sc-btn-primary:hover { filter: brightness(1.08); }
+.sc-btn-ghost { background: transparent; color: var(--muted); }
+.sc-back { min-width: 0; padding: 8px 16px; }
+
+/* ---- Splash ---- */
+.sc-splash { background: #000; cursor: pointer; }
+.sc-splash-logo { max-width: 70%; max-height: 70%; object-fit: contain; }
+.sc-splash-hint { position: absolute; bottom: 28px; right: 32px; color: rgba(255, 255, 255, 0.4); font-size: .85rem; }
+
+/* ---- Warning ---- */
+.sc-warning { padding: 40px; }
+.sc-warning-box {
+  max-width: 560px; text-align: center; padding: 40px;
+  border: 1px solid rgba(255, 77, 125, 0.4); border-radius: 16px;
+  background: rgba(255, 77, 125, 0.06);
+}
+.sc-warning-title { margin-bottom: 18px; color: var(--accent); }
+.sc-warning-text { line-height: 1.7; color: #d6d8e6; margin-bottom: 28px; }
+
+/* ---- Main menu ---- */
+.sc-menu { flex-direction: column; }
+.sc-menu-inner { text-align: center; display: flex; flex-direction: column; align-items: center; }
+.sc-menu-title {
+  font-size: clamp(2.4rem, 7vw, 5rem); line-height: 1.05; margin-bottom: 8px;
+  background: linear-gradient(45deg, #fff, #b9bdd6); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.sc-menu-tagline { color: var(--muted); margin-bottom: 26px; max-width: 600px; }
+.sc-menu-actions { display: flex; flex-direction: column; align-items: center; }
+.sc-resume { border-color: var(--accent-2); color: var(--accent-2); }
+
+/* ---- Layar dengan header (info/gallery/load/settings/credits) ---- */
+.sc-screen { flex-direction: column; align-items: stretch; padding: 28px clamp(20px, 6vw, 80px); justify-content: flex-start; }
+.sc-screen-head { display: flex; align-items: center; gap: 18px; margin-bottom: 24px; }
+.sc-screen-title { font-size: 1.8rem; }
+.sc-empty { color: var(--muted); text-align: center; padding: 40px; grid-column: 1 / -1; }
+
+/* ---- Info ---- */
+.sc-info-card { max-width: 760px; background: var(--panel); border: 1px solid var(--panel-border); border-radius: 14px; padding: 28px; }
+.sc-info-desc { line-height: 1.75; color: #d6d8e6; margin-bottom: 22px; white-space: pre-wrap; }
+.sc-info-meta { display: grid; grid-template-columns: auto 1fr; gap: 8px 18px; }
+.sc-info-meta dt { color: var(--muted); }
+
+/* ---- Galeri ---- */
+.sc-gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; overflow-y: auto; align-content: start; }
+.sc-gallery-item { aspect-ratio: 16/9; border-radius: 10px; overflow: hidden; cursor: pointer; border: 2px solid transparent; transition: transform .15s ease, border-color .15s ease; }
+.sc-gallery-item:hover { border-color: var(--accent); transform: scale(1.03); }
+.sc-gallery-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.sc-lightbox { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.92); cursor: pointer; }
+.sc-lightbox img { max-width: 92vw; max-height: 92vh; object-fit: contain; border-radius: 10px; }
+
+/* ---- Achievements ---- */
+.sc-ach-count { margin-left: auto; font-size: .95rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.sc-ach-list { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; align-content: start; }
+.sc-ach-row { display: flex; align-items: center; gap: 16px; background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px; padding: 14px 18px; }
+.sc-ach-row.locked { opacity: .5; }
+.sc-ach-row.unlocked { border-color: rgba(255, 77, 125, 0.45); }
+.sc-ach-icon { flex: 0 0 auto; width: 44px; height: 44px; display: grid; place-items: center; font-size: 1.5rem; border-radius: 10px; background: rgba(255, 255, 255, 0.06); }
+.sc-ach-body { flex: 1; min-width: 0; }
+.sc-ach-title { font-weight: 600; }
+.sc-ach-desc { font-size: .85rem; color: var(--muted); margin-top: 2px; }
+.sc-ach-status { flex: 0 0 auto; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.sc-ach-row.unlocked .sc-ach-status { color: var(--accent); }
+
+/* ---- Save slots ---- */
+.sc-slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; align-content: start; overflow-y: auto; }
+.sc-slot { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 12px; padding: 18px; cursor: pointer; transition: background .2s ease, border-color .2s ease; }
+.sc-slot:hover { background: rgba(5, 217, 232, 0.12); border-color: var(--accent-2); }
+.sc-slot.empty { opacity: .45; cursor: default; }
+.sc-slot.empty:hover { background: var(--panel); border-color: var(--panel-border); }
+.sc-slot-title { font-weight: 600; margin-bottom: 6px; }
+.sc-slot-info { font-size: .85rem; color: var(--muted); }
+
+/* ---- Settings ---- */
+.sc-settings-body { max-width: 560px; width: 100%; display: flex; flex-direction: column; gap: 16px; }
+.sc-set-row { display: grid; grid-template-columns: 130px 1fr 56px; align-items: center; gap: 14px; }
+.sc-set-row input[type="range"] { width: 100%; accent-color: var(--accent); }
+.sc-set-val { text-align: right; color: var(--accent-2); font-variant-numeric: tabular-nums; }
+.sc-set-toggle { display: flex; align-items: center; justify-content: space-between; max-width: 320px; }
+.sc-set-toggle input { width: 20px; height: 20px; accent-color: var(--accent); }
+
+/* ---- Credits ---- */
+.sc-credits { }
+.sc-credits-lines { text-align: center; line-height: 2.1; color: #d6d8e6; margin: auto; }
+.sc-credits-footer { margin-top: 18px; color: var(--muted); font-size: .9rem; }
+
+/* ---- Background opsional (di-set hub.js dari cover novel) ---- */
+.sc-menu.has-bg::before {
+  content: ''; position: absolute; inset: 0; z-index: -1;
+  background: var(--menu-bg) center/cover no-repeat; filter: blur(8px) brightness(.4); transform: scale(1.08);
+}

@@ -47,7 +47,7 @@ canvas.addEventListener('touchend', () => {
 function drawSnow() {
     ctx.clearRect(0, 0, W, H); // Bersihkan canvas
 
-    // MODIFIKASI: Membuat salju lebih bening (mengurangi alpha)
+    // Membuat salju lebih bening (mengurangi alpha)
     ctx.fillStyle = "rgba(255, 255, 255, 0.4)"; // Dari 0.8 menjadi 0.4, atau sesuai selera
     ctx.beginPath();
     for (let i = 0; i < mp; i++) {

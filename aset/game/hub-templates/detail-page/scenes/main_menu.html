@@ -1,0 +1,59 @@
+<!-- ===== Scene: {{SCENE_NAME}} (main_menu) =====
+     Halaman DETAIL, bukan main menu: seluruh isi novel terlihat sekaligus.
+     Kolom kiri = identitas + sinopsis + daftar chapter; kolom kanan = cover,
+     tombol Lanjutkan, dan ringkasan progres.
+
+     Yang diisi RUNTIME sendiri (tak perlu kode): data-bind (teks metadata),
+     data-bind-asset (cover), dan semua data-action.
+     Yang diisi hub.js: elemen ber-`data-hub-slot` — daftar chapter, angka
+     progres, waktu terakhir main, dan tampil/tidaknya tombol Lanjutkan. -->
+    <section class="hub-scene dp-page" data-scene-id="{{SCENE_ID}}" data-scene-type="main_menu" data-scene-name="{{SCENE_NAME}}">
+      <div class="dp-sheet" data-node="stage">
+        <header class="dp-head" data-node="head">
+          <button type="button" class="dp-back" data-node="exit-btn" data-action="exit">&larr; Kembali</button>
+          <h1 class="dp-title" data-node="title" data-bind="title">Visual Novel</h1>
+        </header>
+
+        <div class="dp-body">
+          <div class="dp-left">
+            <dl class="dp-meta" data-node="meta">
+              <dt>Genre</dt><dd data-bind="genre">&mdash;</dd>
+              <dt>Penulis</dt><dd data-bind="author">&mdash;</dd>
+              <dt>Ilustrator</dt><dd data-bind="illustrator">&mdash;</dd>
+              <dt>VN Mapper</dt><dd data-bind="vnMapper">&mdash;</dd>
+              <dt>Versi</dt><dd data-bind="version">&mdash;</dd>
+            </dl>
+
+            <div class="dp-desc" data-node="desc" data-bind="description">Sinopsis novel akan tampil di sini dari Profil Novel.</div>
+
+            <section class="dp-chapters" data-node="actions">
+              <h2 class="dp-colhead">Daftar Chapter</h2>
+              <button type="button" class="dp-start" data-node="start-btn" data-action="start">Mulai dari Awal</button>
+              <div class="dp-list" data-node="chapter-list" data-hub-slot="chapter-list">
+                <p class="dp-empty">Memuat chapter&hellip;</p>
+              </div>
+            </section>
+          </div>
+
+          <aside class="dp-right" data-node="aside">
+            <div class="dp-cover" data-node="cover">
+              <img data-bind-asset alt="">
+            </div>
+
+            <button type="button" class="dp-continue" data-node="continue-btn"
+                    data-hub-slot="continue" data-action="goto" data-target="{{TARGET:custom_code}}" hidden>
+              Lanjutkan Permainan
+            </button>
+
+            <div class="dp-progress" data-node="progress">
+              <h2>Progres Cerita</h2>
+              <p class="dp-overall" data-hub-slot="overall">Belum ada progres.</p>
+              <div class="dp-bar"><span data-hub-slot="overall-bar"></span></div>
+              <p class="dp-last" data-hub-slot="last-played"></p>
+            </div>
+
+            <button type="button" class="dp-link" data-node="credits-btn" data-action="goto" data-target="{{TARGET:credits}}">Credits</button>
+          </aside>
+        </div>
+      </div>
+    </section>

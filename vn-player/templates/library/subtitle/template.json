@@ -1,0 +1,12 @@
+{
+    "id": "subtitle",
+    "label": "Subtitle \u2014 Tanpa Kotak",
+    "description": "Kotak dialognya DICABUT. Teks berdiri langsung di atas gambar dengan garis-luar tebal seperti takarir, nama pembicara jadi baris besar di atasnya, dan tanda lanjut pindah ke bintang di pojok kanan-bawah LAYAR \u2014 bukan di dalam kotak. Paling cocok untuk adegan yang ingin memperlihatkan artwork sebanyak mungkin. Semuanya lewat CSS di atas markup engine: nol peran dibekukan.",
+    "category": "layout",
+    "layoutFamily": "subtitle",
+    "thumbnail": "preview.png",
+    "tags": ["tanpa kotak", "takarir", "artwork dominan"],
+    "dialogueStyle": "bottom-bar",
+    "materializeStory": false,
+    "themeCascade": "replace-novel"
+}

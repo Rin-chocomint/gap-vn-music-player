@@ -1,0 +1,14 @@
+<!-- ===== Scene: {{SCENE_NAME}} (credits) =====
+     Daftar kredit. Dicapai dari menu via goto, kembali via data-action="back". -->
+    <section class="hub-scene sc-screen sc-credits" data-scene-id="{{SCENE_ID}}" data-scene-type="credits" data-scene-name="{{SCENE_NAME}}" data-hub-screen="credits">
+      <div class="sc-screen-head">
+        <button type="button" class="sc-btn sc-back" data-node="back-btn" data-action="back">&larr; Kembali</button>
+        <h2 class="sc-screen-title" data-node="title">Credits</h2>
+      </div>
+      <div class="sc-credits-lines" data-node="lines">
+        <p>Cerita &amp; Naskah &mdash; <span data-bind="author">&mdash;</span></p>
+        <p>Ilustrasi &mdash; <span data-bind="illustrator">&mdash;</span></p>
+        <p>VN Mapper &mdash; <span data-bind="vnMapper">&mdash;</span></p>
+        <p class="sc-credits-footer">Dibuat dengan GAP VN Player</p>
+      </div>
+    </section>

@@ -1,0 +1,13 @@
+﻿/* ================================ Versi Info =============================== */
+#version-info {
+    position: fixed;
+    bottom: 10px;
+    right: 10px;
+    font-size: 1rem;
+    color: rgba(255, 255, 255, 0.8);
+    padding: 5px 10px;
+    z-index: 1000;
+    pointer-events: none;
+}
+
+/* ================================ End Versi Info =============================== */

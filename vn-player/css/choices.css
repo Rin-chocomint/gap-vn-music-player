@@ -1,0 +1,170 @@
+/* =============================================
+ * VN Player — Choice Styles
+ * Tombol pilihan dan container choices
+ * ============================================= */
+
+#make-choice-container {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    gap: 8px;
+    width: 85%;
+    max-width: 1200px;
+    margin-bottom: 0;
+    margin-top: 0;
+    /* position wajib ada agar z-index berlaku (lihat catatan di dialogue.css). */
+    position: relative;
+    z-index: 10;
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transition: max-height 0.4s ease-out,
+                opacity 0.3s ease-in,
+                margin-top 0.4s ease-out,
+                margin-bottom 0.4s ease-out,
+                padding 0.4s ease-out;
+    pointer-events: none;
+}
+
+#make-choice-container.visible {
+    opacity: 1;
+    max-height: 300px;
+    pointer-events: auto;
+    padding: 15px 10px;
+}
+
+.choice {
+    padding: var(--vn-choice-padding);
+    background-color: var(--vn-choice-bg);
+    color: var(--vn-choice-color);
+    border: var(--vn-choice-border);
+    border-radius: var(--vn-choice-radius);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: var(--vn-choice-font-size);
+    width: 100%;
+    text-align: center;
+    margin: 2px;
+}
+
+.choice:hover {
+    background-color: var(--vn-choice-hover-bg);
+    color: var(--vn-choice-hover-color);
+    transform: scale(var(--vn-choice-hover-scale));
+    transform-origin: center;
+}
+
+/* ===== Input teks bebas (choice.inputType === 'text') =====
+ * Memakai variabel CSS yang sama dengan .choice — otomatis konsisten di
+ * semua tema player (default/dark-horror/light-romance/sci-fi/retro) tanpa
+ * perlu stylesheet tambahan per tema. */
+.choice-text-input-form {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    width: 100%;
+    align-items: stretch;
+}
+
+.choice-text-input {
+    flex: 1;
+    padding: var(--vn-choice-padding);
+    background-color: var(--vn-choice-bg);
+    color: var(--vn-choice-color);
+    border: var(--vn-choice-border);
+    border-radius: var(--vn-choice-radius);
+    font-size: var(--vn-choice-font-size);
+    outline: none;
+    min-width: 0;
+}
+
+.choice-text-input:focus {
+    background-color: var(--vn-choice-hover-bg);
+    color: var(--vn-choice-hover-color);
+}
+
+.choice-text-input-submit {
+    padding: var(--vn-choice-padding);
+    padding-left: 22px;
+    padding-right: 22px;
+    background-color: var(--vn-choice-bg);
+    color: var(--vn-choice-color);
+    border: var(--vn-choice-border);
+    border-radius: var(--vn-choice-radius);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: var(--vn-choice-font-size);
+    white-space: nowrap;
+}
+
+.choice-text-input-submit:hover {
+    background-color: var(--vn-choice-hover-bg);
+    color: var(--vn-choice-hover-color);
+    transform: scale(var(--vn-choice-hover-scale));
+}
+
+/* ===== Timed choice (QTE) — hitung mundur di atas pilihan =====
+ * Dipakai ketika entri choice punya "timeLimit" (ms). Bar menyusut 100%→0;
+ * saat waktu habis, opsi ber-flag "timeout": true dipilih otomatis (fallback:
+ * opsi terakhir). Renderer: displayChoices/startChoiceTimer di display-controller.js.
+ * Diwarnai lewat variabel choice yang sama supaya konsisten lintas tema player. */
+#make-choice-container.timed {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.choice-timer-track {
+    order: -1;              /* selalu di atas tombol pilihan */
+    width: 100%;
+    margin: 0 auto 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.choice-timer-label {
+    font-size: 0.82em;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0.85;
+    color: var(--vn-choice-color);
+    text-align: center;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.choice-timer-bar {
+    height: 6px;
+    width: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #8ad0ff, #d7c5ff);
+    box-shadow: 0 0 10px rgba(168, 132, 255, 0.7);
+    /* Lebar diubah tiap frame via JS (rAF) — bukan CSS transition — supaya bisa
+     * dijeda saat window disembunyikan. Transisi tipis hanya untuk menghaluskan. */
+    transition: background-color 0.2s ease;
+    will-change: width;
+}
+
+.choice-timer-bar.urgent {
+    background: linear-gradient(90deg, #ff9d6c, #ff5a5a);
+    box-shadow: 0 0 14px rgba(255, 90, 90, 0.85);
+    animation: choice-timer-pulse 0.6s ease-in-out infinite;
+}
+
+@keyframes choice-timer-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+}
+
+/* Feedback saat waktu habis: opsi terpilih otomatis menyala, sisanya meredup. */
+.choice.timed-out {
+    background-color: var(--vn-choice-hover-bg);
+    color: var(--vn-choice-hover-color);
+    box-shadow: 0 0 16px rgba(255, 90, 90, 0.6);
+    transform: scale(var(--vn-choice-hover-scale));
+}
+
+.choice.dimmed {
+    opacity: 0.35;
+    filter: grayscale(0.4);
+    transition: opacity 0.3s ease, filter 0.3s ease;
+}

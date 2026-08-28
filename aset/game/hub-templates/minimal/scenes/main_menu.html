@@ -1,0 +1,51 @@
+<!-- ===== Scene: {{SCENE_NAME}} (main_menu) =====
+     Menu utama (layar terminal). Menu adalah DAFTAR BARIS di kolom KIRI;
+     kolom kanan hanya ringkasan metadata (terisi sendiri lewat data-bind).
+     Tombol ditangani engine via data-action. -->
+    <section class="hub-scene m-menu" data-scene-id="{{SCENE_ID}}" data-scene-type="main_menu" data-scene-name="{{SCENE_NAME}}">
+      <div class="m-sheet" data-node="stage">
+        <header class="m-head" data-node="head">
+          <h1 class="m-title" data-node="title" data-bind="title">Visual Novel</h1>
+          <p class="m-tagline" data-node="tagline" data-bind="storyDesc"></p>
+        </header>
+
+        <div class="m-body">
+          <section data-node="actions">
+            <h2 class="m-colhead">Menu</h2>
+            <nav class="m-menu-list m-menu">
+              <button type="button" class="m-item" data-node="start-btn" data-action="start">
+                <span class="m-item-name">Mulai Cerita</span>
+                <span class="m-item-note">Mainkan dari chapter pertama</span>
+              </button>
+              <button type="button" class="m-item" data-node="chapter-btn" data-action="chapter-select">
+                <span class="m-item-name">Pilih Chapter</span>
+                <span class="m-item-note">Lompat ke chapter mana pun yang terbuka</span>
+              </button>
+              <button type="button" class="m-item" data-node="info-btn" data-action="goto" data-target="{{TARGET:info}}">
+                <span class="m-item-name">Tentang Novel</span>
+                <span class="m-item-note">Sinopsis, genre, dan tim pembuat</span>
+              </button>
+              <button type="button" class="m-item" data-node="credits-btn" data-action="goto" data-target="{{TARGET:credits}}">
+                <span class="m-item-name">Credits</span>
+                <span class="m-item-note">Daftar kredit lengkap</span>
+              </button>
+              <button type="button" class="m-item m-item-quit" data-node="exit-btn" data-action="exit">
+                <span class="m-item-name">Keluar</span>
+                <span class="m-item-note">Kembali ke daftar novel</span>
+              </button>
+            </nav>
+          </section>
+
+          <aside class="m-aside" data-node="meta">
+            <h2 class="m-colhead">Ringkasan</h2>
+            <dl class="m-meta">
+              <dt>Genre</dt><dd data-bind="genre">&mdash;</dd>
+              <dt>Penulis</dt><dd data-bind="author">&mdash;</dd>
+              <dt>Versi</dt><dd data-bind="version">&mdash;</dd>
+            </dl>
+          </aside>
+        </div>
+
+        <footer class="m-foot" data-node="foot">Dibuat dengan GAP VN Player</footer>
+      </div>
+    </section>

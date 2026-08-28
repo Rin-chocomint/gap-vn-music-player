@@ -1,0 +1,28 @@
+/* =============================================
+ * VN Player — Default Theme
+ * Tema bawaan engine. Bisa di-override oleh:
+ *   - [Novel]/theme.css
+ *   - [Novel]/[Chapter]/theme.css
+ *   - [Novel]/extensions/*.js (via JS)
+ *
+ * Override cukup tulis ulang CSS variable di :root {}
+ * Contoh custom theme:
+ *   :root {
+ *       --vn-dialogue-bg: rgba(20, 20, 50, 0.85);
+ *       --vn-name-color: #7ecfff;
+ *   }
+ * ============================================= */
+
+/* Default theme tidak perlu override apa-apa —
+   nilai default sudah didefinisikan di variables.css.
+   File ini ada sebagai template & placeholder. */
+
+/* CATATAN MEKANISME (audit G2) — file ini dimuat lewat DUA jalur berbeda,
+   keduanya pada posisi cascade yang sama (setelah modul engine, sebelum
+   theme.css novel/chapter):
+     - Engine player  : <link> STATIS di vn-player/player.html
+     - Custom player  : dinamis via 'vn-engine:resolve-effective-css'
+                        (dipakai VNPlayer.applyEffectiveProfile)
+   Tema NON-default hanya lewat jalur dinamis. Jadi kalau kamu mengedit file
+   ini, efeknya berlaku di kedua jalur — tapi jangan pindahkan <link> statis
+   di player.html tanpa menyesuaikan urutan kanonik di extension-loader.js. */

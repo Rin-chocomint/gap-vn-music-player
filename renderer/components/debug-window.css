@@ -1,0 +1,73 @@
+﻿/* =============================== Window Debug ============================ */
+/*------------------- log window container -------------------------*/
+#log-window-container {
+    position: fixed;
+    top: 50px;
+    left: 50px;
+    width: 700px;
+    height: 400px;
+    min-width: 300px;
+    min-height: 150px;
+    background-color: rgba(15, 18, 25, 0.9);
+    border: 1px solid rgba(0, 255, 255, 0.3);
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    z-index: 9999999;
+    display: flex;
+    flex-direction: column;
+    backdrop-filter: blur(5px);
+}
+
+#log-window-container.hidden {
+    display: none !important;
+}
+
+/*------------------- end log window container -------------------------*/
+
+/*------------------- log title bar -------------------------*/
+.log-title-bar {
+    width: 100%;
+    padding: 8px 12px;
+    background-color: rgba(0, 255, 255, 0.1);
+    color: cyan;
+    font-family: monospace;
+    font-weight: bold;
+    cursor: move;
+    user-select: none;
+}
+
+/*------------------- end log title bar -------------------------*/
+
+/*------------------- log content -------------------------*/
+#log-content {
+    flex-grow: 1;
+    overflow-y: auto;
+    font-family: monospace;
+    font-size: 0.85rem;
+    color: #aaffaa;
+    padding: 5px;
+}
+
+#log-content .log-line {
+    margin: 0;
+    padding: 3px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/*------------------- end log content -------------------------*/
+
+/*------------------- resize handle -------------------------*/
+.resizer {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+}
+
+.resizer-se {
+    bottom: 0;
+    right: 0;
+    cursor: nwse-resize;
+}
+
+/*------------------- end resize handle -------------------------*/
+/* =============================== End Window Debug ============================ */

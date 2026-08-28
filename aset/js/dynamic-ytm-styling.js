@@ -212,6 +212,450 @@ async function extractColors(imageUrl) {
 }
 
 // ============================================================================
+// 2b. PANEL INFO "GAME LOBBY" (UI MOD)
+// Panel DOM kecil bergaya panel info beatmap di song-select game!:
+// badge status, judul besar, artis, pill aksen, dan kolom statistik bergaris.
+// Semua datanya nyata (judul/artis/album/durasi) — bukan gamifikasi.
+// ============================================================================
+
+function renderGameInfoPanel() {
+    try {
+        const songInfo = getSongInfo();
+        let panel = document.getElementById('ts-game-info-panel');
+        if (!panel) {
+            panel = document.createElement('div');
+            panel.id = 'ts-game-info-panel';
+            panel.innerHTML = `
+                <div class="ts-game-badge">SEDANG DIPUTAR</div>
+                <div class="ts-game-title"></div>
+                <div class="ts-game-artist"></div>
+                <div class="ts-game-meta">
+                    <span class="ts-game-star-pill">♪</span>
+                    <span class="ts-game-meta-text"></span>
+                </div>
+                <div class="ts-game-stats">
+                    <div class="ts-game-stat">
+                        <div class="ts-game-stat-label">Artis</div>
+                        <div class="ts-game-stat-value" data-stat="artist">—</div>
+                    </div>
+                    <div class="ts-game-stat">
+                        <div class="ts-game-stat-label">Album</div>
+                        <div class="ts-game-stat-value" data-stat="album">—</div>
+                    </div>
+                    <div class="ts-game-stat">
+                        <div class="ts-game-stat-label">Durasi</div>
+                        <div class="ts-game-stat-value" data-stat="duration">—</div>
+                    </div>
+                </div>`;
+            document.body.appendChild(panel);
+        }
+
+        const setText = (sel, v) => {
+            const el = panel.querySelector(sel);
+            if (el) el.textContent = v;
+        };
+
+        setText('.ts-game-title', songInfo.title || '—');
+        setText('.ts-game-artist', songInfo.artist || '');
+        setText('.ts-game-meta-text', songInfo.album
+            ? `dari album「${songInfo.album}」`
+            : (songInfo.artist ? `oleh ${songInfo.artist}` : ''));
+        setText('[data-stat="artist"]', songInfo.artist || '—');
+        setText('[data-stat="album"]', songInfo.album || '—');
+
+        // Durasi diambil dari time-info player bar ("0:42 / 3:36" -> "3:36").
+        const applyDuration = () => {
+            const t = document.querySelector('ytmusic-player-bar .time-info');
+            const parts = t ? t.textContent.split('/') : [];
+            if (parts.length > 1 && parts[1].trim()) {
+                setText('[data-stat="duration"]', parts[1].trim());
+            }
+        };
+        applyDuration();
+        // Saat lagu baru saja berganti, time-info sering belum termuat — coba sekali lagi.
+        setTimeout(() => {
+            if (document.documentElement.classList.contains('ts-game-lobby-uimod')) applyDuration();
+        }, 1500);
+
+        // Mainkan ulang animasi slide-in tiap ganti lagu.
+        panel.classList.remove('ts-game-panel-in');
+        void panel.offsetWidth;
+        panel.classList.add('ts-game-panel-in');
+    } catch (e) {
+        console.warn('[DynamicTheme] Gagal merender panel info game:', e);
+    }
+}
+
+// ============================================================================
+// 2c. CERMIN TOMBOL GUIDE -> NAVBAR (UI MOD "GAME LOBBY")
+// Membuat deretan tombol di navbar yang MENCERMINKAN entri guide
+// (Beranda/Eksplorasi/Koleksi/Upgrade), tombol "Playlist baru", dan playlist.
+//
+// KENAPA "cermin", bukan memindah node asli?
+//   Versi awal MEMINDAH node Polymer asli ke navbar. Masalahnya, saat pengguna
+//   berpindah halaman, YTM me-render ulang (re-stamp) guide-nya; node yang kita
+//   pindah jadi "diperebutkan" Polymer => layout navbar berantakan.
+//   Solusi tahan banting: JANGAN sentuh node Polymer. Kita bikin <button> POLOS
+//   sendiri (ikon = clone SVG dari entri asli) lalu teruskan klik ke entri asli.
+//   Tombol polos tak pernah disentuh Polymer => layout SELALU rapi. Strip
+//   dibangun ulang tiap selesai navigasi & saat guide berubah, jadi isinya
+//   (termasuk state aktif) selalu sinkron.
+//
+// Tombol hamburger (#guide-button) & rel mini-guide kiri disembunyikan via CSS.
+// ============================================================================
+
+function pickPopulatedGuide() {
+    // YTM punya DUA <ytmusic-guide-renderer>: '#guide-renderer' (laci penuh, sering
+    // belum ter-render saat terlipat) & '#mini-guide-renderer' (rel mini, selalu
+    // terisi saat terlipat). Pilih yang BENAR-BENAR berisi entri; utamakan mini.
+    const hasEntries = (g) => g && g.querySelector('#sections ytmusic-guide-entry-renderer');
+    const guides = document.querySelectorAll('ytmusic-guide-renderer');
+    for (const g of guides) if (g.id === 'mini-guide-renderer' && hasEntries(g)) return g;
+    for (const g of guides) if (hasEntries(g)) return g;
+    return null;
+}
+
+function buildNavbarGuide() {
+    if (!document.documentElement.classList.contains('ts-game-lobby-uimod')) return false;
+
+    const leftContent = document.querySelector('ytmusic-nav-bar #left-content');
+    const guide = pickPopulatedGuide();
+    if (!leftContent || !guide) return false;
+
+    const items = guide.querySelectorAll(
+        '#sections ytmusic-guide-entry-renderer,' +
+        '#sections ytmusic-guide-section-renderer #buttons yt-button-renderer'
+    );
+    if (!items.length) return false;
+
+    let strip = document.getElementById('ts-game-navbar-guide');
+    if (!strip) {
+        strip = document.createElement('div');
+        strip.id = 'ts-game-navbar-guide';
+        // Sibling tepat di kanan #left-content (jangan di dalamnya — sering ke-clip).
+        leftContent.insertAdjacentElement('afterend', strip);
+    }
+
+    // Bangun ulang dari nol supaya selalu sinkron dgn keadaan guide terkini.
+    strip.textContent = '';
+
+    items.forEach((orig) => {
+        const title = (
+            (orig.querySelector('.title') && orig.querySelector('.title').textContent) ||
+            (orig.querySelector('.ytSpecButtonShapeNextButtonTextContent') && orig.querySelector('.ytSpecButtonShapeNextButtonTextContent').textContent) ||
+            orig.getAttribute('aria-label') || ''
+        ).trim();
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'ts-game-nav-btn';
+        if (title) { btn.title = title; btn.setAttribute('aria-label', title); }
+        if (orig.hasAttribute('active') || orig.getAttribute('aria-current') === 'true') {
+            btn.classList.add('ts-game-nav-active');
+        }
+
+        // Ikon = clone SVG dari entri asli HANYA untuk yang punya ikon khas:
+        //   - .guide-icon          -> ikon nav (Beranda/Eksplorasi/Koleksi/Upgrade)
+        //   - .ytSpecButtonShapeNextIcon -> "+" tombol "Playlist baru"
+        // Entri playlist sengaja TIDAK pakai ikon play/badge-nya (semua sama),
+        // melainkan INISIAL judul supaya tiap playlist bisa dibedakan.
+        const svg = orig.querySelector('.guide-icon svg, .ytSpecButtonShapeNextIcon svg');
+        if (svg) {
+            btn.appendChild(svg.cloneNode(true));
+        } else {
+            const span = document.createElement('span');
+            span.className = 'ts-game-nav-initial';
+            span.textContent = (title.charAt(0) || '♪').toUpperCase();
+            btn.appendChild(span);
+        }
+
+        // Teruskan klik ke entri ASLI (yang masih dikelola YTM) => navigasi tetap jalan.
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const target = orig.querySelector('a[href], button') ||
+                orig.querySelector('tp-yt-paper-item') || orig;
+            try { target.click(); } catch (_) { orig.click(); }
+        });
+
+        strip.appendChild(btn);
+    });
+
+    document.documentElement.classList.add('ts-game-guide-relocated');
+    return true;
+}
+
+let guideMirrorObserver = null;
+let guideMirrorNavHandler = null;
+
+function relocateGuideButtonsToNavbar(retries = 12) {
+    if (!document.documentElement.classList.contains('ts-game-lobby-uimod')) return;
+
+    try {
+        if (!buildNavbarGuide()) {
+            // Navbar/guide belum termuat => coba lagi nanti.
+            if (retries > 0) setTimeout(() => relocateGuideButtonsToNavbar(retries - 1), 700);
+            return;
+        }
+
+        // Bangun ulang strip tiap selesai navigasi (supaya state aktif & isi sinkron).
+        if (!guideMirrorNavHandler) {
+            guideMirrorNavHandler = () => {
+                if (!document.documentElement.classList.contains('ts-game-lobby-uimod')) return;
+                // Beri jeda agar YTM sempat me-render guide & header halaman baru.
+                setTimeout(() => { buildNavbarGuide(); replayTrapezoidIfReused(); refreshGameCarouselCards(); updateGameCarouselCentered(); }, 250);
+                setTimeout(() => { buildNavbarGuide(); replayTrapezoidIfReused(); refreshGameCarouselCards(); updateGameCarouselCentered(); }, 900);
+            };
+            document.addEventListener('yt-navigate-finish', guideMirrorNavHandler);
+        }
+
+        // Pantau guide untuk perubahan (re-stamp) di luar event navigasi.
+        if (!guideMirrorObserver) {
+            const miniHost = document.querySelector('#mini-guide') || document.querySelector('ytmusic-app');
+            if (miniHost) {
+                let pending = null;
+                guideMirrorObserver = new MutationObserver(() => {
+                    if (pending) return;
+                    pending = setTimeout(() => { pending = null; buildNavbarGuide(); }, 300);
+                });
+                // childList -> tangkap re-stamp guide; attribute active/aria-current
+                // -> tangkap pergantian halaman aktif agar highlight ikut diperbarui.
+                guideMirrorObserver.observe(miniHost, {
+                    childList: true,
+                    subtree: true,
+                    attributes: true,
+                    attributeFilter: ['active', 'aria-current']
+                });
+            }
+        }
+    } catch (e) {
+        console.warn('[DynamicTheme] Gagal membangun tombol guide navbar:', e);
+    }
+}
+
+function restoreGuideButtons() {
+    // Tombol kita cuma <button> polos => cukup buang strip-nya; tak ada node Polymer
+    // yang perlu dikembalikan (entri asli tak pernah kita pindah).
+    const strip = document.getElementById('ts-game-navbar-guide');
+    if (strip) strip.remove();
+    document.documentElement.classList.remove('ts-game-guide-relocated');
+
+    if (guideMirrorNavHandler) {
+        document.removeEventListener('yt-navigate-finish', guideMirrorNavHandler);
+        guideMirrorNavHandler = null;
+    }
+    if (guideMirrorObserver) {
+        try { guideMirrorObserver.disconnect(); } catch (_) { }
+        guideMirrorObserver = null;
+    }
+    lastTrapezoidHeader = null;
+}
+
+// ----------------------------------------------------------------------------
+// Animasi "in" trapesium banner channel.
+// Header BARU (di-stamp ulang) otomatis memutar animasi CSS-nya saat dibuat.
+// Tapi kalau YTM MEMAKAI-ULANG elemen header yang sama antar-channel, animasi
+// CSS tak ikut main lagi — maka kita paksa replay di sini (reset 'animation'
+// lalu reflow). Hanya untuk header yang dipakai-ulang, supaya header baru tak
+// dobel main.
+// ----------------------------------------------------------------------------
+let lastTrapezoidHeader = null;
+
+function replayTrapezoidIfReused() {
+    if (!document.documentElement.classList.contains('ts-game-lobby-uimod')) return;
+    const header = document.querySelector(
+        'ytmusic-browse-response ytmusic-immersive-header-renderer,' +
+        'ytmusic-browse-response ytmusic-visual-header-renderer'
+    );
+    if (!header) { lastTrapezoidHeader = null; return; }
+
+    if (header === lastTrapezoidHeader) {
+        // Dipakai-ulang => putar ulang animasi CSS-nya.
+        try {
+            header.style.animation = 'none';
+            void header.offsetWidth;      // paksa reflow
+            header.style.animation = '';  // balik ke animasi dari stylesheet => replay
+        } catch (_) { }
+    }
+    lastTrapezoidHeader = header;
+}
+
+// ============================================================================
+// 2d. CAROUSEL "SONG SELECT" — busur lebar + klik-ke-tengah (UI MOD GAME LOBBY)
+// BUSUR sekarang 100% digerakkan CSS Scroll-Driven Animations:
+//   animation-timeline: view(block) pada kartu => kompositor browser sendiri
+//   yang menghitung scaleX dari posisi scroll. Zero JS per-frame.
+// JS hanya perlu:
+//   - Deteksi kartu paling dekat pusat viewport (untuk klik-ke-tengah).
+//   - Refresh daftar kartu saat navigasi / lazy load.
+// ============================================================================
+
+let gameCarouselActive = false;
+let gameCarouselCards = [];
+let gameCarouselCenterCard = null;
+let gameCarouselScroller = null;
+let gameCarouselLastRefresh = 0;
+let gameCarouselScrollHandler = null;
+let gameCarouselClickHandler = null;
+
+function isHomeBrowse(br) {
+    if (!br) return false;
+    const pt = br.getAttribute('page-type');
+    if (pt && pt !== 'MUSIC_PAGE_TYPE_HOME') return false;
+    if (br.querySelector('ytmusic-immersive-header-renderer')) return false;
+    if (br.querySelector('ytmusic-visual-header-renderer')) return false;
+    return true;
+}
+
+function refreshGameCarouselCards() {
+    const out = [];
+    document
+        .querySelectorAll('ytmusic-browse-response ytmusic-carousel ytmusic-two-row-item-renderer')
+        .forEach((c) => { if (isHomeBrowse(c.closest('ytmusic-browse-response'))) out.push(c); });
+    gameCarouselCards = out;
+
+    // Kontainer yang men-scroll (acuan pusat + scrollIntoView).
+    gameCarouselScroller = null;
+    let p = out[0] ? out[0].parentElement : null;
+    while (p && p !== document.body) {
+        const s = getComputedStyle(p);
+        if (/(auto|scroll)/.test(s.overflowY) && p.scrollHeight > p.clientHeight + 4) { gameCarouselScroller = p; break; }
+        p = p.parentElement;
+    }
+}
+
+// Deteksi kartu paling dekat pusat viewport — HANYA untuk logika klik-ke-tengah.
+// Dipanggil saat scroll event (throttled), BUKAN per-frame.
+// Busur (scaleX) sudah ditangani sepenuhnya oleh CSS animation-timeline: view().
+function updateGameCarouselCentered() {
+    if (!gameCarouselActive || !gameCarouselCards.length) return;
+
+    const centerY = gameCarouselCenterY();
+    const vh = window.innerHeight;
+    let best = null, bestD = Infinity;
+
+    for (const card of gameCarouselCards) {
+        if (!card.isConnected) continue;
+        const r = card.getBoundingClientRect();
+        if (!r.height || r.bottom < 0 || r.top > vh) continue;
+        const dist = Math.abs((r.top + r.height / 2) - centerY);
+        if (dist < bestD) { bestD = dist; best = card; }
+    }
+
+    if (best && best !== gameCarouselCenterCard) {
+        if (gameCarouselCenterCard) gameCarouselCenterCard.classList.remove('ts-game-card-centered');
+        best.classList.add('ts-game-card-centered');
+        gameCarouselCenterCard = best;
+    }
+}
+
+function getCenterHomeCard() {
+    // Dipakai saat KLIK (jarang) => baca rect segar agar akurat.
+    const centerY = gameCarouselCenterY();
+    let best = null, bestD = Infinity;
+    for (const card of gameCarouselCards) {
+        if (!card.isConnected) continue;
+        const r = card.getBoundingClientRect();
+        if (r.height === 0) continue;
+        const dist = Math.abs((r.top + r.height / 2) - centerY);
+        if (dist < bestD) { bestD = dist; best = card; }
+    }
+    return best;
+}
+
+function gameCarouselCenterY() {
+    if (gameCarouselScroller && gameCarouselScroller.isConnected) {
+        const r = gameCarouselScroller.getBoundingClientRect();
+        return r.top + r.height / 2;
+    }
+    return window.innerHeight * 0.46;
+}
+
+function onGameCarouselClickCapture(e) {
+    if (!gameCarouselActive) return;
+    const card = e.target.closest && e.target.closest('ytmusic-two-row-item-renderer');
+    if (!card) return;
+    if (gameCarouselCards.indexOf(card) === -1) {
+        refreshGameCarouselCards();
+        if (gameCarouselCards.indexOf(card) === -1) return;
+    }
+
+    if (card === getCenterHomeCard()) {
+        // Jika sudah ditandai sedang navigasi, biarkan event lolos agar YTM berpindah
+        if (card.__tsNavigating) return;
+        const a = card.querySelector('a');
+        if (!a) return;
+
+        // Cegat klik langsung agar kita bisa putar animasi dulu
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+
+        document.documentElement.classList.add('ts-game-animating-out');
+        card.__tsNavigating = true;
+
+        // Beri jeda 400ms (sebagian besar animasi 0.6s sudah selesai) sebelum pindah beneran
+        setTimeout(() => {
+            a.click();
+            // Cleanup state setelah pindah
+            setTimeout(() => {
+                card.__tsNavigating = false;
+                document.documentElement.classList.remove('ts-game-animating-out');
+            }, 1000);
+        }, 120);
+        return;
+    }
+
+    // Belum di tengah => batalkan aksi YTM, luncurkan kartu ke tengah dulu.
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+    try { card.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    catch (_) { try { card.scrollIntoView(); } catch (__) { } }
+    // Perbarui centered card setelah scroll settle
+    setTimeout(updateGameCarouselCentered, 300);
+    setTimeout(updateGameCarouselCentered, 650);
+}
+
+function initGameCarousel() {
+    if (gameCarouselActive) { refreshGameCarouselCards(); updateGameCarouselCentered(); return; }
+    gameCarouselActive = true;
+    refreshGameCarouselCards();
+
+    // Scroll handler ringan: hanya refresh daftar kartu & deteksi centered card.
+    // Busur (scaleX) sepenuhnya dikerjakan CSS animation-timeline: view().
+    gameCarouselScrollHandler = () => {
+        const now = Date.now();
+        if (now - gameCarouselLastRefresh > 600) { gameCarouselLastRefresh = now; refreshGameCarouselCards(); }
+        updateGameCarouselCentered();
+    };
+    document.addEventListener('scroll', gameCarouselScrollHandler, true);
+
+    gameCarouselClickHandler = onGameCarouselClickCapture;
+    document.addEventListener('click', gameCarouselClickHandler, true);
+
+    // Home memuat bertahap => beberapa pass awal untuk kumpulkan kartu.
+    [120, 500, 1200, 2500].forEach((t) => setTimeout(() => {
+        if (!gameCarouselActive) return;
+        refreshGameCarouselCards();
+        updateGameCarouselCentered();
+    }, t));
+}
+
+function teardownGameCarousel() {
+    if (!gameCarouselActive) return;
+    gameCarouselActive = false;
+    if (gameCarouselScrollHandler) document.removeEventListener('scroll', gameCarouselScrollHandler, true);
+    if (gameCarouselClickHandler) document.removeEventListener('click', gameCarouselClickHandler, true);
+    gameCarouselCards.forEach((c) => {
+        c.classList.remove('ts-game-card-centered');
+    });
+    gameCarouselCards = [];
+    gameCarouselCenterCard = null;
+    gameCarouselScroller = null;
+    gameCarouselScrollHandler = gameCarouselClickHandler = null;
+}
+
+// ============================================================================
 // 3. STYLER & COMMUNICATOR (The "Action")
 // ============================================================================
 
@@ -224,9 +668,13 @@ function applyDynamicTheme(palette) {
     const unset = (k) => root.style.removeProperty(k);
 
     // Get current theme mode (default to 'default')
-    // Back-compat: old config may still send 'unified' (removed). Treat it as 'overlay'.
-    const requestedMode = window.DYNAMIC_THEME_MODE;
-    const themeMode = (requestedMode === 'unified') ? 'overlay' : (requestedMode || 'default');
+    // Back-compat: old config may still send 'unified' (removed) -> 'overlay',
+    // atau mode Lobby lawas -> 'game-lobby-uimod'.
+    let requestedMode = window.DYNAMIC_THEME_MODE;
+    if (requestedMode !== 'game-lobby-uimod' && requestedMode?.endsWith('-lobby-uimod')) requestedMode = 'game-lobby-uimod';
+    const themeMode = requestedMode === 'unified'
+        ? 'overlay'
+        : (requestedMode === 'default' ? 'default-optimized' : (requestedMode || 'default-optimized'));
     console.log('[DynamicTheme] Applying theme with mode:', themeMode);
 
     // Always reset mode-specific YTM variables first.
@@ -234,6 +682,33 @@ function applyDynamicTheme(palette) {
     // switching modes will cause visual "identity mixing".
     unset('--ytmusic-nav-bar');
     unset('--ytmusic-player-page-background');
+
+    // Cleanup terpusat untuk mode Aurora (ui mod): kalau mode aktif bukan aurora,
+    // pastikan style & state-nya dicabut total (dia paling agresif merombak DOM look).
+    if (themeMode !== 'aurora-uimod') {
+        const auroraStyle = document.getElementById('ts-aurora-uimod-styles');
+        if (auroraStyle) auroraStyle.remove();
+        document.documentElement.classList.remove('ts-aurora-uimod');
+        unset('--ts-aurora-artwork');
+    }
+
+    // Cleanup terpusat untuk mode Game Lobby (ui mod): cabut style, class root,
+    // dan panel info DOM-nya kalau mode aktif bukan dia.
+    if (themeMode !== 'game-lobby-uimod') {
+        const gameStyle = document.getElementById('ts-game-lobby-uimod-styles');
+        if (gameStyle) gameStyle.remove();
+        document.documentElement.classList.remove('ts-game-lobby-uimod');
+        const gamePanel = document.getElementById('ts-game-info-panel');
+        if (gamePanel) gamePanel.remove();
+        // Buang backdrop parallax (elemen nyata) agar tidak menggantung di mode lain.
+        const gameBg = document.getElementById('ts-game-bg');
+        if (gameBg) gameBg.remove();
+        // Kembalikan tombol guide yang sempat dipindah ke navbar.
+        restoreGuideButtons();
+        // Matikan efek busur carousel + bersihkan lebar/inline-nya.
+        teardownGameCarousel();
+        unset('--ts-game-artwork');
+    }
 
     // Set Raw Palette Variables
     if (palette.Vibrant) set('--ts-palette-vibrant-hex', palette.Vibrant.getHex());
@@ -630,6 +1105,1492 @@ function applyDynamicTheme(palette) {
             // Nav bar biarkan transparent
             unset('--ytmusic-nav-bar');
 
+        } else if (themeMode === 'aurora-uimod') {
+            // === MODE AURORA (UI MOD): Perombakan tampilan, bukan sekadar warna ===
+            // Konsep: YT Music dirombak jadi "music lounge" —
+            // 1. Backdrop = cover album itu sendiri, di-blur ekstrem + animasi aurora dari palet.
+            // 2. Player bar dilepas dari tepi layar jadi "dock" kapsul kaca melayang.
+            // 3. Artwork di player page jadi piringan vinyl bundar yang berputar pelan.
+            // 4. Kartu home/playlist di-rounded, hover-nya mengangkat dengan glow warna palet.
+            // 5. Nav bar melebur transparan; scrollbar nyaris hilang.
+            console.log('[DynamicTheme] Applying AURORA (UI MOD) mode');
+
+            // Hapus style mode lain
+            for (const id of ['ts-overlay-mode-styles', 'ts-unified-mode-styles', 'ts-harmony-mode-styles', 'ts-default-optimized-styles', 'ts-seamless-mode-styles']) {
+                const el = document.getElementById(id);
+                if (el) el.remove();
+            }
+
+            const auroraAccent = palette.Vibrant ? palette.Vibrant.getHex() : primaryColor;
+            const auroraGlow = palette.LightVibrant ? palette.LightVibrant.getHex() : auroraAccent;
+            const auroraDeep = palette.DarkMuted ? palette.DarkMuted.getHex() : '#0a0a0a';
+
+            set('--ts-body-color', 'transparent');
+            set('--ts-playerbar-color', 'transparent');
+            set('--ts-aurora-primary', primaryColor);
+            set('--ts-aurora-secondary', secondaryColor);
+            set('--ts-aurora-accent', auroraAccent);
+            set('--ts-aurora-glow', auroraGlow);
+            set('--ts-aurora-deep', auroraDeep);
+
+            // Cover album sebagai backdrop. currentArtworkUrl di-set oleh onSongChange.
+            if (currentArtworkUrl) {
+                set('--ts-aurora-artwork', `url("${currentArtworkUrl.replace(/"/g, '%22')}")`);
+            }
+
+            // Tandai root agar selector CSS bisa scoped ke mode ini
+            document.documentElement.classList.add('ts-aurora-uimod');
+
+            const styleId = 'ts-aurora-uimod-styles';
+            let auroraStyle = document.getElementById(styleId);
+            if (!auroraStyle) {
+                auroraStyle = document.createElement('style');
+                auroraStyle.id = styleId;
+                document.head.appendChild(auroraStyle);
+            }
+
+            auroraStyle.textContent = `
+                /* ===== AURORA (UI MOD) ===== */
+
+                @keyframes ts-aurora-drift {
+                    0%   { transform: translate3d(-4%, -4%, 0) scale(1.12) rotate(0deg); }
+                    50%  { transform: translate3d(4%, 3%, 0) scale(1.18) rotate(1.5deg); }
+                    100% { transform: translate3d(-4%, -4%, 0) scale(1.12) rotate(0deg); }
+                }
+                @keyframes ts-aurora-hue {
+                    0%   { filter: blur(60px) saturate(1.4) hue-rotate(0deg) brightness(0.55); }
+                    50%  { filter: blur(60px) saturate(1.4) hue-rotate(-14deg) brightness(0.5); }
+                    100% { filter: blur(60px) saturate(1.4) hue-rotate(0deg) brightness(0.55); }
+                }
+                @keyframes ts-vinyl-spin {
+                    from { transform: rotate(0deg); }
+                    to   { transform: rotate(360deg); }
+                }
+
+                /* --- LAYER 1: Backdrop cover album blur + aurora --- */
+                body::before {
+                    content: '';
+                    position: fixed;
+                    inset: -8%;
+                    background:
+                        var(--ts-aurora-artwork, linear-gradient(135deg, var(--ts-aurora-primary), var(--ts-aurora-secondary)))
+                        center / cover no-repeat;
+                    animation: ts-aurora-drift 38s ease-in-out infinite,
+                               ts-aurora-hue 24s ease-in-out infinite;
+                    z-index: -2;
+                    pointer-events: none;
+                }
+                /* Vignette + tint palet di atas backdrop agar teks tetap terbaca */
+                body::after {
+                    content: '';
+                    position: fixed;
+                    inset: 0;
+                    background:
+                        radial-gradient(ellipse at 50% 110%, color-mix(in srgb, var(--ts-aurora-accent) 30%, transparent) 0%, transparent 55%),
+                        linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.35) 40%, rgba(0,0,0,0.75) 100%);
+                    z-index: -1;
+                    pointer-events: none;
+                }
+
+                /* Semua kontainer utama transparan agar backdrop tembus */
+                body,
+                ytmusic-app, ytmusic-app-layout,
+                #content.ytmusic-app, ytmusic-browse-response,
+                ytmusic-player-page, ytmusic-player-queue,
+                ytmusic-player-queue #contents,
+                ytmusic-player-queue ytmusic-tab-renderer,
+                ytmusic-player-queue #tab-content,
+                ytmusic-pivot-bar-renderer, ytmusic-header-renderer,
+                ytmusic-player-page #main-panel,
+                ytmusic-player-page #player-page-content,
+                ytmusic-player-page #song-media-window,
+                ytmusic-player-page #player-controls,
+                ytmusic-player-page .middle-controls {
+                    background: transparent !important;
+                }
+
+                /* --- LAYER 2: Nav bar melebur jadi kabut kaca tipis --- */
+                ytmusic-app-layout > [slot="nav-bar"],
+                #nav-bar-background,
+                #mini-guide-background, #mini-guide, #mini-guide-spacer,
+                tp-yt-app-drawer, tp-yt-app-drawer #contentContainer,
+                #guide-wrapper, #guide-content,
+                ytmusic-guide-renderer, ytmusic-guide-renderer #sections {
+                    background: transparent !important;
+                }
+                ytmusic-app-layout > [slot="nav-bar"] {
+                    backdrop-filter: blur(18px) brightness(0.85);
+                    -webkit-backdrop-filter: blur(18px) brightness(0.85);
+                    border-bottom: 1px solid rgba(255,255,255,0.06);
+                }
+
+                /* --- LAYER 3: Player bar => DOCK kapsul kaca melayang --- */
+                #player-bar-background { background: transparent !important; }
+                /* Centering TANPA transform: YTM memakai transform sendiri untuk animasi
+                   show/hide player bar, jadi transform kita bisa ditimpa dan bar bergeser
+                   keluar layar. left:0 + right:0 + margin:auto aman dari konflik itu. */
+                ytmusic-player-bar {
+                    left: 0 !important;
+                    right: 0 !important;
+                    margin-left: auto !important;
+                    margin-right: auto !important;
+                    bottom: 14px !important;
+                    width: min(92vw, 1100px) !important;
+                    border-radius: 999px !important;
+                    background: rgba(10, 10, 14, 0.45) !important;
+                    backdrop-filter: blur(24px) saturate(1.5);
+                    -webkit-backdrop-filter: blur(24px) saturate(1.5);
+                    border: 1px solid rgba(255,255,255,0.12) !important;
+                    box-shadow:
+                        0 12px 40px rgba(0,0,0,0.55),
+                        0 0 0 1px color-mix(in srgb, var(--ts-aurora-accent) 25%, transparent),
+                        0 0 32px color-mix(in srgb, var(--ts-aurora-accent) 18%, transparent) !important;
+                    overflow: hidden;
+                    transition: box-shadow 0.5s ease, background 0.5s ease;
+                }
+                /* Thumbnail di dock: JANGAN paksa ukuran/bentuk — biarkan dimensi
+                   alaminya (thumbnail video 16:9 jadi tampak "ditarik" kalau dipaksa).
+                   Cukup rounding halus + object-fit agar tidak pernah terdistorsi. */
+                ytmusic-player-bar .middle-controls img {
+                    width: auto !important;
+                    max-width: none !important;
+                    border-radius: 8px !important;
+                    object-fit: contain !important;
+                }
+
+                /* --- LAYER 4: Vinyl mode di player page --- */
+                /* Hilangkan kotak letterbox gelap di belakang vinyl:
+                   kontainer player YTM punya background hitam sendiri. */
+                ytmusic-player,
+                ytmusic-player #player,
+                ytmusic-player #song-image,
+                ytmusic-player #song-media-window,
+                ytmusic-player-page #player,
+                ytmusic-player-page #main-panel #player {
+                    background: transparent !important;
+                    box-shadow: none !important;
+                }
+                ytmusic-player-page #song-image,
+                ytmusic-player-page #song-image img,
+                ytmusic-player-page #thumbnail,
+                ytmusic-player #song-image img {
+                    border-radius: 50% !important;
+                    box-shadow:
+                        0 0 0 10px rgba(0,0,0,0.55),
+                        0 0 0 12px color-mix(in srgb, var(--ts-aurora-glow) 40%, transparent),
+                        0 24px 60px rgba(0,0,0,0.6) !important;
+                }
+                /* Putar pelan saat lagu berjalan (state attr milik YTM player bar) */
+                html.ts-aurora-uimod body:has(ytmusic-player-bar[play-button-state="playing"]) ytmusic-player-page #song-image img {
+                    animation: ts-vinyl-spin 28s linear infinite;
+                }
+                /* Video tetap kotak rounded biasa, jangan dipaksa bundar */
+                ytmusic-player-page #song-video,
+                ytmusic-player-page #song-video video {
+                    border-radius: 16px !important;
+                    animation: none !important;
+                }
+
+                /* --- LAYER 5: Kartu konten jadi panel kaca rounded --- */
+                ytmusic-two-row-item-renderer,
+                ytmusic-responsive-list-item-renderer,
+                ytmusic-carousel-shelf-renderer .ytmusic-carousel {
+                    border-radius: 14px !important;
+                    transition: background 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease !important;
+                }
+                ytmusic-two-row-item-renderer:hover,
+                ytmusic-responsive-list-item-renderer:hover {
+                    background: rgba(255,255,255,0.06) !important;
+                    transform: translateY(-3px) scale(1.01);
+                    box-shadow: 0 10px 28px rgba(0,0,0,0.45),
+                                0 0 18px color-mix(in srgb, var(--ts-aurora-accent) 22%, transparent);
+                }
+                ytmusic-two-row-item-renderer img {
+                    border-radius: 10px !important;
+                }
+
+                /* ============================================================
+                   LAYER 6: STYLING PER JENIS HALAMAN
+                   ============================================================ */
+
+                /* --- 6a. HOME: judul shelf bergradien + chip filter kaca --- */
+                ytmusic-carousel-shelf-basic-header-renderer .title {
+                    background: linear-gradient(90deg, #ffffff 30%, var(--ts-aurora-glow) 100%);
+                    -webkit-background-clip: text;
+                    background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                }
+                /* Chip filter (All, J-pop, Sedih, dst) => pil kaca rapi & kompak.
+                   PENTING: style ditempel ke .gradient-box / <a> di DALAM chip,
+                   bukan ke <ytmusic-chip-cloud-chip-renderer> luarnya — kalau di luar,
+                   chip home (chip-style STYLE_LARGE_TRANSLUCENT) berubah jadi blob bulat besar. */
+                ytmusic-chip-cloud-chip-renderer {
+                    background: transparent !important;
+                    border: none !important;
+                }
+                ytmusic-chip-cloud-chip-renderer .gradient-box {
+                    border-radius: 999px !important;
+                    background: rgba(255,255,255,0.07) !important;
+                    border: 1px solid rgba(255,255,255,0.12) !important;
+                    transition: background 0.25s ease, box-shadow 0.25s ease,
+                                border-color 0.25s ease !important;
+                    overflow: hidden;
+                }
+                ytmusic-chip-cloud-chip-renderer a,
+                ytmusic-chip-cloud-chip-renderer button {
+                    border-radius: 999px !important;
+                    background: transparent !important;
+                    height: 38px !important;
+                    min-height: 0 !important;
+                    padding: 0 18px !important;
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    white-space: nowrap;
+                }
+                ytmusic-chip-cloud-chip-renderer:hover .gradient-box {
+                    background: rgba(255,255,255,0.14) !important;
+                }
+                ytmusic-chip-cloud-chip-renderer[is-selected] .gradient-box,
+                ytmusic-chip-cloud-chip-renderer[aria-selected="true"] .gradient-box {
+                    background: color-mix(in srgb, var(--ts-aurora-accent) 45%, rgba(0,0,0,0.4)) !important;
+                    border-color: color-mix(in srgb, var(--ts-aurora-accent) 70%, transparent) !important;
+                    box-shadow: 0 0 14px color-mix(in srgb, var(--ts-aurora-accent) 35%, transparent);
+                }
+
+                /* --- 6a-2. HOME: PEROMBAKAN SUSUNAN UI --- */
+
+                /* Bar chip mood (Sedih, Tidur, ...) jadi STICKY di bawah nav bar:
+                   tetap terlihat saat scroll, dengan kabut kaca agar konten lewat di belakangnya. */
+                ytmusic-browse-response ytmusic-section-list-renderer > #header {
+                    position: sticky !important;
+                    top: 0;
+                    z-index: 20;
+                    padding: 8px 0 10px 0;
+                    background: linear-gradient(180deg, rgba(8,8,12,0.78) 0%, rgba(8,8,12,0.45) 70%, transparent 100%) !important;
+                    backdrop-filter: blur(14px);
+                    -webkit-backdrop-filter: blur(14px);
+                }
+
+                /* Setiap shelf/rak konten jadi PANEL kaca modular — home berubah dari
+                   daftar polos memanjang menjadi susunan kartu-panel bertingkat. */
+                ytmusic-browse-response ytmusic-carousel-shelf-renderer,
+                ytmusic-browse-response ytmusic-grid-renderer,
+                ytmusic-browse-response ytmusic-shelf-renderer {
+                    background: rgba(255,255,255,0.035) !important;
+                    border: 1px solid rgba(255,255,255,0.07) !important;
+                    border-radius: 22px !important;
+                    padding: 18px 20px !important;
+                    margin: 0 4px 26px 4px !important;
+                    box-shadow: 0 6px 24px rgba(0,0,0,0.25);
+                    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+                }
+                ytmusic-browse-response ytmusic-carousel-shelf-renderer:hover,
+                ytmusic-browse-response ytmusic-grid-renderer:hover,
+                ytmusic-browse-response ytmusic-shelf-renderer:hover {
+                    border-color: color-mix(in srgb, var(--ts-aurora-accent) 30%, rgba(255,255,255,0.07)) !important;
+                    box-shadow: 0 6px 24px rgba(0,0,0,0.25),
+                                0 0 22px color-mix(in srgb, var(--ts-aurora-accent) 12%, transparent);
+                }
+
+                /* Header shelf (avatar + "Dengarkan lagi") diberi garis aksen bawah
+                   sebagai pemisah visual antara judul dan isi rak. */
+                ytmusic-carousel-shelf-basic-header-renderer {
+                    border-bottom: 1px solid rgba(255,255,255,0.07);
+                    padding-bottom: 10px !important;
+                    margin-bottom: 14px !important;
+                }
+                /* Strapline kecil di atas judul (nama channel) berwarna aksen */
+                ytmusic-carousel-shelf-basic-header-renderer .strapline,
+                ytmusic-carousel-shelf-basic-header-renderer .strapline-text {
+                    color: var(--ts-aurora-glow) !important;
+                    letter-spacing: 1.5px;
+                }
+                /* Avatar channel di header shelf diberi ring aksen */
+                ytmusic-carousel-shelf-basic-header-renderer img {
+                    border-radius: 50% !important;
+                    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ts-aurora-accent) 60%, transparent);
+                }
+                /* Tombol "Selengkapnya" jadi pil kaca */
+                ytmusic-carousel-shelf-basic-header-renderer yt-button-renderer,
+                ytmusic-carousel-shelf-basic-header-renderer .more-button {
+                    border-radius: 999px !important;
+                    background: rgba(255,255,255,0.06) !important;
+                    border: 1px solid rgba(255,255,255,0.1) !important;
+                }
+
+                /* Hover kartu: thumbnail ikut zoom halus (melengkapi lift yang sudah ada) */
+                ytmusic-two-row-item-renderer ytmusic-thumbnail-renderer {
+                    overflow: hidden;
+                    border-radius: 10px !important;
+                }
+                ytmusic-two-row-item-renderer ytmusic-thumbnail-renderer img {
+                    transition: transform 0.35s ease;
+                }
+                ytmusic-two-row-item-renderer:hover ytmusic-thumbnail-renderer img {
+                    transform: scale(1.06);
+                }
+
+                /* Sidebar kiri (Beranda/Eksplorasi/Koleksi) jadi pill rail:
+                   item membulat, yang aktif menyala warna aksen. */
+                ytmusic-guide-entry-renderer {
+                    border-radius: 14px !important;
+                    margin: 2px 6px !important;
+                    transition: background 0.2s ease !important;
+                }
+                ytmusic-guide-entry-renderer:hover {
+                    background: rgba(255,255,255,0.08) !important;
+                }
+                ytmusic-guide-entry-renderer[active],
+                ytmusic-guide-entry-renderer[aria-selected="true"] {
+                    background: color-mix(in srgb, var(--ts-aurora-accent) 25%, rgba(255,255,255,0.05)) !important;
+                    box-shadow: inset 3px 0 0 var(--ts-aurora-accent);
+                }
+
+                /* --- 6b. CHANNEL: banner artis melebur ke backdrop aurora --- */
+                ytmusic-immersive-header-renderer {
+                    position: relative;
+                    background: transparent !important;
+                    border-radius: 0 0 28px 28px;
+                    overflow: hidden;
+                }
+                /* Fade bawah banner agar menyatu dengan backdrop, tidak putus kaku */
+                ytmusic-immersive-header-renderer::after {
+                    content: '';
+                    position: absolute;
+                    left: 0; right: 0; bottom: 0;
+                    height: 45%;
+                    background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.65) 100%);
+                    pointer-events: none;
+                }
+                ytmusic-immersive-header-renderer .immersive-header-title,
+                ytmusic-immersive-header-renderer h1 {
+                    text-shadow: 0 2px 18px rgba(0,0,0,0.8);
+                }
+
+                /* --- 6c. PLAYLIST: header jadi panel kaca dengan cover bercahaya --- */
+                ytmusic-responsive-header-renderer,
+                ytmusic-editable-playlist-detail-header-renderer,
+                ytmusic-detail-header-renderer {
+                    background: rgba(255,255,255,0.05) !important;
+                    border: 1px solid rgba(255,255,255,0.1) !important;
+                    border-radius: 20px !important;
+                    backdrop-filter: blur(20px) saturate(1.3);
+                    -webkit-backdrop-filter: blur(20px) saturate(1.3);
+                    box-shadow: 0 8px 32px rgba(0,0,0,0.4),
+                                0 0 24px color-mix(in srgb, var(--ts-aurora-accent) 12%, transparent) !important;
+                    overflow: hidden;
+                }
+                ytmusic-responsive-header-renderer img,
+                ytmusic-editable-playlist-detail-header-renderer img,
+                ytmusic-detail-header-renderer img {
+                    border-radius: 14px !important;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.5),
+                                0 0 20px color-mix(in srgb, var(--ts-aurora-glow) 25%, transparent) !important;
+                }
+
+                /* --- 6d. SEARCH: kotak cari pil kaca + hasil "top result" premium --- */
+                ytmusic-search-box {
+                    background: rgba(255,255,255,0.08) !important;
+                    border: 1px solid rgba(255,255,255,0.12) !important;
+                    border-radius: 999px !important;
+                    backdrop-filter: blur(12px);
+                    -webkit-backdrop-filter: blur(12px);
+                    transition: background 0.25s ease, border-radius 0.25s ease !important;
+                }
+                /* Saat dropdown saran terbuka, melebar jadi panel solid agar terbaca */
+                ytmusic-search-box[opened] {
+                    border-radius: 20px !important;
+                    background: rgba(12, 12, 18, 0.92) !important;
+                }
+                ytmusic-search-suggestions-section,
+                ytmusic-search-suggestion {
+                    background: transparent !important;
+                }
+                ytmusic-search-suggestion:hover {
+                    background: color-mix(in srgb, var(--ts-aurora-accent) 18%, transparent) !important;
+                    border-radius: 10px;
+                }
+                /* Kartu "Hasil teratas" => panel kaca dengan aksen tepi kiri */
+                ytmusic-card-shelf-renderer {
+                    background: rgba(255,255,255,0.05) !important;
+                    border: 1px solid rgba(255,255,255,0.1) !important;
+                    border-left: 3px solid var(--ts-aurora-accent) !important;
+                    border-radius: 16px !important;
+                    backdrop-filter: blur(16px);
+                    -webkit-backdrop-filter: blur(16px);
+                }
+                ytmusic-tabbed-search-results-renderer,
+                ytmusic-shelf-renderer,
+                ytmusic-playlist-shelf-renderer,
+                ytmusic-item-section-renderer {
+                    background: transparent !important;
+                }
+
+                /* --- 6e. UNIVERSAL: tab & antrean (BERIKUTNYA/LIRIK/TERKAIT) --- */
+                tp-yt-paper-tabs, paper-tabs {
+                    --paper-tabs-selection-bar-color: var(--ts-aurora-accent);
+                }
+                ytmusic-player-queue-item {
+                    border-radius: 10px !important;
+                    transition: background 0.2s ease !important;
+                }
+                ytmusic-player-queue-item:hover {
+                    background: rgba(255,255,255,0.07) !important;
+                }
+                ytmusic-player-queue-item[selected],
+                ytmusic-player-queue-item[play-button-state="playing"],
+                ytmusic-player-queue-item[play-button-state="paused"] {
+                    background: color-mix(in srgb, var(--ts-aurora-accent) 22%, rgba(0,0,0,0.3)) !important;
+                }
+                /* Ikon overlay (speaker/play) di thumbnail antrean: kunci ke 24px genap
+                   agar render-nya tajam, tidak kena pembulatan scaling (23.99px). */
+                ytmusic-player-queue-item yt-icon,
+                ytmusic-player-queue-item yt-icon svg {
+                    width: 24px !important;
+                    height: 24px !important;
+                    shape-rendering: geometricPrecision;
+                }
+
+                /* --- Detail: scrollbar tipis, teks dengan depth --- */
+                html::-webkit-scrollbar, body::-webkit-scrollbar,
+                ytmusic-app::-webkit-scrollbar, ytmusic-app *::-webkit-scrollbar {
+                    width: 6px;
+                    background: transparent;
+                }
+                html::-webkit-scrollbar-thumb, body::-webkit-scrollbar-thumb,
+                ytmusic-app::-webkit-scrollbar-thumb, ytmusic-app *::-webkit-scrollbar-thumb {
+                    background: color-mix(in srgb, var(--ts-aurora-accent) 55%, transparent) !important;
+                    border-radius: 3px;
+                }
+                .title, .subtitle, .byline,
+                ytmusic-player-bar .title, ytmusic-player-bar .byline {
+                    text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+                }
+
+                /* Beri ruang ekstra di bawah konten supaya tidak ketutup dock melayang */
+                ytmusic-app-layout #content,
+                ytmusic-player-page {
+                    padding-bottom: 24px;
+                }
+            `;
+
+            // Variabel native YTM: biarkan player page transparan (backdrop kita yang tampil)
+            set('--ytmusic-player-page-background', 'transparent');
+            unset('--ytmusic-nav-bar');
+
+        } else if (themeMode === 'game-lobby-uimod') {
+            // === MODE GAME LOBBY (UI MOD): YT Music dirias jadi lobby game ritme ===
+            // Referensi: layar song-select (home) & layar loading beatmap (player page).
+            // 1. HOME = "song select": backdrop cover album tajam yang digelapkan,
+            //    toolbar atas gelap, kartu konten jadi "beatmap card" dengan tepi aksen
+            //    yang menggeser ke kiri saat hover, chip filter jadi pil + garis pelangi
+            //    star-difficulty, dan panel info lagu (DOM) bergaya panel beatmap game.
+            // 2. PLAYER PAGE = "loading screen": backdrop blur ekstrem terang, artwork
+            //    jadi lingkaran ber-ring putih seperti logo game!, info lagu terpusat,
+            //    panel queue kanan jadi panel "PENGATURAN" frosted beraksen kuning.
+            // Tetap informatif, bukan gamifikasi: semua teks/statistik adalah data asli.
+            console.log('[DynamicTheme] Applying GAME LOBBY (UI MOD) mode');
+
+            // Hapus style mode lain (aurora dibersihkan oleh cleanup terpusat di atas)
+            for (const id of ['ts-overlay-mode-styles', 'ts-unified-mode-styles', 'ts-harmony-mode-styles', 'ts-default-optimized-styles', 'ts-seamless-mode-styles']) {
+                const el = document.getElementById(id);
+                if (el) el.remove();
+            }
+
+            const gameAccent = palette.Vibrant ? palette.Vibrant.getHex() : primaryColor;
+            const gameGlow = palette.LightVibrant ? palette.LightVibrant.getHex() : gameAccent;
+            const gameDeep = palette.DarkMuted ? palette.DarkMuted.getHex() : '#101018';
+
+            set('--ts-body-color', 'transparent');
+            set('--ts-playerbar-color', 'transparent');
+            set('--ts-game-primary', primaryColor);
+            set('--ts-game-secondary', secondaryColor);
+            set('--ts-game-accent', gameAccent);
+            set('--ts-game-glow', gameGlow);
+            set('--ts-game-deep', gameDeep);
+
+            // Cover album sebagai backdrop "song select". Di-set oleh onSongChange.
+            if (currentArtworkUrl) {
+                set('--ts-game-artwork', `url("${currentArtworkUrl.replace(/"/g, '%22')}")`);
+            }
+
+            document.documentElement.classList.add('ts-game-lobby-uimod');
+
+            // Backdrop "song select" sebagai elemen NYATA agar parallax kursor bisa
+            // di-transform langsung pada satu elemen daun (tanpa CSS var di <body>
+            // yang memicu recalc seluruh subtree). Background-nya tetap dibaca dari
+            // --ts-game-artwork lewat CSS, jadi otomatis ikut berganti tiap lagu.
+            if (!document.getElementById('ts-game-bg')) {
+                const gameBg = document.createElement('div');
+                gameBg.id = 'ts-game-bg';
+                gameBg.setAttribute('aria-hidden', 'true');
+                document.body.appendChild(gameBg);
+            }
+
+            // Scope perombakan layout HANYA ke halaman HOME.
+            // CATATAN PENTING: halaman CHANNEL/ARTIS juga TIDAK membawa page-type
+            // (cuma immersive-mode), jadi ':not([page-type])' saja keliru ikut
+            // menyeret halaman channel ke layout home (konten kedorong ke kanan).
+            // Pembeda andal: halaman channel/artis memuat salah satu header:
+            //   - <ytmusic-immersive-header-renderer>  (kasus 1: artis/daftar musik)
+            //   - <ytmusic-visual-header-renderer>     (kasus 2: channel pengguna)
+            // sedangkan home tidak punya keduanya. Maka kecualikan browse-response
+            // yang mengandung salah satu header tsb dari layout home.
+            const HOME_SCOPE = 'ytmusic-browse-response:is(:not([page-type]),[page-type="MUSIC_PAGE_TYPE_HOME"]):not(:has(ytmusic-immersive-header-renderer)):not(:has(ytmusic-visual-header-renderer))';
+
+            const styleId = 'ts-game-lobby-uimod-styles';
+            let gameStyle = document.getElementById(styleId);
+            if (!gameStyle) {
+                gameStyle = document.createElement('style');
+                gameStyle.id = styleId;
+                document.head.appendChild(gameStyle);
+            }
+
+            gameStyle.textContent = `
+                /* ===== GAME LOBBY (UI MOD) ===== */
+
+                @keyframes ts-game-panel-in {
+                    from { opacity: 0; transform: translateX(-18px); }
+                    to   { opacity: 1; transform: none; }
+                }
+                @keyframes ts-game-logo-pulse {
+                    0%, 100% { transform: scale(1); }
+                    50%      { transform: scale(1.015); }
+                }
+
+                /* BUSUR CAROUSEL via CSS Scroll-Driven Animations (Chromium 115+)
+                   Kartu di-scaleX berdasarkan posisi scroll — TANPA JS per-frame.
+                   entry 0% = kartu baru masuk viewport (atas/bawah tepi),
+                   entry 50% = kartu tepat di tengah viewport = skala penuh.
+                   cover range dipakai agar animasi berjalan selama kartu terlihat. */
+                @keyframes ts-game-arc-scale {
+                    0%   { transform: scaleX(0.66); }
+                    50%  { transform: scaleX(1); }
+                    100% { transform: scaleX(0.66); }
+                }
+                /* Counter-scale untuk teks .details agar tetap proporsional.
+                   Nilai 1/0.66 ≈ 1.515 di tepi, 1 di tengah. */
+                @keyframes ts-game-arc-counter {
+                    0%   { transform: scaleX(1.515); }
+                    50%  { transform: scaleX(1); }
+                    100% { transform: scaleX(1.515); }
+                }
+
+                /* --- LAYER 0: Backdrop "song select" = cover album digelapkan ---
+                   Dirender sebagai ELEMEN NYATA (#ts-game-bg), BUKAN body::before.
+                   Kenapa? Parallax kursor menggerakkan layer ini tiap frame. Kalau
+                   pakai body::before, satu-satunya cara menggesernya adalah lewat CSS
+                   var di <body> (pseudo hanya bisa membacanya via inheritance) — dan
+                   mengubah var pewarisan di <body> memaksa SELURUH subtree app
+                   (ribuan node YTM) di-recalc style tiap frame => stutter.
+                   Elemen daun tersendiri yang transform-nya ditulis langsung oleh JS
+                   = nol invalidasi subtree => benar-benar mulus, murni di kompositor. */
+                #ts-game-bg {
+                    position: fixed;
+                    inset: -2%;
+                    background:
+                        var(--ts-game-artwork, linear-gradient(135deg, var(--ts-game-primary), var(--ts-game-secondary)))
+                        no-repeat center center / cover !important;
+                    filter: brightness(1) saturate(1.15);
+                    transform: scale(1.08) translate3d(0px, 0px, 0); /* offset di-set oleh JS parallax */
+                    z-index: -1;
+                    transition: background 0.8s ease, filter 0.8s ease;
+                    will-change: transform;
+                    backface-visibility: hidden;
+                    pointer-events: none;
+                }
+                /* Scrim khas song select: kiri lebih gelap (zona panel info) + vignette */
+                body::after {
+                    content: '';
+                    position: fixed;
+                    inset: 0;
+                    background:
+                        linear-gradient(90deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.15) 45%, rgba(0,0,0,0.4) 100%),
+                        linear-gradient(180deg, rgba(0,0,0,0.45) 0%, transparent 18%, transparent 70%, rgba(0,0,0,0.55) 100%);
+                    z-index: -1;
+                    pointer-events: none;
+                }
+                /* Saat player page terbuka => backdrop berubah jadi blur ekstrem terang
+                   seperti layar loading beatmap (screenshot 2). */
+                html.ts-player-page-open #ts-game-bg {
+                    filter: blur(48px) brightness(0.8) saturate(1.25);
+                }
+                html.ts-player-page-open body::after {
+                    background: linear-gradient(180deg, rgba(0,0,0,0.25), rgba(0,0,0,0.45));
+                }
+
+                /* Semua kontainer utama transparan agar backdrop tembus */
+                body,
+                ytmusic-app, ytmusic-app-layout,
+                #content.ytmusic-app, ytmusic-browse-response,
+                ytmusic-player-page,
+                ytmusic-player-page #main-panel,
+                ytmusic-player-page #player-page-content,
+                ytmusic-player-page #song-media-window,
+                ytmusic-player-page #player-controls,
+                ytmusic-player-page .middle-controls,
+                ytmusic-pivot-bar-renderer, ytmusic-header-renderer {
+                    background: transparent !important;
+                }
+
+                /* Menghilangkan batasan tinggi gradien bawaan YT Music (biasanya kepotong setengah layar) */
+                ytmusic-browse-response[has-background]:not([disable-gradient]) .background-gradient.ytmusic-browse-response,
+                .background-gradient {
+                    background-size: 100% 100% !important;
+                    background-image: none !important; /* Matikan sekalian jika mengganggu background artwork lama. */
+                }
+
+                /* --- LAYER 1: Nav bar => toolbar gelap game --- */
+                #nav-bar-background,
+                #mini-guide-background, #mini-guide, #mini-guide-spacer,
+                ytmusic-guide-renderer {
+                    background: transparent !important;
+                }
+                
+                /* Menghilangkan seluruh struktur sidebar/guide dari layout agar tidak menyisakan kolom kosong */
+                tp-yt-app-drawer, 
+                tp-yt-app-drawer #contentContainer,
+                #guide-wrapper, 
+                #guide-content,
+                ytmusic-guide-renderer #sections,
+                ytmusic-guide-section-renderer {
+                    display: none !important;
+                    width: 0 !important;
+                }
+                ytmusic-app-layout > [slot="nav-bar"] {
+                    background: rgba(16, 16, 22, 0.96) !important;
+                    border-bottom: 1px solid rgba(255,255,255,0.07);
+                }
+
+                /* Kotak cari => panel cari gelap khas pojok kanan-atas song select */
+                ytmusic-search-box {
+                    background: rgba(0,0,0,0.5) !important;
+                    border: 1px solid rgba(255,255,255,0.1) !important;
+                    border-radius: 8px !important;
+                    transition: background 0.25s ease, border-radius 0.25s ease !important;
+                }
+                ytmusic-search-box input {
+                    caret-color: var(--ts-game-glow) !important;
+                }
+                ytmusic-search-box[opened] {
+                    border-radius: 12px !important;
+                    background: rgba(12, 12, 18, 0.95) !important;
+                }
+                ytmusic-search-suggestions-section,
+                ytmusic-search-suggestion {
+                    background: transparent !important;
+                }
+                ytmusic-search-suggestion:hover {
+                    background: color-mix(in srgb, var(--ts-game-accent) 20%, transparent) !important;
+                    border-radius: 8px;
+                }
+
+                /* Sidebar kiri jadi pill rail; item aktif menyala aksen */
+                ytmusic-guide-entry-renderer {
+                    border-radius: 12px !important;
+                    margin: 2px 6px !important;
+                    transition: background 0.2s ease !important;
+                }
+                ytmusic-guide-entry-renderer:hover {
+                    background: rgba(255,255,255,0.08) !important;
+                }
+                ytmusic-guide-entry-renderer[active],
+                ytmusic-guide-entry-renderer[aria-selected="true"] {
+                    background: color-mix(in srgb, var(--ts-game-accent) 25%, rgba(0,0,0,0.35)) !important;
+                    box-shadow: inset 3px 0 0 var(--ts-game-accent);
+                }
+
+                /* --- LAYER 2: Bar chip => baris filter/sortir + garis pelangi --- */
+                /* Sticky seperti baris "Sortir/Pengelompokan" game, dengan garis pelangi
+                   star-difficulty sebagai pembatas bawah. */
+                ytmusic-browse-response ytmusic-section-list-renderer > #header {
+                    position: sticky !important;
+                    top: 0;
+                    z-index: 20;
+                    padding: 8px 0 12px 0;
+                    background: linear-gradient(180deg, rgba(10,10,16,0.88) 0%, rgba(10,10,16,0.55) 75%, transparent 100%) !important;
+                    backdrop-filter: blur(12px);
+                    -webkit-backdrop-filter: blur(12px);
+                }
+                ytmusic-browse-response ytmusic-section-list-renderer > #header::after {
+                    content: '';
+                    position: absolute;
+                    left: 0; right: 0; bottom: 0;
+                    height: 2px;
+                    background: linear-gradient(90deg,
+                        #4fc0ff 0%, #4ffbdf 18%, #7cff4f 35%, #f6f05a 50%,
+                        #ff8068 65%, #ff4e6f 82%, #c645b8 100%);
+                    opacity: 0.75;
+                    pointer-events: none;
+                }
+                ytmusic-chip-cloud-chip-renderer {
+                    background: transparent !important;
+                    border: none !important;
+                }
+                ytmusic-chip-cloud-chip-renderer .gradient-box {
+                    border-radius: 999px !important;
+                    background: rgba(0,0,0,0.45) !important;
+                    border: 1px solid rgba(255,255,255,0.14) !important;
+                    transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease !important;
+                    overflow: hidden;
+                }
+                ytmusic-chip-cloud-chip-renderer a,
+                ytmusic-chip-cloud-chip-renderer button {
+                    border-radius: 999px !important;
+                    background: transparent !important;
+                    height: 36px !important;
+                    min-height: 0 !important;
+                    padding: 0 18px !important;
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    white-space: nowrap;
+                }
+                ytmusic-chip-cloud-chip-renderer:hover .gradient-box {
+                    background: rgba(255,255,255,0.12) !important;
+                }
+                ytmusic-chip-cloud-chip-renderer[is-selected] .gradient-box,
+                ytmusic-chip-cloud-chip-renderer[aria-selected="true"] .gradient-box {
+                    background: color-mix(in srgb, var(--ts-game-accent) 55%, rgba(0,0,0,0.35)) !important;
+                    border-color: color-mix(in srgb, var(--ts-game-accent) 80%, transparent) !important;
+                    box-shadow: 0 0 14px color-mix(in srgb, var(--ts-game-accent) 40%, transparent);
+                }
+
+                /* --- LAYER 3: PEROMBAKAN HOME => layout "song select" 1:1 --- */
+                /* Seluruh konten home dipindah jadi KOLOM KANAN (daftar beatmap),
+                   sisi kiri dibiarkan lapang untuk backdrop + panel info lagu,
+                   persis pembagian layar song select game ritme. */
+                ${HOME_SCOPE} {
+                    width: min(65vw, 1000px) !important; /* Diperpanjang agar beatmap card bisa ditarik lebih jauh ke kiri */
+                    margin-left: auto !important;
+                    margin-right: 0 !important;
+                }
+                @media (max-width: 1100px) {
+                    ${HOME_SCOPE} {
+                        width: auto !important;
+                        margin-left: 0 !important;
+                    }
+                }
+
+                /* Carousel horizontal => TUMPUKAN VERTIKAL ala daftar beatmap.
+                   SEMUA pembungkus dibuat overflow: visible supaya kartu bebas
+                   melebar/mengecil (busur) & efek hover tak terpotong. */
+                ${HOME_SCOPE} ytmusic-carousel,
+                ${HOME_SCOPE} ytmusic-carousel-shelf-renderer,
+                ${HOME_SCOPE} ytmusic-carousel .carousel,
+                ${HOME_SCOPE} ytmusic-carousel #items-wrapper {
+                    overflow: visible !important;
+                }
+                ${HOME_SCOPE} ytmusic-carousel ul#items {
+                    display: flex !important;
+                    flex-direction: column !important;
+                    align-items: flex-end !important;   /* kartu di-anchor ke KANAN */
+                    gap: 4px !important;
+                    width: 100% !important;
+                    padding: 0 16px !important;          /* ruang utk hover */
+                    transform: translateX(0) !important;
+                    overflow: visible !important;
+                    transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s ease !important;
+                }
+                /* Animasi out: geser carousel ke kanan saat masuk ke player page atau sedang di-klik */
+                html.ts-player-page-open ${HOME_SCOPE} ytmusic-carousel ul#items,
+                html.ts-game-animating-out ${HOME_SCOPE} ytmusic-carousel ul#items {
+                    transform: translateX(120%) !important;
+                    opacity: 0 !important;
+                }
+                
+                @keyframes ts-game-carousel-in {
+                    from { transform: translateX(120%); opacity: 0; }
+                    to   { transform: translateX(0); opacity: 1; }
+                }
+                
+                /* Animasi in: masuk kembali dari kanan saat player ditutup */
+                html.ts-game-animating-in ${HOME_SCOPE} ytmusic-carousel ul#items {
+                    animation: ts-game-carousel-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
+                }
+                ${HOME_SCOPE} ytmusic-grid-renderer #items {
+                    display: flex !important;
+                    flex-direction: column !important;
+                    gap: 8px !important;
+                }
+                /* Panah geser carousel tidak relevan lagi di layout vertikal */
+                ${HOME_SCOPE} ytmusic-carousel-shelf-basic-header-renderer yt-icon-button {
+                    display: none !important;
+                }
+
+                /* KARTU BEATMAP 1:1 — artwork full-bleed jadi BACKGROUND kartu,
+                   scrim gelap di sisi kiri, judul+info menumpang di atasnya,
+                   tepi aksen kiri dari palet. Hover = kartu menggeser ke kiri
+                   dengan outline putih, persis kartu terpilih di carousel game. */
+                ${HOME_SCOPE} ytmusic-two-row-item-renderer {
+                    position: relative !important;
+                    display: flex !important;
+                    flex-direction: row !important;
+                    align-items: stretch !important;
+                    width: 100% !important;
+                    margin: 0 0 0 auto !important;
+                    /* BUSUR via CSS Scroll-Driven Animation — kompositor browser
+                       menghitung scaleX langsung dari posisi scroll kartu di viewport.
+                       Poros kanan => mengecil dari kiri (tepi resede), tengah penuh. */
+                    transform-origin: right center !important;
+                    animation: ts-game-arc-scale linear both !important;
+                    animation-timeline: view(block) !important;
+                    min-height: 110px !important;
+                    max-height: 110px !important;
+                    padding: 0 !important;
+                    border-left: 6px solid var(--ts-game-accent) !important;
+                    border-radius: 12px 6px 6px 12px !important;
+                    overflow: hidden !important;
+                    background: rgba(10,10,16,0.7) !important;
+                    outline: 2px solid transparent;
+                    outline-offset: -2px;
+                    transition: border-left-width 0.2s ease, box-shadow 0.2s ease, outline-color 0.2s ease, filter 0.2s ease !important;
+                    will-change: transform;
+                }
+                /* Hover: sorotan TANPA ubah ukuran (outline + sedikit terang + glow)
+                   supaya tak bentrok dgn transform busur CSS scroll-driven. */
+                ${HOME_SCOPE} ytmusic-two-row-item-renderer:hover {
+                    outline-color: rgba(255,255,255,0.9);
+                    filter: brightness(1.1);
+                    box-shadow: 0 8px 24px rgba(0,0,0,0.55),
+                                0 0 18px color-mix(in srgb, var(--ts-game-accent) 35%, transparent);
+                    z-index: 3;
+                }
+                /* Kartu yang sedang DI TENGAH (siap diputar sekali klik) => disorot,
+                   gema "beatmap terpilih" di song-select. */
+                ${HOME_SCOPE} ytmusic-two-row-item-renderer.ts-game-card-centered {
+                    outline-color: rgba(255,255,255,0.92) !important;
+                    border-left-width: 16px !important;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.6),
+                                0 0 26px color-mix(in srgb, var(--ts-game-accent) 50%, transparent) !important;
+                    z-index: 4 !important;
+                }
+                /* Link gambar direntangkan ke seluruh kartu => seluruh kartu klikabel */
+                ${HOME_SCOPE} ytmusic-two-row-item-renderer a.image-wrapper {
+                    position: absolute !important;
+                    inset: 0 !important;
+                    width: 100% !important;
+                    height: 100% !important;
+                    margin: 0 !important;
+                }
+                ${HOME_SCOPE} ytmusic-two-row-item-renderer ytmusic-thumbnail-renderer {
+                    position: absolute !important;
+                    inset: 0 !important;
+                    width: 100% !important;
+                    height: 100% !important;
+                    border-radius: 0 !important;
+                    overflow: hidden;
+                }
+                ${HOME_SCOPE} ytmusic-two-row-item-renderer ytmusic-thumbnail-renderer yt-img-shadow,
+                ${HOME_SCOPE} ytmusic-two-row-item-renderer ytmusic-thumbnail-renderer img {
+                    width: 100% !important;
+                    height: 100% !important;
+                    object-fit: cover !important;
+                    /* Mengarahkan fokus potongan (crop) lebih ke atas agar area kepala/wajah tidak hilang */
+                    object-position: center 25% !important;
+                    border-radius: 0 !important;
+                    transition: transform 0.35s ease;
+                }
+                ${HOME_SCOPE} ytmusic-two-row-item-renderer:hover ytmusic-thumbnail-renderer img {
+                    transform: scale(1.05);
+                }
+                /* Scrim agar teks terbaca di atas artwork */
+                ${HOME_SCOPE} ytmusic-two-row-item-renderer::before {
+                    content: '';
+                    position: absolute;
+                    inset: 0;
+                    background: linear-gradient(90deg,
+                        rgba(8,8,12,0.95) 0%, rgba(8,8,12,0.85) 45%,
+                        rgba(8,8,12,0.4) 75%, rgba(8,8,12,0.05) 100%);
+                    z-index: 1;
+                    pointer-events: none;
+                }
+                /* Overlay play/speaker tetap di atas scrim agar terlihat & klikabel */
+                ${HOME_SCOPE} ytmusic-two-row-item-renderer ytmusic-item-thumbnail-overlay-renderer {
+                    z-index: 2;
+                }
+                /* Teks di atas semua layer; area kosongnya tembus klik ke kartu.
+                   COUNTER-SCALE: kartu di-scaleX(f) untuk busur => teks ikut gepeng.
+                   JS membalas dgn 'transform: scaleX(1/f)' LANGSUNG ke elemen ini
+                   (poros kiri) supaya TEKS tetap proporsional & terbaca. Yang sedikit
+                   gepeng hanya gambar latar. */
+                ${HOME_SCOPE} ytmusic-two-row-item-renderer .details {
+                    position: relative;
+                    z-index: 2;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                    width: 72%;
+                    margin: 0 !important;
+                    padding: 4px 16px !important;
+                    pointer-events: none;
+                    transform-origin: left center;
+                    /* Counter-scale: membalas scaleX busur kartu agar teks tetap
+                       proporsional. Juga digerakkan CSS scroll-driven animation. */
+                    animation: ts-game-arc-counter linear both;
+                    animation-timeline: view(block);
+                    will-change: transform;
+                }
+                ${HOME_SCOPE} ytmusic-two-row-item-renderer .details a {
+                    pointer-events: auto;
+                }
+                ${HOME_SCOPE} ytmusic-two-row-item-renderer .details .title {
+                    font-size: 16px !important;
+                    font-weight: 700 !important;
+                    line-height: 1.3 !important;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+                }
+                ${HOME_SCOPE} ytmusic-two-row-item-renderer .details .subtitle {
+                    font-size: 12px !important;
+                    opacity: 0.88;
+                    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+                }
+
+                /* Header shelf dikecilkan jadi label grup ringkas di atas tumpukan
+                   kartu (gema teks "298 matches" di atas daftar beatmap). */
+                ${HOME_SCOPE} ytmusic-carousel-shelf-basic-header-renderer {
+                    padding: 2px 4px !important;
+                    margin: 14px 0 8px 0 !important;
+                }
+                ${HOME_SCOPE} ytmusic-carousel-shelf-basic-header-renderer .title,
+                ${HOME_SCOPE} ytmusic-carousel-shelf-basic-header-renderer .title a {
+                    font-size: 17px !important;
+                    font-weight: 700 !important;
+                    letter-spacing: 0.4px;
+                    text-shadow: 0 1px 6px rgba(0,0,0,0.7);
+                }
+                ${HOME_SCOPE} ytmusic-carousel-shelf-basic-header-renderer img {
+                    width: 28px !important;
+                    height: 28px !important;
+                }
+
+                /* Baris lagu di halaman lain (list item): versi ramping kartu beatmap */
+                ytmusic-responsive-list-item-renderer {
+                    background: rgba(10,10,16,0.55) !important;
+                    border-left: 4px solid color-mix(in srgb, var(--ts-game-accent) 75%, transparent) !important;
+                    border-radius: 10px !important;
+                    margin: 3px 0 !important;
+                    transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease !important;
+                }
+                ytmusic-responsive-list-item-renderer:hover {
+                    background: rgba(255,255,255,0.08) !important;
+                    transform: translateX(-6px);
+                    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+                }
+
+                /* Aksen umum header shelf (semua halaman) */
+                ytmusic-carousel-shelf-basic-header-renderer .strapline,
+                ytmusic-carousel-shelf-basic-header-renderer .strapline-text {
+                    color: var(--ts-game-glow) !important;
+                    letter-spacing: 1.5px;
+                }
+                ytmusic-carousel-shelf-basic-header-renderer img {
+                    border-radius: 50% !important;
+                    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ts-game-accent) 60%, transparent);
+                }
+                ytmusic-carousel-shelf-basic-header-renderer yt-button-renderer,
+                ytmusic-carousel-shelf-basic-header-renderer .more-button {
+                    border-radius: 999px !important;
+                    background: rgba(0,0,0,0.45) !important;
+                    border: 1px solid rgba(255,255,255,0.12) !important;
+                }
+
+                /* --- LAYER 4: Player bar => toolbar bawah game + wedge pink --- */
+                #player-bar-background { background: transparent !important; }
+                ytmusic-player-bar {
+                    background: rgba(14, 14, 20, 0.92) !important;
+                    border-top: 1px solid rgba(255,255,255,0.08) !important;
+                    backdrop-filter: blur(14px);
+                    -webkit-backdrop-filter: blur(14px);
+                    /* Pertahankan clipping/original geometry player bar Game Lobby. */
+                    overflow: hidden;
+                }
+                /* Wedge pink miring khas tombol "Kembali" game, jadi alas kontrol kiri */
+                ytmusic-player-bar::before {
+                    content: '';
+                    position: absolute;
+                    top: 0; bottom: 0;
+                    left: -28px;
+                    width: 250px;
+                    background: linear-gradient(135deg, #ff70ab 0%, #e0457f 100%);
+                    transform: skewX(-18deg);
+                    box-shadow: 0 0 24px rgba(255, 90, 150, 0.45);
+                    z-index: 0;
+                    pointer-events: none;
+                }
+                ytmusic-player-bar #left-controls,
+                ytmusic-player-bar .middle-controls,
+                ytmusic-player-bar .right-controls {
+                    position: relative;
+                    z-index: 1;
+                }
+                /* Pertahankan posisi asli slider; hanya naikkan hit-area di atas
+                   dekorasi agar bisa dijangkau kursor. Jangan override position. */
+                ytmusic-player-bar #progress-bar,
+                ytmusic-player-bar tp-yt-paper-slider.progress-bar,
+                ytmusic-player-bar tp-yt-paper-slider[role="slider"] {
+                    z-index: 3 !important;
+                    pointer-events: auto !important;
+                    cursor: pointer !important;
+                }
+                ytmusic-player-bar #left-controls .time-info {
+                    color: #ffffff !important;
+                    font-weight: 600;
+                    text-shadow: 0 1px 3px rgba(0,0,0,0.35);
+                }
+                ytmusic-player-bar .middle-controls img {
+                    border-radius: 6px !important;
+                    object-fit: contain !important;
+                }
+
+                /* --- LAYER 5: Player page => layar "loading beatmap" --- */
+                /* Hilangkan letterbox gelap di belakang artwork */
+                ytmusic-player,
+                ytmusic-player #player,
+                ytmusic-player #song-image,
+                ytmusic-player #song-media-window,
+                ytmusic-player-page #player,
+                ytmusic-player-page #main-panel #player {
+                    background: transparent !important;
+                    box-shadow: none !important;
+                }
+                /* Artwork bundar ber-ring putih, gema dari logo game! di layar loading */
+                ytmusic-player-page #song-image,
+                ytmusic-player-page #song-image img,
+                ytmusic-player-page #thumbnail,
+                ytmusic-player #song-image img {
+                    border-radius: 50% !important;
+                    box-shadow:
+                        0 0 0 6px rgba(255,255,255,0.92),
+                        0 0 0 7px rgba(0,0,0,0.15),
+                        0 18px 60px rgba(0,0,0,0.45),
+                        0 0 40px color-mix(in srgb, var(--ts-game-glow) 35%, transparent) !important;
+                }
+                /* Denyut halus saat lagu berjalan (logo game! berdetak ke musik) */
+                html.ts-game-lobby-uimod body:has(ytmusic-player-bar[play-button-state="playing"]) ytmusic-player-page #song-image img {
+                    animation: ts-game-logo-pulse 2.4s ease-in-out infinite;
+                }
+                /* Video tetap kotak rounded, jangan dipaksa bundar */
+                ytmusic-player-page #song-video,
+                ytmusic-player-page #song-video video {
+                    border-radius: 16px !important;
+                    animation: none !important;
+                }
+
+                /* Panel queue kanan => panel "PENGATURAN" frosted beraksen kuning */
+                ytmusic-player-queue {
+                    background: rgba(255,255,255,0.1) !important;
+                    backdrop-filter: blur(26px) saturate(1.2);
+                    -webkit-backdrop-filter: blur(26px) saturate(1.2);
+                    border-radius: 14px;
+                    border: 1px solid rgba(255,255,255,0.18);
+                }
+                ytmusic-player-queue #contents,
+                ytmusic-player-queue ytmusic-tab-renderer,
+                ytmusic-player-queue #tab-content {
+                    background: transparent !important;
+                }
+                tp-yt-paper-tabs, paper-tabs {
+                    --paper-tabs-selection-bar-color: #ffd966;
+                }
+                ytmusic-player-page .tab-header {
+                    font-weight: 700 !important;
+                    letter-spacing: 1px;
+                }
+                ytmusic-player-queue-item {
+                    border-radius: 8px !important;
+                    transition: background 0.2s ease !important;
+                }
+                ytmusic-player-queue-item:hover {
+                    background: rgba(255,255,255,0.08) !important;
+                }
+                ytmusic-player-queue-item[selected],
+                ytmusic-player-queue-item[play-button-state="playing"],
+                ytmusic-player-queue-item[play-button-state="paused"] {
+                    background: rgba(255, 217, 102, 0.2) !important;
+                    box-shadow: inset 3px 0 0 #ffd966;
+                }
+
+                /* --- LAYER 6: Panel info lagu (DOM #ts-game-info-panel) --- */
+                /* Mode home: panel KIRI-ATAS di area lapang sisi kiri, persis posisi
+                   panel info beatmap di song select (teks di atas scrim gradien,
+                   kolom statistik bergaris atas seperti tabel CS/AR/HP). */
+                #ts-game-info-panel {
+                    position: fixed;
+                    left: 96px;
+                    top: 84px;
+                    z-index: 6;
+                    max-width: min(38vw, 540px);
+                    padding: 18px 30px 16px 18px;
+                    pointer-events: none;
+                    color: #fff;
+                    background: linear-gradient(90deg, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.35) 75%, transparent 100%);
+                    border-left: 4px solid var(--ts-game-accent, #ff70ab);
+                    border-radius: 0 14px 14px 0;
+                    backdrop-filter: blur(4px);
+                    -webkit-backdrop-filter: blur(4px);
+                }
+                #ts-game-info-panel.ts-game-panel-in {
+                    animation: ts-game-panel-in 0.45s ease;
+                }
+                #ts-game-info-panel .ts-game-badge {
+                    display: inline-block;
+                    background: #b8f37c;
+                    color: #243a0a;
+                    font-size: 10px;
+                    font-weight: 800;
+                    letter-spacing: 1.6px;
+                    border-radius: 999px;
+                    padding: 3px 12px;
+                    margin-bottom: 8px;
+                }
+                #ts-game-info-panel .ts-game-title {
+                    font-size: 36px;
+                    font-weight: 300;
+                    line-height: 1.15;
+                    text-shadow: 0 2px 10px rgba(0,0,0,0.7);
+                    overflow: hidden;
+                    display: -webkit-box;
+                    -webkit-line-clamp: 2;
+                    -webkit-box-orient: vertical;
+                }
+                #ts-game-info-panel .ts-game-artist {
+                    font-size: 16px;
+                    opacity: 0.92;
+                    margin-top: 2px;
+                    text-shadow: 0 1px 6px rgba(0,0,0,0.7);
+                }
+                #ts-game-info-panel .ts-game-meta {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    margin-top: 10px;
+                }
+                #ts-game-info-panel .ts-game-star-pill {
+                    background: var(--ts-game-accent, #ff70ab);
+                    color: #fff;
+                    font-size: 11px;
+                    font-weight: 700;
+                    padding: 2px 10px;
+                    border-radius: 999px;
+                    box-shadow: 0 0 10px color-mix(in srgb, var(--ts-game-accent) 45%, transparent);
+                }
+                #ts-game-info-panel .ts-game-meta-text {
+                    font-size: 12.5px;
+                    opacity: 0.95;
+                    text-shadow: 0 1px 4px rgba(0,0,0,0.7);
+                }
+                #ts-game-info-panel .ts-game-stats {
+                    display: flex;
+                    gap: 22px;
+                    margin-top: 12px;
+                }
+                #ts-game-info-panel .ts-game-stat {
+                    border-top: 2px solid rgba(255,255,255,0.85);
+                    padding-top: 4px;
+                    min-width: 64px;
+                    max-width: 150px;
+                }
+                #ts-game-info-panel .ts-game-stat-label {
+                    font-size: 10.5px;
+                    opacity: 0.8;
+                    letter-spacing: 0.4px;
+                }
+                #ts-game-info-panel .ts-game-stat-value {
+                    font-size: 13px;
+                    font-weight: 600;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+                @media (max-width: 1000px) {
+                    #ts-game-info-panel { display: none; }
+                }
+
+                /* Mode player page: panel berubah jadi info terpusat di bawah artwork
+                   ("No title / Reol / Celsius' Easy" di screenshot loading). */
+                html.ts-player-page-open #ts-game-info-panel {
+                    left: 0;
+                    right: 36vw;
+                    top: auto;
+                    bottom: 110px;
+                    max-width: none;
+                    background: none;
+                    border-left: none;
+                    backdrop-filter: none;
+                    -webkit-backdrop-filter: none;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    text-align: center;
+                }
+                html.ts-player-page-open #ts-game-info-panel .ts-game-title {
+                    font-size: 34px;
+                    max-width: 560px;
+                }
+                html.ts-player-page-open #ts-game-info-panel .ts-game-stats {
+                    justify-content: center;
+                }
+                html.ts-player-page-open #ts-game-info-panel .ts-game-stat {
+                    border-top-color: rgba(255,255,255,0.65);
+                    text-align: center;
+                }
+                /* Layout sempit: queue pindah ke bawah, info kembali ke tengah penuh */
+                @media (max-width: 936px) {
+                    html.ts-player-page-open #ts-game-info-panel { right: 0; }
+                }
+
+                /* --- Detail: scrollbar tipis aksen --- */
+                html::-webkit-scrollbar, body::-webkit-scrollbar,
+                ytmusic-app::-webkit-scrollbar, ytmusic-app *::-webkit-scrollbar {
+                    width: 6px;
+                    background: transparent;
+                }
+                html::-webkit-scrollbar-thumb, body::-webkit-scrollbar-thumb,
+                ytmusic-app::-webkit-scrollbar-thumb, ytmusic-app *::-webkit-scrollbar-thumb {
+                    background: color-mix(in srgb, var(--ts-game-accent) 55%, transparent) !important;
+                    border-radius: 3px;
+                }
+                .title, .subtitle, .byline,
+                ytmusic-player-bar .title, ytmusic-player-bar .byline {
+                    text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+                }
+
+                /* ============================================================
+                   LAYER 7a — HOME: hapus hero "immersive-background"
+                   Background cover raksasa bawaan home (is-background) ditiadakan;
+                   sebagai gantinya backdrop "song select" kita (body::before) yang
+                   dipakai. Banner channel (.image, tanpa is-background) tidak kena.
+                   ============================================================ */
+                ytmusic-browse-response #background.immersive-background,
+                ytmusic-browse-response .immersive-background,
+                ytmusic-fullbleed-thumbnail-renderer[is-background] {
+                    display: none !important;
+                }
+
+                /* ============================================================
+                   LAYER 7b — NAVBAR: hamburger guide-button tak diperlukan lagi
+                   (semua isi guide sudah dipindah jadi deretan ikon di navbar).
+                   Rel mini-guide kiri juga disembunyikan karena isinya sudah pindah;
+                   ruang kirinya jadi lapang untuk backdrop "song select".
+                   ============================================================ */
+                ytmusic-nav-bar #guide-button {
+                    display: none !important;
+                }
+                /* Rel mini-guide kiri hanya disembunyikan SETELAH isinya benar-benar
+                   pindah ke navbar (class ts-game-guide-relocated diset oleh JS).
+                   Kalau relokasi gagal, rel asli tetap tampil agar tombol tak hilang. */
+                html.ts-game-guide-relocated #mini-guide,
+                html.ts-game-guide-relocated #mini-guide-background,
+                html.ts-game-guide-relocated #mini-guide-spacer {
+                    display: none !important;
+                    width: 0 !important;
+                }
+
+                /* ============================================================
+                   LAYER 7c — NAVBAR: deretan tombol "cermin" guide (IKON saja)
+                   Tombol di sini adalah <button class="ts-game-nav-btn"> POLOS buatan
+                   sendiri (lihat buildNavbarGuide di JS), BUKAN node Polymer YTM —
+                   makanya layout-nya stabil walau halaman berganti-ganti.
+                   ============================================================ */
+
+                /* PENTING: secara default kotak search (.center-content) YTM dipasang
+                   'position:absolute; left:50%; translateX(-50%)' (mengambang di
+                   TENGAH, lepas dari alur), sehingga MENUTUPI strip tombol kita.
+                   Saat tombol aktif (ts-game-guide-relocated), kembalikan navbar jadi
+                   baris flex normal: [logo][tombol][search] berurutan, tak tumpuk.
+                   right-content (cast/avatar) dibiarkan absolut mengambang di kanan. */
+                html.ts-game-guide-relocated ytmusic-nav-bar {
+                    justify-content: flex-start !important;
+                }
+                html.ts-game-guide-relocated ytmusic-nav-bar .center-content {
+                    position: static !important;
+                    transform: none !important;
+                    left: auto !important;
+                    margin-left: 0 !important;
+                    width: auto !important;
+                    flex: 0 1 auto !important;
+                    justify-content: flex-start !important;
+                    padding-left: 0 !important;
+                }
+                html.ts-game-guide-relocated ytmusic-nav-bar .center-content ytmusic-search-box {
+                    margin-left: 0 !important;
+                }
+
+                ytmusic-nav-bar #ts-game-navbar-guide {
+                    display: flex !important;
+                    align-items: center;
+                    gap: 24px;
+                    /* Jarak lega: kiri dari logo, kanan ke kotak search */
+                    margin: 0 22px 0 28px;
+                    padding: 0 2px;
+                    /* Jangan menyusut: tampilkan tombol apa adanya (dibatasi max-width,
+                       lebihnya bisa di-scroll horizontal) supaya tak terdesak search. */
+                    flex: 0 0 auto;
+                    max-width: 56vw;
+                    overflow-x: auto;
+                    overflow-y: hidden;
+                    scrollbar-width: none;
+                }
+                ytmusic-nav-bar #ts-game-navbar-guide::-webkit-scrollbar {
+                    width: 0 !important;
+                    height: 0 !important;
+                    background: transparent !important;
+                }
+                /* Ubin ikon 38x38 yang seragam & SELALU terlihat (latar sendiri). */
+                ytmusic-nav-bar #ts-game-navbar-guide .ts-game-nav-btn {
+                    flex: 0 0 auto;
+                    box-sizing: border-box;
+                    width: 28px;
+                    height: 28px;
+                    margin: 0;
+                    padding: 0;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    border: none;
+                    border-radius: 9px;
+                    background: rgba(255,255,255,0.07);
+                    color: #fff;
+                    cursor: pointer;
+                    transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+                }
+                ytmusic-nav-bar #ts-game-navbar-guide .ts-game-nav-btn:hover {
+                    background: rgba(255,255,255,0.18);
+                    transform: translateY(-1px);
+                }
+                /* Ikon (SVG clone) — putih, ukuran pas */
+                ytmusic-nav-bar #ts-game-navbar-guide .ts-game-nav-btn svg {
+                    width: 22px;
+                    height: 22px;
+                    fill: #fff;
+                    color: #fff;
+                    pointer-events: none;
+                    opacity: 0.95;
+                }
+                /* Inisial untuk playlist (yang tak punya ikon) */
+                ytmusic-nav-bar #ts-game-navbar-guide .ts-game-nav-btn .ts-game-nav-initial {
+                    font-size: 14px;
+                    font-weight: 800;
+                    line-height: 1;
+                    color: #fff;
+                    opacity: 0.95;
+                }
+
+                /* ============================================================
+                   LAYER 7d — CHANNEL: banner + content dibungkus balok TRAPESIUM
+                   menggantung di kiri. Kiri lurus nempel batas layar; hanya sudut
+                   miring kanan yang terlihat. Bentuknya ELONGATED & KONSISTEN
+                   (aspect-ratio tetap), TIDAK bergantung ukuran gambar — gambar
+                   sekadar mengisi via object-fit: cover.
+
+                   Animasi "in" diadaptasi dari referensi panel lobby (rotate+scale+
+                   fade, easing cubic-bezier(.22,1,.36,1)), tapi PORosnya digeser ke
+                   KIRI (transform-origin: left center) sesuai posisi kiri kita, dan
+                   mulai miring ke bawah (rotate +deg => ujung kanan turun) lalu lurus.
+                   Efek glow "settled" baru dinyalakan SETELAH animasi gerak selesai
+                   (animation-delay) supaya mulus/tak nge-lag — seperti .ldp-settled.
+                   ============================================================ */
+                @keyframes ts-game-trapezoid-in {
+                    from { opacity: 0; transform: rotate(4deg) scale(0.97); }
+                    to   { opacity: 1; transform: rotate(0deg) scale(1); }
+                }
+                @keyframes ts-game-trapezoid-settle {
+                    from {
+                        border-color: transparent;
+                        box-shadow: inset 0 0 0 0 transparent;
+                    }
+                    to {
+                        border-color: color-mix(in srgb, var(--ts-game-glow, #00aeef) 40%, transparent);
+                        box-shadow:
+                            inset 0 0 18px color-mix(in srgb, var(--ts-game-glow, #00aeef) 20%, transparent),
+                            inset 0 0 40px color-mix(in srgb, var(--ts-game-glow, #00aeef) 8%, transparent);
+                    }
+                }
+                /* Balok trapesium — berlaku untuk KEDUA jenis header channel:
+                   - kasus 1: ytmusic-immersive-header-renderer
+                   - kasus 2: ytmusic-visual-header-renderer */
+                ytmusic-browse-response ytmusic-immersive-header-renderer,
+                ytmusic-browse-response ytmusic-visual-header-renderer {
+                    position: relative !important;
+                    display: block !important;
+                    box-sizing: border-box !important;
+                    width: min(64vw, 960px) !important;
+                    /* Tinggi = 5/16 lebar => balok memanjang & konsisten, lepas dari
+                       ukuran gambar. (Konten dijadikan overlay absolut di bawah supaya
+                       tidak ikut menambah tinggi.) */
+                    aspect-ratio: 16 / 5 !important;
+                    min-height: 0 !important;
+                    margin: 88px auto 0 0 !important;
+                    background: var(--ts-game-deep, #101018) !important;
+                    border: 1px solid transparent !important;   /* untuk glow "settled" */
+                    /* Trapesium: kiri lurus (x=0), kanan miring (bawah-kanan ditarik masuk) */
+                    -webkit-clip-path: polygon(0 0, 100% 0, calc(100% - 96px) 100%, 0 100%);
+                    clip-path: polygon(0 0, 100% 0, calc(100% - 96px) 100%, 0 100%);
+                    border-radius: 0 !important;
+                    overflow: hidden !important;
+                    transform-origin: left center !important;   /* mengayun dari sisi kiri */
+                    /* TANPA !important supaya JS bisa memutar-ulang animasi (replay)
+                       saat header dipakai-ulang antar-channel (lihat replayTrapezoid). */
+                    animation: ts-game-trapezoid-in 380ms cubic-bezier(0.22, 1, 0.36, 1) both,
+                               ts-game-trapezoid-settle 520ms ease 380ms both;
+                    /* drop-shadow (bukan box-shadow) karena elemen ber-clip-path tak bisa
+                       menampilkan box-shadow biasa. */
+                    filter: drop-shadow(-4px 10px 22px rgba(0,0,0,0.45));
+                    will-change: transform, opacity;
+                    backface-visibility: hidden;
+                }
+                /* Banner mengisi penuh balok (kedua jenis header), apa pun ukurannya */
+                ytmusic-browse-response ytmusic-immersive-header-renderer ytmusic-fullbleed-thumbnail-renderer.image,
+                ytmusic-browse-response ytmusic-immersive-header-renderer ytmusic-fullbleed-thumbnail-renderer.image picture,
+                ytmusic-browse-response ytmusic-immersive-header-renderer ytmusic-fullbleed-thumbnail-renderer.image img,
+                ytmusic-browse-response ytmusic-visual-header-renderer ytmusic-fullbleed-thumbnail-renderer.image,
+                ytmusic-browse-response ytmusic-visual-header-renderer ytmusic-fullbleed-thumbnail-renderer.image picture,
+                ytmusic-browse-response ytmusic-visual-header-renderer ytmusic-fullbleed-thumbnail-renderer.image img {
+                    position: absolute !important;
+                    inset: 0 !important;
+                    width: 100% !important;
+                    height: 100% !important;
+                    object-fit: cover !important;
+                    object-position: center center !important;
+                }
+                /* content (judul/avatar + tombol) jadi OVERLAY absolut di bawah balok
+                   => tidak ikut menentukan tinggi (tinggi tetap konsisten via aspect).
+                   Beri ruang kanan supaya tombol tak kena sudut miring trapesium. */
+                ytmusic-browse-response ytmusic-immersive-header-renderer .content-container-wrapper,
+                ytmusic-browse-response ytmusic-visual-header-renderer .gradient-container {
+                    position: absolute !important;
+                    left: 0 !important;
+                    right: 0 !important;
+                    bottom: 0 !important;
+                    z-index: 1;
+                }
+                ytmusic-browse-response ytmusic-immersive-header-renderer .content-container,
+                ytmusic-browse-response ytmusic-visual-header-renderer .content-container {
+                    padding-right: 116px !important;
+                }
+            `;
+
+            // Variabel native YTM: player page transparan (backdrop blur kita yang tampil)
+            set('--ytmusic-player-page-background', 'transparent');
+            unset('--ytmusic-nav-bar');
+
+            // Panel info lagu bergaya game (DOM), diperbarui tiap ganti lagu
+            renderGameInfoPanel();
+
+            // Pindahkan tombol-tombol guide ke navbar (deretan ikon).
+            relocateGuideButtonsToNavbar();
+
+            // Lacak header channel (untuk replay animasi trapesium saat dipakai-ulang).
+            replayTrapezoidIfReused();
+
+            // Aktifkan efek busur + klik-ke-tengah di carousel home.
+            initGameCarousel();
+
         } else if (themeMode === 'harmony') {
             // === MODE HARMONY: Sistem gradien multi-layer yang kohesif ===
             // aliran warna yang harmonis dan terpadu di seluruh elemen UI
@@ -892,6 +2853,8 @@ let themeObserver = null;
 let playerUiObserver = null;
 let dynamicThemeDisabled = false;
 
+let tsWasPlayerOpen = false;
+
 function syncPlayerPageOpenState() {
     const root = document.documentElement;
 
@@ -901,6 +2864,14 @@ function syncPlayerPageOpenState() {
         document.querySelector('ytmusic-player-page[player-page-open]') ||
         document.querySelector('ytmusic-app-layout[player-page-open]')
     );
+
+    // Jika player baru saja ditutup, putar animasi masuk
+    if (!isOpen && tsWasPlayerOpen) {
+        root.classList.add('ts-game-animating-in');
+        // Hapus class setelah durasi animasi selesai
+        setTimeout(() => root.classList.remove('ts-game-animating-in'), 600);
+    }
+    tsWasPlayerOpen = isOpen;
 
     root.classList.toggle('ts-player-page-open', isOpen);
 }
@@ -993,7 +2964,10 @@ function initObserver() {
 
 // Global function to update theme mode and reapply
 window.updateThemeMode = function (newMode) {
-    const sanitizedMode = (newMode === 'unified') ? 'overlay' : newMode;
+    if (newMode !== 'game-lobby-uimod' && newMode?.endsWith('-lobby-uimod')) newMode = 'game-lobby-uimod';
+    const sanitizedMode = newMode === 'unified'
+        ? 'overlay'
+        : (newMode === 'default' ? 'default-optimized' : newMode);
     console.log('[DynamicTheme] Updating theme mode to:', sanitizedMode);
     window.DYNAMIC_THEME_MODE = sanitizedMode;
 
@@ -1038,7 +3012,16 @@ window.disableDynamicTheme = function () {
     document.documentElement.classList.remove('ts-player-page-open');
 
     // Remove injected style tags
-    const styleIds = ['ts-overlay-mode-styles', 'ts-unified-mode-styles', 'ts-harmony-mode-styles', 'ts-default-optimized-styles', 'ts-seamless-mode-styles', 'ts-base-styles'];
+    const styleIds = ['ts-overlay-mode-styles', 'ts-unified-mode-styles', 'ts-harmony-mode-styles', 'ts-default-optimized-styles', 'ts-seamless-mode-styles', 'ts-aurora-uimod-styles', 'ts-game-lobby-uimod-styles', 'ts-base-styles'];
+    document.documentElement.classList.remove('ts-aurora-uimod');
+    document.documentElement.classList.remove('ts-game-lobby-uimod');
+    const gameInfoPanel = document.getElementById('ts-game-info-panel');
+    if (gameInfoPanel) gameInfoPanel.remove();
+    const gameBgEl = document.getElementById('ts-game-bg');
+    if (gameBgEl) gameBgEl.remove();
+    // Kembalikan tombol guide yang sempat dipindah ke navbar.
+    restoreGuideButtons();
+    teardownGameCarousel();
     for (const id of styleIds) {
         const el = document.getElementById(id);
         if (el) el.remove();
@@ -1082,6 +3065,22 @@ window.disableDynamicTheme = function () {
         '--ts-seamless-primary',
         '--ts-seamless-secondary',
 
+        // Aurora (ui mod) mode variables
+        '--ts-aurora-primary',
+        '--ts-aurora-secondary',
+        '--ts-aurora-accent',
+        '--ts-aurora-glow',
+        '--ts-aurora-deep',
+        '--ts-aurora-artwork',
+
+        // Game Lobby (ui mod) mode variables
+        '--ts-game-primary',
+        '--ts-game-secondary',
+        '--ts-game-accent',
+        '--ts-game-glow',
+        '--ts-game-deep',
+        '--ts-game-artwork',
+
         '--paper-slider-active-color',
         '--paper-slider-knob-color',
         '--paper-slider-secondary-color',
@@ -1102,8 +3101,11 @@ window.disableDynamicTheme = function () {
 };
 
 // Optional: allow re-enabling without reload
-window.enableDynamicTheme = function (mode = 'default') {
-    const sanitizedMode = (mode === 'unified') ? 'overlay' : mode;
+window.enableDynamicTheme = function (mode = 'default-optimized') {
+    if (mode !== 'game-lobby-uimod' && mode?.endsWith('-lobby-uimod')) mode = 'game-lobby-uimod';
+    const sanitizedMode = mode === 'unified'
+        ? 'overlay'
+        : (mode === 'default' ? 'default-optimized' : mode);
     console.log('[DynamicTheme] Enabling Dynamic Theme...');
     dynamicThemeDisabled = false;
     window.DYNAMIC_THEME_MODE = sanitizedMode;
@@ -1123,11 +3125,182 @@ window.enableDynamicTheme = function (mode = 'default') {
 (function () {
     injectBaseStyles();
     initPlayerUiObserver();
+    // --- GAME MODS: SPEED CONTROLLER (HT, DT) ---
+    function initSpeedMods() {
+        // Tanam CSS ke document.head
+        if (!document.getElementById('ts-speed-mods-style')) {
+            const style = document.createElement('style');
+            style.id = 'ts-speed-mods-style';
+            style.textContent = `
+                #ts-speed-mods-container {
+                    position: fixed;
+                    right: 32px;
+                    bottom: 100px; /* Melayang pas di atas player-bar */
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    z-index: 999999;
+                    background: rgba(0, 0, 0, 0.4);
+                    padding: 6px;
+                    border-radius: 12px;
+                    backdrop-filter: blur(12px);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+                }
+                .ts-mod-btn {
+                    background: rgba(255, 255, 255, 0.1);
+                    border: 1px solid rgba(255, 255, 255, 0.15);
+                    border-radius: 8px;
+                    color: rgba(255, 255, 255, 0.8);
+                    font-size: 11px;
+                    font-weight: bold;
+                    padding: 6px 12px;
+                    cursor: pointer;
+                    transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+                    outline: none;
+                }
+                .ts-mod-btn:hover { background: rgba(255, 255, 255, 0.25); color: #fff; }
+                .ts-mod-btn.active {
+                    background: var(--ts-game-accent, #ff70ab);
+                    border-color: transparent;
+                    color: #000;
+                    box-shadow: 0 0 16px color-mix(in srgb, var(--ts-game-accent, #ff70ab) 60%, transparent);
+                    transform: scale(1.05) translateY(-2px);
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        setInterval(() => {
+            if (document.getElementById('ts-speed-mods-container')) return;
+
+            const container = document.createElement('div');
+            container.id = 'ts-speed-mods-container';
+            container.innerHTML = `
+                <button class="ts-mod-btn" data-speed="0.75" title="Half Time">HT</button>
+                <button class="ts-mod-btn active" data-speed="1.0" title="Normal Speed">1X</button>
+                <button class="ts-mod-btn" data-speed="1.25" title="Double Time (Light)">DT-</button>
+                <button class="ts-mod-btn" data-speed="1.5" title="Double Time (Nightcore)">DT</button>
+            `;
+
+            // Pasang ke body secara langsung, bebas hambatan Polymer!
+            document.body.appendChild(container);
+
+            const btns = container.querySelectorAll('.ts-mod-btn');
+            let currentSpeed = 1.0;
+            const existingVideo = document.querySelector('video');
+            if (existingVideo) currentSpeed = existingVideo.playbackRate;
+
+            btns.forEach(b => {
+                b.classList.remove('active');
+                if (parseFloat(b.getAttribute('data-speed')) === currentSpeed) {
+                    b.classList.add('active');
+                }
+            });
+
+            function applySpeed() {
+                const video = document.querySelector('video');
+                if (video) video.playbackRate = currentSpeed;
+            }
+
+            btns.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    btns.forEach(b => b.classList.remove('active'));
+                    e.target.classList.add('active');
+                    currentSpeed = parseFloat(e.target.getAttribute('data-speed'));
+                    applySpeed();
+                });
+            });
+
+        }, 2000);
+
+        setInterval(() => {
+            const video = document.querySelector('video');
+            const modContainer = document.getElementById('ts-speed-mods-container');
+            if (!video || !modContainer) return;
+            
+            const activeBtn = modContainer.querySelector('.ts-mod-btn.active');
+            if (activeBtn) {
+                const intendedSpeed = parseFloat(activeBtn.getAttribute('data-speed'));
+                if (video.playbackRate !== intendedSpeed) {
+                    video.playbackRate = intendedSpeed;
+                }
+            }
+        }, 500);
+    }
+
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initObserver);
+        document.addEventListener('DOMContentLoaded', () => {
+            initObserver();
+            initSpeedMods();
+        });
     } else {
         initObserver();
+        initSpeedMods();
     }
+
+    // ── Parallax backdrop kursor (khusus mode Game Lobby) ─────────────────────
+    // Backdrop digerakkan dengan menulis `transform` LANGSUNG ke #ts-game-bg
+    // (satu elemen daun), bukan lewat CSS var di <body>. Menulis transform ke satu
+    // elemen daun + translate3d/will-change => murni di kompositor, NOL invalidasi
+    // style ke ribuan node app => benar-benar mulus tanpa stutter.
+    //
+    // Smoothing-nya exponential + framerate-independent (konsisten di 60/120/144Hz)
+    // dan dibuat RESPONSIF supaya backdrop langsung "menempel" ke kursor — sigap,
+    // tanpa rasa delay.
+    let pxTargetX = 0, pxTargetY = 0;   // target dari posisi kursor
+    let pxCurX = 0, pxCurY = 0;         // posisi teranimasi saat ini
+    let pxRunning = false;
+    let pxLastTs = 0;
+    let pxLastEl = null;
+
+    const PX_INTENSITY = 34;     // amplitudo geser maksimum (px)
+    const PX_RESPONSE = 0.024;   // laju catch-up per ms (makin besar = makin sigap)
+
+    function pxFrame(ts) {
+        const el = document.getElementById('ts-game-bg');
+        if (dynamicThemeDisabled || !el) { pxRunning = false; pxLastEl = null; return; }
+
+        // Elemen baru (mode baru diaktifkan) => mulai dari netral, tanpa lompatan.
+        if (el !== pxLastEl) { pxCurX = pxCurY = 0; pxLastEl = el; }
+
+        // dt di-clamp agar tidak melompat jauh saat tab kembali fokus / frame drop.
+        const dt = pxLastTs ? Math.min(ts - pxLastTs, 50) : 16.7;
+        pxLastTs = ts;
+
+        // Exponential smoothing yang stabil di refresh-rate berapa pun.
+        const a = 1 - Math.exp(-dt * PX_RESPONSE);
+        pxCurX += (pxTargetX - pxCurX) * a;
+        pxCurY += (pxTargetY - pxCurY) * a;
+
+        el.style.transform =
+            `scale(1.08) translate3d(${pxCurX.toFixed(2)}px, ${pxCurY.toFixed(2)}px, 0)`;
+
+        // Hentikan loop saat sudah praktis menempel di target (hemat CPU).
+        if (Math.abs(pxTargetX - pxCurX) < 0.06 && Math.abs(pxTargetY - pxCurY) < 0.06) {
+            pxRunning = false;
+        } else {
+            requestAnimationFrame(pxFrame);
+        }
+    }
+
+    document.addEventListener('mousemove', (e) => {
+        if (dynamicThemeDisabled) return;
+        // Parallax hanya relevan untuk backdrop mode Game Lobby.
+        if (!document.documentElement.classList.contains('ts-game-lobby-uimod')) return;
+
+        const xPos = (e.clientX / window.innerWidth) - 0.5;
+        const yPos = (e.clientY / window.innerHeight) - 0.5;
+
+        pxTargetX = -xPos * PX_INTENSITY;
+        pxTargetY = -yPos * PX_INTENSITY;
+
+        if (!pxRunning) {
+            pxRunning = true;
+            pxLastTs = 0; // reset timer agar dt frame pertama wajar
+            requestAnimationFrame(pxFrame);
+        }
+    }, { passive: true });
 
     // Marker for host-side injection guards
     try {

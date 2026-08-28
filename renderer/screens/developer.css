@@ -1,0 +1,16 @@
+﻿/* ============================ Dev Screen ================================= */
+/*------------------- developer screen -------------------------*/
+#developer-screen h2 {
+    font-size: 4rem;
+    font-weight: bold;
+    animation: fadeIn 2s ease forwards;
+}
+
+#developer-screen h4 {
+    font-size: 1.5rem;
+    margin-top: 10px;
+    animation: fadeIn 2s ease forwards;
+}
+
+/*------------------- end developer screen -------------------------*/
+/* ============================ End Dev Screen ================================= */

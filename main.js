@@ -6,7 +6,15 @@ const RPC = require('discord-rpc');
 const clientId = '1394882882220068924';
 
 let rpc = null;
-let rpcStartTime = null;           // Waktu kapan RPC berhasil terhubung
+// Waktu kapan RPC berhasil terhubung, sebagai ANGKA epoch-ms.
+// Dulu sebuah `Date`, dan itu selamat hanya karena `rpc.setActivity()` diam-diam
+// mengubahnya (`timestamps.start instanceof Date → getTime()`). Begitu payload
+// dirakit sendiri lewat `request('SET_ACTIVITY')`, konversi itu ikut hilang dan
+// Discord menolak SELURUH activity: `child "timestamps" ... must be a number`
+// (code 4000) — bukan cuma gambarnya yang hilang, seluruh status berhenti
+// diperbarui. Disimpan sebagai angka sejak awal supaya jebakan itu tak bisa
+// kembali lewat pemanggil mana pun.
+let rpcStartTime = null;
 let isRpcEnabled = false;          // Status fitur RPC (diaktifkan/dinonaktifkan oleh user)
 let isRpcReady = false;            // Status koneksi RPC (true hanya saat ready dan terhubung)
 let isRpcConnecting = false;       // Flag untuk mencegah koneksi ganda saat proses koneksi
@@ -68,6 +76,7 @@ function connectRPC() {
             cleanupRpcInstance();
             return;
         }
+        
         console.log('[RPC] Berhasil terhubung ke Discord.');
         isRpcConnecting = false;
         isRpcReady = true;
@@ -76,7 +85,7 @@ function connectRPC() {
             clearInterval(rpcRetryInterval);
             rpcRetryInterval = null;
         }
-        rpcStartTime = new Date();
+        rpcStartTime = Date.now();
 
         // Tentukan state awal berdasarkan mode
         let detailsText = 'Di Menu Utama';
@@ -89,8 +98,7 @@ function connectRPC() {
             detailsText = 'GAP Free GIF overlay!';
             stateText = 'Mengatur Overlay';
         } else {
-            // mode game
-            detailsText = 'GAP VN & Music Player'; // Sesuai prompt user: "judulnya ... akan seperti biasa GAP VN & Music Player"
+            detailsText = 'GAP VN & Music Player';
             stateText = 'Di Menu Utama';
         }
 
@@ -119,12 +127,13 @@ function connectRPC() {
             cleanupRpcInstance();
             return;
         }
+        
         console.error('[RPC] Gagal login, akan mencoba lagi.', err.message);
         setupRpcRetry();
     });
 }
 
-// helper untuk cleanup instance RPC tanpa trigger event
+// Fungsi helper untuk cleanup instance RPC tanpa trigger event
 function cleanupRpcInstance() {
     if (rpc) {
         try {
@@ -178,12 +187,20 @@ function destroyRPC(isDisablingFeature = true) {
         rpcRetryInterval = null;
         console.log('[RPC] Retry interval dibersihkan.');
     }
+
+    // Bersihkan throttle SET_ACTIVITY (cegah pending send lama menyala setelah re-enable)
+    if (pendingRpcTimer) {
+        clearTimeout(pendingRpcTimer);
+        pendingRpcTimer = null;
+    }
+    pendingRpcSend = null;
+    lastMusicRpcSig = null;
     
     // isRpcEnabled diubah segera jika fitur dinonaktifkan (mencegah retry baru)
     if (isDisablingFeature) {
         isRpcEnabled = false;
     }
-        
+    
     // Reset flag koneksi
     isRpcConnecting = false;
     
@@ -226,45 +243,200 @@ function destroyRPC(isDisablingFeature = true) {
     }
 }
 
+// Hanya URL http(s) publik yang valid untuk Discord large_image (di-proxy jadi mp:external/...).
+// Tolak data:, blob:, file:, path lokal, dan placeholder gstatic → biar fallback ke 'main_icon'.
+function sanitizeRpcLargeImage(value) {
+    if (typeof value !== 'string' || !value) return null;
+    if (!/^https?:\/\//i.test(value)) return null;          // buang data:/lokal/relatif
+    if (value.includes('gstatic.com')) return null;          // placeholder YTM
+    // Perbesar thumbnail googleusercontent (mis. =w60-h60-...) jadi kotak besar
+    return value.replace(/=w\d+-h\d+[^/]*$/i, '=w512-h512');
+}
+
+// Dedup untuk mode musik: hindari spam SET_ACTIVITY (Discord membatasi ~5 update / 20 detik).
+// Saat memutar normal, progress bar berjalan sendiri di sisi client; kita hanya perlu update
+// ketika lagu/artis/play-pause/gambar berubah atau saat user seek (lompatan waktu).
+let lastMusicRpcSig = null;
+let lastMusicRpcStart = 0;
+
+// ===== Throttle global SET_ACTIVITY =====
+// Discord menolak update yang terlalu sering dengan "code 1000 Unknown Error".
+// Sumber utama spam: saat lagu masih loading, webview mengirim judul 'Unknown Title'
+// setiap 1 dtk → jalur idle di bawah ikut terkirim tiap detik → kena rate-limit, lalu
+// update lagu yang sebenarnya pun ditolak → judul nyangkut di "Idle".
+// Solusi: batasi minimal 1 kirim / RPC_MIN_INTERVAL_MS dengan "trailing edge" — payload
+// TERBARU selalu dikirim setelah cooldown, jadi begitu judul asli tiba ia tetap ikut terkirim.
+const RPC_MIN_INTERVAL_MS = 4000;
+let lastRpcSentAt = 0;
+let pendingRpcSend = null;     // fungsi kirim TERBARU yang menunggu cooldown
+let pendingRpcTimer = null;
+
+function scheduleRpcSend(sendFn) {
+    const elapsed = Date.now() - lastRpcSentAt;
+    if (elapsed >= RPC_MIN_INTERVAL_MS) {
+        lastRpcSentAt = Date.now();
+        sendFn();
+        return;
+    }
+    // Masih dalam cooldown → simpan HANYA yang terbaru, kirim di akhir cooldown.
+    pendingRpcSend = sendFn;
+    if (!pendingRpcTimer) {
+        pendingRpcTimer = setTimeout(() => {
+            pendingRpcTimer = null;
+            const fn = pendingRpcSend;
+            pendingRpcSend = null;
+            if (fn && rpc && isRpcEnabled && isRpcReady) {
+                lastRpcSentAt = Date.now();
+                fn();
+            }
+        }, RPC_MIN_INTERVAL_MS - elapsed);
+    }
+}
+
 function updateRpcActivity(data) {
     // Cek semua kondisi sebelum update
     if (!rpc || !isRpcEnabled || !isRpcReady) {
         return;
     }
 
-    const { details, state, largeImageKey, smallImageKey, smallImageText, songTitle, songArtist } = data;
+    const {
+        details, state, largeImageKey, smallImageKey, smallImageText,
+        songTitle, songArtist, album, currentTime, duration, isPlaying
+    } = data;
 
-    const payload = {
+    const cleanLargeImage = sanitizeRpcLargeImage(largeImageKey);
+
+    // Anggap "lagu nyata" hanya jika judul valid (hindari placeholder tampil sebagai lagu)
+    const isRealSong = songTitle && songTitle !== 'Loading...' && songTitle !== 'Unknown Title';
+
+    // Update yang berasal dari mode musik SELALU membawa `songTitle` (string), sedangkan
+    // idle/menu/VN membawa `details` tanpa `songTitle`. Saat lagu sedang loading/berganti,
+    // webview sempat mengirim judul placeholder ('Unknown Title'/'Loading...') tiap detik.
+    // Dulu ini memaksa RPC balik ke "Idle" lalu nyangkut di sana. Sekarang: ABAIKAN glitch
+    // sesaat itu dan tahan state lagu terakhir. (Perpindahan ke menu/VN tetap mengirim
+    // `details` tanpa `songTitle`, jadi pembersihan ke idle yang sah tetap jalan.)
+    const isSongUpdate = typeof songTitle === 'string';
+    if (isSongUpdate && !isRealSong) {
+        return;
+    }
+
+    // ===== Mode musik: tampil sebagai "Listening to ..." (type 2) + progress bar, ala =====
+    if (isRealSong) {
+        // Hitung timestamp progress bar (hanya saat memutar & durasi valid)
+        let startMs = 0;
+        let hasBar = false;
+        if (isPlaying && Number(duration) > 0) {
+            startMs = Date.now() - Math.round(Number(currentTime || 0) * 1000);
+            hasBar = true;
+        }
+
+        // Baris artis + penanda jeda yang jelas
+        const artistLine = songArtist ? `oleh ${songArtist}` : 'Artis tidak diketahui';
+        const stateLine = isPlaying ? artistLine : `⏸ Dijeda · ${songArtist || 'Artis tidak diketahui'}`;
+
+        // Lewati update berulang yang tidak penting (anti rate-limit).
+        const sig = `${songTitle}||${songArtist || ''}||${album || ''}||${isPlaying ? 1 : 0}||${cleanLargeImage || ''}`;
+        const startClose = Math.abs(startMs - lastMusicRpcStart) < 2500; // <2.5s = progres normal, bukan seek
+        if (sig === lastMusicRpcSig && (!hasBar || startClose)) {
+            return;
+        }
+
+        const activity = {
+            type: 2, // ActivityType.LISTENING → header jadi "Listening to <nama app>"
+            details: songTitle,
+            state: stateLine,
+            assets: {
+                large_image: cleanLargeImage || 'main_icon',
+                large_text: album || songTitle,  // hover tampilkan album (fallback ke judul)
+                small_image: smallImageKey || (isPlaying ? 'play_icon' : 'pause_icon'),
+                small_text: smallImageText || (isPlaying ? 'Memutar' : 'Dijeda')
+            },
+            buttons: [
+                { label: 'Cobain aplikasinya?', url: 'https://github.com/Rin-chocomint' }
+            ],
+            instance: false
+        };
+
+        if (hasBar) {
+            activity.timestamps = { start: startMs, end: startMs + Math.round(Number(duration) * 1000) };
+        }
+
+        // discord-rpc v4 setActivity() tidak mengirim field `type`, jadi pakai request() mentah.
+        // PENTING: signature dedup baru di-"commit" SETELAH kirim sukses. Kalau gagal
+        // (mis. rate-limit "code 1000"), sig dibiarkan apa adanya supaya update berikutnya
+        // dengan lagu yang sama TIDAK ter-dedup → judul tidak nyangkut di "Idle".
+        scheduleRpcSend(() => {
+            rpc.request('SET_ACTIVITY', { pid: process.pid, activity })
+                .then(() => {
+                    lastMusicRpcSig = sig;
+                    lastMusicRpcStart = startMs;
+                })
+                .catch(err => {
+                    console.error('[RPC] Gagal mengatur aktivitas musik: ', err);
+                    if (err.message && err.message.includes('Could not connect')) {
+                        setupRpcRetry();
+                    }
+                });
+        });
+        return;
+    }
+
+    // ===== Mode non-musik (menu utama / VN): tetap "Playing" seperti semula =====
+    lastMusicRpcSig = null; // reset agar musik berikutnya pasti dikirim ulang
+
+    // BENTUKNYA DISAMAKAN DENGAN JALUR MUSIK, dan itu bukan kerapian.
+    //
+    // Gejala yang melahirkan perubahan ini: cover musik (URL http) TAMPIL di
+    // Discord, sementara gambar novel dengan URL sejenis tampil sebagai ikon
+    // kosong. Keduanya melewati `sanitizeRpcLargeImage()` yang sama dan sama-sama
+    // berakhir di `assets.large_image`, jadi bedanya hanya bisa ada di BENTUK
+    // activity-nya. Yang berbeda tinggal tiga: `type`, ada/tidaknya `small_image`,
+    // dan `timestamps` yang di sini selalu ada.
+    //
+    // `rpc.setActivity()` sendiri bukan tersangka — di discord-rpc v4 ia hanya
+    // memetakan largeImageKey → assets.large_image lalu memanggil request()
+    // SET_ACTIVITY yang sama persis. Yang dilakukan di sini adalah menghapus
+    // ketiga perbedaan sisanya supaya jalur yang TERBUKTI jalan dan jalur ini
+    // benar-benar sebangun, dan `type` ditulis eksplisit (0 = Playing) alih-alih
+    // dibiarkan kosong.
+    const largeText = 'Aplikasi visual novel & pemutar musik — Alpha v0.0.0.9';
+    const activity = {
+        type: 0, // Playing
         details: details || 'Idle',
         state: state,
-        startTimestamp: rpcStartTime,
-        largeImageKey: largeImageKey || 'main_icon',
-        largeImageText: 'Eksperimental Aplikasi visual novel & pemutar musik | Tahap Alpha v0.0.0.8 | cobain sekarang Aplikasinya download di github ',
-        instance: false,
+        // Dipaksa jadi angka DI SINI juga, bukan hanya di sumbernya. Kegagalannya
+        // total (Discord menolak seluruh activity, status berhenti diperbarui) dan
+        // senyap dari sisi pengguna, jadi satu baris penjaga jauh lebih murah
+        // daripada mengandalkan setiap pemanggil menaruh tipe yang benar.
+        timestamps: { start: Number(rpcStartTime) || Date.now() },
+        assets: {
+            large_image: cleanLargeImage || 'main_icon',
+            large_text: largeText,
+            // Discord menolak small_text KOSONG saat small_image ada
+            // (menyumbang "code 1000"), jadi keduanya selalu berpasangan.
+            small_image: smallImageKey || 'main_icon',
+            small_text: smallImageText || 'GAP VN Player'
+        },
         buttons: [
-            {
-                label: '>//',
-                url: 'https://github.com/Rin-chocomint'
-            }
-        ]
+            { label: 'Cobain aplikasinya?', url: 'https://github.com/Rin-chocomint' }
+        ],
+        instance: false
     };
 
-    if (smallImageKey) {
-        payload.smallImageKey = smallImageKey;
-        payload.smallImageText = smallImageText || '';
-    }
-
-    // Jika sedang memutar musik, buat format yang lebih bagus
-    if (songTitle) {
-        payload.details = `🎵 Mendengarkan: ${songTitle}`;
-        payload.state = `🎤 oleh ${songArtist || 'Tidak diketahui'}`;
-    }
-
-    rpc.setActivity(payload).catch(err => {
-        console.error("[RPC] Gagal mengatur aktivitas: ", err);
-        if (err.message.includes('Could not connect')) {
-            setupRpcRetry();
-        }
+    scheduleRpcSend(() => {
+        rpc.request('SET_ACTIVITY', { pid: process.pid, activity })
+            .then(() => {
+                // Dicatat supaya kegagalan "gambar tidak muncul" bisa dibedakan dari
+                // "payload tidak pernah terkirim" tanpa menebak-nebak.
+                console.log('[RPC] Aktivitas terkirim. large_image =', activity.assets.large_image);
+            })
+            .catch(err => {
+                console.error('[RPC] Gagal mengatur aktivitas: ', err);
+                console.error('[RPC] Payload yang ditolak:', JSON.stringify(activity));
+                if (err.message && err.message.includes('Could not connect')) {
+                    setupRpcRetry();
+                }
+            });
     });
 }
 
@@ -272,9 +444,211 @@ function updateRpcActivity(data) {
 // main.js (Aplikasi Utama)
 //-------------------------------------
 const { app, BrowserWindow, BrowserView, ipcMain, session, screen, dialog, globalShortcut } = require('electron');
+const {
+    createGeometry: createGifOverlayGeometry,
+    moveGeometry: moveGifOverlayGeometry,
+    resizeGeometry: resizeGifOverlayGeometry,
+    hasSizeDrift: hasGifOverlaySizeDrift,
+    geometryCenter: getGifOverlayGeometryCenter
+} = require('./gif-overlay-geometry');
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+
+// =====================================================================
+// [LOGIN-FIX] Dukungan popup login YouTube Music / Google di dalam <webview>
+// ---------------------------------------------------------------------
+// PELAJARAN PENTING (jangan diulang): JANGAN menyamarkan User-Agent webview.
+//   Memanggil contents.setUserAgent('...Chrome...') HANYA mengubah string UA,
+//   TANPA mengubah Client Hints (Sec-CH-UA) milik Electron. Akibatnya UA dan
+//   Client-Hints jadi TIDAK COCOK, dan justru itu yang membuat Google menolak
+//   login: "Browser atau aplikasi ini mungkin tidak aman"
+//   (accounts.google.com/v3/signin/rejected).
+//   UA DEFAULT Electron bersifat konsisten dan SUDAH diterima Google, jadi
+//   biarkan apa adanya. (Percobaan spoof UA pada 2026-06 menyebabkan regresi.)
+//
+// Yang AMAN & tetap berguna (tidak mengubah alur login satu-halaman yang
+// selama ini sudah berhasil):
+//   - allowpopups (index.html) + setWindowOpenHandler di bawah: agar alur
+//     login yang memakai window.open (popup) tidak diblokir diam-diam.
+//   - Event lama webContents.on('new-window') (main.js:5130) sudah DIHAPUS
+//     sejak Electron 22 (project ini Electron 33); penggantinya di sini.
+// =====================================================================
+function gapIsAuthPopupUrl(url) {
+    if (!url) return false;
+    return /accounts\.google\.com|accounts\.youtube\.com|\/signin|ServiceLogin|gsi\/|o\/oauth2|consent/i.test(url);
+}
+function gapIsYtMusicUrl(url) {
+    return /(^|\/\/)music\.youtube\.com/i.test(url || '');
+}
+
+// =====================================================================
+// [LOGIN-DEADLINE] Lacak satu percobaan login: klik tombol -> navigasi ->
+// halaman login selesai dimuat. Bila ada yang macet, peringatkan user.
+// Alur:
+//   (renderer) preload mendeteksi klik a.sign-in-link -> kirim ke main via
+//   ipc 'webview-login-clicked'. Main lalu memasang dua deadline:
+//     1. NAV  : apakah webview MULAI menuju alamat login? (klik tak bereaksi)
+//     2. LOAD : setelah mulai, apakah halaman login SELESAI dimuat?
+//   Navigasi/popup dipantau dari listener webContents <webview> di bawah.
+// =====================================================================
+const gapLogin = {
+    phase: 'idle',     // idle | clicked | navigating | loaded | failed
+    clickAt: 0,
+    target: '',
+    embedder: null,    // webContents pengirim klik (untuk balas notifikasi)
+    navTimer: null,
+    loadTimer: null
+};
+const GAP_NAV_DEADLINE_MS = 6000;    // klik -> webview MULAI menuju login
+const GAP_LOAD_DEADLINE_MS = 15000;  // mulai login -> halaman login selesai dimuat
+
+function gapLoginNotify(kind, extra) {
+    const payload = Object.assign({ kind }, extra || {});
+    console.warn('[Login Deadline] ANOMALI:', JSON.stringify(payload));
+    try {
+        if (gapLogin.embedder && !gapLogin.embedder.isDestroyed()) {
+            gapLogin.embedder.send('login-network-anomaly', payload);
+        }
+    } catch (e) { /* abaikan */ }
+}
+
+function gapLoginClearTimers() {
+    clearTimeout(gapLogin.navTimer);
+    clearTimeout(gapLogin.loadTimer);
+}
+
+// Log ke console main DAN diteruskan ke host (panel di native-player.html /
+// index.html) lewat channel 'login-debug-log', supaya user tanpa DevTools
+// tetap bisa membaca log diagnosa login.
+function gapSendDebug(level, line, contents) {
+    if (level === 'warn') console.warn(line); else console.log(line);
+    try {
+        const host = (contents && contents.hostWebContents) || gapLogin.embedder;
+        if (host && !host.isDestroyed()) host.send('login-debug-log', { level, line, time: Date.now() });
+    } catch (e) { /* abaikan */ }
+}
+
+// Dipanggil saat navigasi/popup menuju halaman auth benar-benar DIMULAI.
+function gapLoginOnAuthNavStarted(via) {
+    // Hanya relevan bila ada klik login baru-baru ini (<= 12 dtk).
+    if (gapLogin.phase !== 'clicked' || (Date.now() - gapLogin.clickAt) > 12000) return;
+    gapLogin.phase = 'navigating';
+    clearTimeout(gapLogin.navTimer);
+    gapSendDebug('info', `[Login Deadline] Webview MULAI menuju halaman login (${via}). Memantau durasi pemuatan...`);
+    gapLogin.loadTimer = setTimeout(() => {
+        if (gapLogin.phase === 'navigating') {
+            gapSendDebug('warn', '[Login Deadline] Halaman login dimulai tapi BELUM selesai dimuat dalam 15 dtk.');
+            gapLoginNotify('slow-auth-load', { target: gapLogin.target, suspect: 'network-provider' });
+        }
+    }, GAP_LOAD_DEADLINE_MS);
+}
+
+// Dipanggil saat halaman auth SELESAI dimuat.
+function gapLoginOnAuthLoaded(url) {
+    if (gapLogin.phase !== 'navigating') return;
+    gapLogin.phase = 'loaded';
+    clearTimeout(gapLogin.loadTimer);
+    gapSendDebug('info', `[Login Deadline] Halaman login SELESAI dimuat: ${url}`);
+}
+
+ipcMain.on('webview-login-clicked', (event, data) => {
+    gapLoginClearTimers();
+    gapLogin.phase = 'clicked';
+    gapLogin.clickAt = Date.now();
+    gapLogin.target = (data && data.target) || '';
+    gapLogin.embedder = event.sender;
+    gapSendDebug('info', `[Login Deadline] Tombol Login DITEKAN. Target: ${gapLogin.target || '(tak diketahui)'}`);
+
+    // Deadline 1: apakah webview benar-benar MULAI menuju alamat login?
+    gapLogin.navTimer = setTimeout(() => {
+        if (gapLogin.phase === 'clicked') {
+            gapSendDebug('warn', '[Login Deadline] Klik login TIDAK memicu navigasi/popup apa pun dalam 6 dtk.');
+            gapLoginNotify('no-navigation-after-click', { target: gapLogin.target });
+            gapLogin.phase = 'idle';
+        }
+    }, GAP_NAV_DEADLINE_MS);
+});
+
+app.on('web-contents-created', (event, contents) => {
+    // Hanya tangani konten dari <webview> (guest YT Music), bukan window utama.
+    if (contents.getType() !== 'webview') return;
+
+    // CATATAN: SENGAJA tidak memanggil contents.setUserAgent(...) di sini.
+    // Biarkan UA default Electron (konsisten dengan Client Hints) agar Google
+    // tidak menolak login. Lihat blok pelajaran di atas.
+
+    // --- LOG: ke mana pun webview bernavigasi (sorot saat KELUAR dari YTM) ---
+    contents.on('did-start-navigation', (e, url, isInPlace, isMainFrame) => {
+        if (!isMainFrame) return;
+        const tag = gapIsAuthPopupUrl(url) ? '  [-> LOGIN GOOGLE]'
+            : (!gapIsYtMusicUrl(url) && !/^about:/.test(url)) ? '  [KELUAR dari YT Music]' : '';
+        gapSendDebug('info', `[Webview Nav] start    -> ${url}${tag}`, contents);
+        if (gapIsAuthPopupUrl(url)) gapLoginOnAuthNavStarted('navigasi-halaman');
+    });
+    contents.on('did-navigate', (e, url) => {
+        gapSendDebug('info', `[Webview Nav] navigated-> ${url}`, contents);
+    });
+    contents.on('did-navigate-in-page', (e, url, isMainFrame) => {
+        if (isMainFrame) gapSendDebug('info', `[Webview Nav] in-page  -> ${url}`, contents);
+    });
+    contents.on('did-stop-loading', () => {
+        const u = contents.getURL();
+        gapSendDebug('info', `[Webview Nav] stop     @ ${u}`, contents);
+        if (gapIsAuthPopupUrl(u)) gapLoginOnAuthLoaded(u);
+    });
+    contents.on('did-fail-load', (e, code, desc, validatedURL, isMainFrame) => {
+        if (!isMainFrame) return;
+        gapSendDebug('warn', `[Webview Nav] FAIL (${code} ${desc}) @ ${validatedURL}`, contents);
+        if (gapIsAuthPopupUrl(validatedURL)) {
+            gapLoginClearTimers();
+            gapLogin.phase = 'failed';
+            gapLoginNotify('auth-load-failed', { errorCode: code, errorDesc: desc, url: validatedURL, suspect: 'network-provider' });
+        }
+    });
+
+    // --- Popup (window.open) dari halaman login agar tidak diblokir senyap ---
+    contents.setWindowOpenHandler(({ url }) => {
+        if (gapIsAuthPopupUrl(url)) {
+            gapSendDebug('info', `[LOGIN-FIX] Mengizinkan popup login Google: ${url}`, contents);
+            gapLoginOnAuthNavStarted('popup'); // klik -> popup = aksi navigasi terjadi
+            return {
+                action: 'allow',
+                overrideBrowserWindowOptions: {
+                    width: 500,
+                    height: 650,
+                    autoHideMenuBar: true,
+                    webPreferences: { nodeIntegration: false, contextIsolation: true }
+                }
+            };
+        }
+        // URL non-login (mis. link "Privacy"/"Terms") -> buka di browser sistem.
+        gapSendDebug('info', `[LOGIN-FIX] Membuka URL eksternal dari webview: ${url}`, contents);
+        require('electron').shell.openExternal(url);
+        return { action: 'deny' };
+    });
+
+    // --- Pantau pemuatan jendela POPUP login (load-nya di webContents popup) ---
+    contents.on('did-create-window', (win, details) => {
+        const startUrl = (details && details.url) || (win.webContents && win.webContents.getURL()) || '';
+        gapSendDebug('info', `[Webview Nav] popup window dibuat -> ${startUrl}`, contents);
+        const wc = win.webContents;
+        wc.on('did-stop-loading', () => {
+            const u = wc.getURL();
+            gapSendDebug('info', `[Webview Nav] (popup) stop @ ${u}`, contents);
+            if (gapIsAuthPopupUrl(u)) gapLoginOnAuthLoaded(u);
+        });
+        wc.on('did-fail-load', (e, code, desc, validatedURL, isMainFrame) => {
+            if (!isMainFrame) return;
+            gapSendDebug('warn', `[Webview Nav] (popup) FAIL (${code} ${desc}) @ ${validatedURL}`, contents);
+            if (gapIsAuthPopupUrl(validatedURL)) {
+                gapLoginClearTimers();
+                gapLogin.phase = 'failed';
+                gapLoginNotify('auth-load-failed', { errorCode: code, errorDesc: desc, url: validatedURL, suspect: 'network-provider' });
+            }
+        });
+    });
+});
 
 // IPC handler global untuk update activity dari renderer (dipakai di semua mode)
 ipcMain.on('update-rpc-activity', (event, data) => {
@@ -304,6 +678,13 @@ const musicDirectory = path.join(__dirname, 'aset', 'music');
 const wallpaperDirectory = path.join(__dirname, 'aset', 'wallpaper');
 const visualNovelsDirectory = path.join(__dirname, 'aset', 'game', 'visual_novels');
 
+// Inisialisasi VN Engine modular (Rin.js)
+const vnEngine = require('./vn-engine');
+const updater = require('./vn-engine/updater');
+const { normalizeScript, validateNovelMeta } = require('./vn-engine/schema-validator');
+// Init dilakukan setelah versionsManifest dimuat (baris bawah)
+// Lihat: vnEngine.initVNEngine() call di bawah
+
 // ======================== Integrity Check & Novel Security Module ======================== //
 const crypto = require('crypto');
 
@@ -317,6 +698,24 @@ try {
     }
 } catch (e) {
     console.error('[Integrity] Failed to load versions.json:', e.message);
+}
+
+// Inisialisasi sistem update (Tier-1 per-file dari GitHub).
+// IPC handler didaftarkan sekali; pengecekan dipicu saat boot native/gif
+// atau manual dari Settings (game mode).
+try {
+    updater.initUpdater({
+        app,
+        ipcMain,
+        BrowserWindow,
+        dialog,
+        shell: require('electron').shell,
+        appDir: __dirname,
+        getMainWindow: () => mainWindow,
+        localManifest: versionsManifest || {}
+    });
+} catch (e) {
+    console.error('[Updater] Gagal inisialisasi modul updater:', e.message);
 }
 
 // Menghitung hash SHA-256 dari file
@@ -369,271 +768,7 @@ function checkCoreIntegrity() {
     return { checked: true, results };
 }
 
-// ======================== Novel Content Security Scanner ======================== //
-
-// Pattern untuk mendeteksi kode berbahaya/mencurigakan
-const DANGEROUS_PATTERNS = {
-    // JavaScript execution
-    evalUsage: /\beval\s*\(/gi,
-    functionConstructor: /new\s+Function\s*\(/gi,
-
-    // Inline script tags dalam HTML strings
-    scriptTags: /<script[\s\S]*?>[\s\S]*?<\/script>/gi,
-
-    // Event handlers yang mungkin berbahaya
-    onEventHandlers: /\bon(click|load|error|mouseover|focus)\s*=/gi,
-
-    // External resource loading
-    externalUrls: /https?:\/\/[^\s"'<>]+/gi,
-
-    // Node.js/Electron specific
-    requireUsage: /\brequire\s*\(\s*['"][^'"]+['"]\s*\)/gi,
-    ipcUsage: /ipcRenderer|ipcMain/gi,
-
-    // File system access
-    fsAccess: /\bfs\.(read|write|unlink|rmdir)/gi,
-
-    // Shell execution
-    shellExec: /child_process|exec\(|spawn\(/gi
-};
-
-// Scan konten script.json untuk mendeteksi kode mencurigakan dan external URLs
-function scanNovelScript(scriptPath) {
-    const warnings = {
-        hasCustomJs: false,
-        hasDangerousCode: false,
-        hasExternalUrls: false,
-        externalUrls: [],
-        dangerousPatterns: [],
-        details: []
-    };
-
-    try {
-        if (!fs.existsSync(scriptPath)) {
-            return { error: 'Script not found', warnings };
-        }
-
-        const content = fs.readFileSync(scriptPath, 'utf-8');
-        const script = JSON.parse(content);
-
-        // Scan setiap entry di script
-        script.forEach((entry, index) => {
-            const entryStr = JSON.stringify(entry);
-
-            // Cek eval dan Function constructor
-            if (DANGEROUS_PATTERNS.evalUsage.test(entryStr)) {
-                warnings.hasDangerousCode = true;
-                warnings.dangerousPatterns.push({ type: 'eval', index });
-            }
-            DANGEROUS_PATTERNS.evalUsage.lastIndex = 0;
-
-            if (DANGEROUS_PATTERNS.functionConstructor.test(entryStr)) {
-                warnings.hasDangerousCode = true;
-                warnings.dangerousPatterns.push({
-                    type: 'Function constructor',
-                    index,
-                    entryType: entry.type || 'unknown'
-                });
-            }
-            DANGEROUS_PATTERNS.functionConstructor.lastIndex = 0;
-
-            // Cek script tags
-            if (DANGEROUS_PATTERNS.scriptTags.test(entryStr)) {
-                warnings.hasCustomJs = true;
-                const scriptMatch = entryStr.match(DANGEROUS_PATTERNS.scriptTags);
-                warnings.details.push({
-                    type: 'script_tag',
-                    index,
-                    entryType: entry.type || 'unknown',
-                    property: entry.customHtml ? 'customHtml' : (entry.htmlContent ? 'htmlContent' : 'unknown'),
-                    preview: scriptMatch ? scriptMatch[0].substring(0, 50) + '...' : null
-                });
-            }
-            DANGEROUS_PATTERNS.scriptTags.lastIndex = 0;
-
-            // Cek require usage
-            if (DANGEROUS_PATTERNS.requireUsage.test(entryStr)) {
-                warnings.hasDangerousCode = true;
-                warnings.dangerousPatterns.push({
-                    type: 'require()',
-                    index,
-                    entryType: entry.type || 'unknown'
-                });
-            }
-            DANGEROUS_PATTERNS.requireUsage.lastIndex = 0;
-
-            // Cek shell execution
-            if (DANGEROUS_PATTERNS.shellExec.test(entryStr)) {
-                warnings.hasDangerousCode = true;
-                warnings.dangerousPatterns.push({
-                    type: 'shell execution',
-                    index,
-                    entryType: entry.type || 'unknown'
-                });
-            }
-            DANGEROUS_PATTERNS.shellExec.lastIndex = 0;
-
-            // Cek external URLs
-            const urlMatches = entryStr.match(DANGEROUS_PATTERNS.externalUrls);
-            if (urlMatches) {
-                // Filter trusted domains
-                const trustedDomains = versionsManifest?.security?.trustedDomains || [];
-                urlMatches.forEach(url => {
-                    const isTrusted = trustedDomains.some(domain => url.includes(domain));
-                    if (!isTrusted) {
-                        warnings.hasExternalUrls = true;
-                        if (!warnings.externalUrls.includes(url)) {
-                            warnings.externalUrls.push(url);
-                        }
-                    }
-                });
-            }
-
-            // Cek apakah entry memiliki specialEvent dengan JS custom
-            if (entry.specialEvent) {
-                const seStr = JSON.stringify(entry.specialEvent);
-                if (seStr.includes('eval') || seStr.includes('Function(') ||
-                    seStr.includes('<script') || seStr.includes('javascript:')) {
-                    warnings.hasCustomJs = true;
-                    warnings.details.push({
-                        type: 'special_event_js',
-                        index,
-                        entryType: entry.type || 'unknown',
-                        property: 'specialEvent',
-                        eventType: entry.specialEvent.type || 'unknown'
-                    });
-                }
-            }
-
-            // Cek properti customHtml
-            if (entry.customHtml) {
-                warnings.hasCustomJs = true;
-                warnings.details.push({
-                    type: 'custom_html',
-                    index,
-                    entryType: entry.type || 'unknown',
-                    property: 'customHtml',
-                    preview: entry.customHtml.substring(0, 50) + (entry.customHtml.length > 50 ? '...' : '')
-                });
-            }
-
-            // Cek properti htmlContent
-            if (entry.htmlContent) {
-                warnings.hasCustomJs = true;
-                warnings.details.push({
-                    type: 'html_content',
-                    index,
-                    entryType: entry.type || 'unknown',
-                    property: 'htmlContent',
-                    preview: entry.htmlContent.substring(0, 50) + (entry.htmlContent.length > 50 ? '...' : '')
-                });
-            }
-
-            // Cek properti externalResource
-            if (entry.externalResource) {
-                warnings.hasExternalUrls = true;
-                if (!warnings.externalUrls.includes(entry.externalResource)) {
-                    warnings.externalUrls.push(entry.externalResource);
-                }
-                warnings.details.push({
-                    type: 'external_resource',
-                    index,
-                    entryType: entry.type || 'unknown',
-                    property: 'externalResource',
-                    url: entry.externalResource
-                });
-            }
-        });
-    } catch (e) {
-        console.error(`[Security] Error scanning script ${scriptPath}:`, e.message);
-        warnings.error = e.message;
-    }
-
-    return warnings;
-}
-
-// Scan seluruh folder novel untuk index.html yang mungkin dimodifikasi
-function scanNovelFolder(novelPath) {
-    const warnings = {
-        modifiedIndexHtml: false,
-        externalResources: [],
-        customScripts: []
-    };
-
-    try {
-        // Cek file index.html di dalam folder chapter
-        const chapters = fs.readdirSync(novelPath);
-        chapters.forEach(chapter => {
-            const chapterPath = path.join(novelPath, chapter);
-            if (fs.statSync(chapterPath).isDirectory()) {
-                const indexPath = path.join(chapterPath, 'index.html');
-                if (fs.existsSync(indexPath)) {
-                    const content = fs.readFileSync(indexPath, 'utf-8');
-
-                    // Periksa skrip atau sumber daya eksternal
-                    const srcMatches = content.match(/src\s*=\s*["']https?:\/\/[^"']+["']/gi);
-                    if (srcMatches) {
-                        const trustedDomains = versionsManifest?.security?.trustedDomains || [];
-                        srcMatches.forEach(match => {
-                            const url = match.replace(/src\s*=\s*["']/i, '').replace(/["']$/, '');
-                            const isTrusted = trustedDomains.some(domain => url.includes(domain));
-                            if (!isTrusted && !warnings.externalResources.includes(url)) {
-                                warnings.externalResources.push(url);
-                            }
-                        });
-                    }
-
-                    // Periksa skrip inline
-                    const scriptMatches = content.match(/<script[\s\S]*?>[\s\S]*?<\/script>/gi);
-                    if (scriptMatches) {
-                        scriptMatches.forEach(script => {
-                            // Abaikan skrip kosong atau pola yang udah dianggap aman
-                            if (script.includes('ipcRenderer') && !script.includes('eval')) {
-                                // Kayaknya ini skrip boilerplate bawaan player VN
-                            } else if (script.length > 100) {
-                                warnings.customScripts.push({
-                                    chapter,
-                                    preview: script.substring(0, 200) + '...'
-                                });
-                            }
-                        });
-                    }
-                }
-            }
-        });
-
-    } catch (e) {
-        console.error(`[Security] Error scanning novel folder ${novelPath}:`, e.message);
-    }
-
-    return warnings;
-}
-
-// IPC untuk scan novel sebelum dimainkan
-ipcMain.handle('security:scan-novel', async (event, { storyTitle, chapter }) => {
-    const novelPath = path.join(visualNovelsDirectory, storyTitle);
-    const scriptPath = path.join(novelPath, chapter, 'script.json');
-
-    console.log(`[Security] Scanning novel: ${storyTitle} / ${chapter}`);
-
-    const scriptWarnings = scanNovelScript(scriptPath);
-    const folderWarnings = scanNovelFolder(novelPath);
-
-    const result = {
-        storyTitle,
-        chapter,
-        hasSecurityConcerns: scriptWarnings.hasCustomJs ||
-            scriptWarnings.hasDangerousCode ||
-            scriptWarnings.hasExternalUrls ||
-            folderWarnings.externalResources.length > 0,
-        script: scriptWarnings,
-        folder: folderWarnings,
-        timestamp: new Date().toISOString()
-    };
-
-    console.log('[Security] Scan result:', JSON.stringify(result, null, 2));
-    return result;
-});
+// ============ Novel Content Security Scanner (dipindah ke vn-engine/security-scanner.js) ============ //
 
 // Handler IPC untuk mengecek integritas core files
 ipcMain.handle('integrity:check-core', async () => {
@@ -646,6 +781,20 @@ ipcMain.handle('integrity:get-versions', async () => {
 });
 
 // ======================== Akhir Integrity Check & Novel Security Module ======================== //
+
+// Inisialisasi VN Engine — registrasi semua IPC handler
+// mainWindow diakses via getter saat runtime, jadi aman dipanggil sebelum window dibuat
+vnEngine.initVNEngine({
+    getMainWindow: () => mainWindow,
+    ipcMain,
+    visualNovelsDirectory,
+    appDir: __dirname,
+    updateRpcActivity,
+    versionsManifest,
+    // UX-B07: diagnostics tingkat-proses butuh `app` — userData untuk laporan
+    // lintas sesi, dan web-contents-created supaya webview preview ikut terpantau.
+    app
+});
 
 let logOverlayWindow = null;
 let isLogOverlayEnabled = false;
@@ -671,8 +820,21 @@ let miniPlayerCursorInterval = null; // Interval untuk tracking cursor di sekita
 let isMiniPlayerFeatureEnabled = false;
 let lastLoggedTitleForUpdateMiniPlayerData = null; // Untuk logging update mini player
 
-let currentStoryTitle = null;
-let currentChapter = null;
+let rhythmOverlayWindow = null; // Jendela overlay gamifikasi rhythm
+let isRhythmOverlayEnabled = false;
+let lastRhythmTrackTitle = null; // Untuk deteksi ganti lagu
+let runtimeRhythmHideNowPlaying = false;
+
+let hubCodeEditorWindow = null; // Window terpisah untuk Hub Code Editor (Advanced)
+
+// currentStoryTitle & currentChapter sekarang dikelola oleh vn-engine/core.js
+
+const MUSIC_PLAYBACK_SPEED_VALUES = new Set(['0.75', '1.0', '1.25', '1.5', 'nightcore']);
+
+function sanitizeMusicPlaybackSpeed(value) {
+    const normalized = String(value ?? '1.0');
+    return MUSIC_PLAYBACK_SPEED_VALUES.has(normalized) ? normalized : '1.0';
+}
 
 // Pengaturan pengguna default
 const defaultUserSettings = {
@@ -705,14 +867,20 @@ const defaultUserSettings = {
     showLogOverlay: false,
     overlayModeEnabled: false,
     dynamicThemeEnabled: false,
-    dynamicThemeMode: 'default',
+    dynamicThemeMode: 'default-optimized',
+    playbackSpeed: '1.0',
+    guiTheme: 'default',
     miniPlayerHideOnCursor: false,
+    rhythmOverlayEnabled: false,  // Overlay gamifikasi rhythm (kombo & score)
+    rhythmHideNowPlaying: false,  // Sembunyikan panel Now Playing di overlay rhythm
     // === GIF Overlay Settings ===
     gifOverlayEnabled: false,
     gifOverlayLocked: false,
     gifOverlays: [],              // Array: [{id, path, settings, bounds}]
     gifOverlayPresets: [],        // Array: [{presetId, name, createdAt, overlays}]
-    activePresetId: null          // ID preset yang sedang aktif
+    activePresetId: null,         // ID preset yang sedang aktif
+    // Override fitur khusus per judul + artis. Berbeda dari pengaturan global.
+    musicProfiles: {}
 };
 
 let userSettings = { ...defaultUserSettings };
@@ -737,6 +905,32 @@ function getUserDataFilePath() {
     } catch (e) {
         console.warn('[Main] Gagal mendapatkan userData path untuk data:', e);
         return null;
+    }
+}
+
+function writeJsonFileSafely(filePath, value) {
+    const tmpPath = `${filePath}.tmp`;
+    const backupPath = `${filePath}.bak`;
+    fs.writeFileSync(tmpPath, JSON.stringify(value, null, 2), 'utf8');
+
+    try {
+        if (fs.existsSync(backupPath)) fs.unlinkSync(backupPath);
+        if (fs.existsSync(filePath)) fs.renameSync(filePath, backupPath);
+        fs.renameSync(tmpPath, filePath);
+        if (fs.existsSync(backupPath)) fs.unlinkSync(backupPath);
+    } catch (error) {
+        // Pertahankan versi terakhir yang valid jika penggantian file gagal.
+        try {
+            if (!fs.existsSync(filePath) && fs.existsSync(backupPath)) {
+                fs.renameSync(backupPath, filePath);
+            }
+        } catch (restoreError) {
+            console.error('[Main] Gagal memulihkan file settings cadangan:', restoreError);
+        }
+        try {
+            if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+        } catch (_) { }
+        throw error;
     }
 }
 
@@ -798,17 +992,25 @@ function normalizeUserSettings() {
     userSettings.overlayModeEnabled = toBool(userSettings.overlayModeEnabled, defaultUserSettings.overlayModeEnabled);
     userSettings.dynamicThemeEnabled = toBool(userSettings.dynamicThemeEnabled, defaultUserSettings.dynamicThemeEnabled);
     userSettings.miniPlayerHideOnCursor = toBool(userSettings.miniPlayerHideOnCursor, defaultUserSettings.miniPlayerHideOnCursor);
+    userSettings.rhythmOverlayEnabled = toBool(userSettings.rhythmOverlayEnabled, defaultUserSettings.rhythmOverlayEnabled);
+    userSettings.rhythmHideNowPlaying = toBool(userSettings.rhythmHideNowPlaying, defaultUserSettings.rhythmHideNowPlaying);
 
     if (typeof userSettings.dynamicThemeMode !== 'string') userSettings.dynamicThemeMode = defaultUserSettings.dynamicThemeMode;
+    if (userSettings.dynamicThemeMode === 'default' || userSettings.dynamicThemeMode === 'unified') {
+        userSettings.dynamicThemeMode = 'default-optimized';
+    }
+    if (!userSettings.musicProfiles || typeof userSettings.musicProfiles !== 'object' || Array.isArray(userSettings.musicProfiles)) {
+        userSettings.musicProfiles = {};
+    }
+    userSettings.playbackSpeed = sanitizeMusicPlaybackSpeed(userSettings.playbackSpeed);
     if (typeof userSettings.webgpuVisualizerStyle !== 'string') userSettings.webgpuVisualizerStyle = String(userSettings.webgpuVisualizerStyle ?? defaultUserSettings.webgpuVisualizerStyle);
 }
 
 function saveUserDataToDisk(dataPayload) {
     const filePath = getUserDataFilePath();
-    if (!filePath) return;
+    if (!filePath) return false;
     try {
-        const payload = JSON.stringify(dataPayload, null, 2);
-        fs.writeFileSync(filePath, payload, 'utf8');
+        writeJsonFileSafely(filePath, dataPayload);
         return true;
     } catch (e) {
         console.error('[Main] Gagal menyimpan user data ke disk:', e);
@@ -834,7 +1036,7 @@ function splitSettingsAndData(fullSettings) {
 
 function saveUserSettingsToDisk() {
     const filePath = getUserSettingsFilePath();
-    if (!filePath) return;
+    if (!filePath) return false;
 
     try {
         normalizeUserSettings();
@@ -843,21 +1045,17 @@ function saveUserSettingsToDisk() {
         const { settingsPayload, dataPayload } = splitSettingsAndData(userSettings);
 
         // Simpan Data (Selalu simpan data agar tidak hilang)
-        saveUserDataToDisk(dataPayload);
+        if (!saveUserDataToDisk(dataPayload)) {
+            throw new Error('User data GIF tidak berhasil ditulis ke disk.');
+        }
 
         // Simpan Settings
-        const tmpPath = `${filePath}.tmp`;
-        const payload = JSON.stringify({
+        writeJsonFileSafely(filePath, {
             ...settingsPayload,
             _meta: {
                 savedAt: new Date().toISOString()
             }
-        }, null, 2);
-        fs.writeFileSync(tmpPath, payload, 'utf8');
-        if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-        }
-        fs.renameSync(tmpPath, filePath);
+        });
         return true;
     } catch (e) {
         console.error('[Main] Gagal menyimpan user settings ke disk:', e);
@@ -877,6 +1075,14 @@ function scheduleSaveUserSettings() {
         saveUserSettingsTimer = null;
         console.log('[Main] User settings otomatis disimpan ke disk (debounced).');
     }, 500);
+}
+
+function flushUserSettingsToDisk() {
+    if (saveUserSettingsTimer) {
+        clearTimeout(saveUserSettingsTimer);
+        saveUserSettingsTimer = null;
+    }
+    return saveUserSettingsToDisk() === true;
 }
 
 function clearUserSettingsOnDisk() {
@@ -947,9 +1153,32 @@ function loadUserSettingsFromDisk() {
     userSettings = { ...defaultUserSettings, ...settingsObj, ...dataObj };
     normalizeUserSettings();
 
+    if (!Array.isArray(userSettings.gifOverlays)) userSettings.gifOverlays = [];
+    if (!Array.isArray(userSettings.gifOverlayPresets)) userSettings.gifOverlayPresets = [];
+
+    // activePresetId menunjuk dokumen yang aktif, tetapi snapshot global bisa
+    // tertinggal pada versi lama. Pulihkan dari preset tanpa pernah menghapus
+    // workspace hanya karena ID preset null/stale.
+    if (userSettings.activePresetId) {
+        const activePreset = userSettings.gifOverlayPresets.find(
+            preset => preset.presetId === userSettings.activePresetId
+        );
+        if (!activePreset) {
+            console.warn(`[GIF Settings] Preset aktif ${userSettings.activePresetId} tidak ditemukan; workspace tetap dipertahankan.`);
+            userSettings.activePresetId = null;
+            migrationNeeded = true;
+        } else if (userSettings.gifOverlays.length === 0 && Array.isArray(activePreset.overlays) && activePreset.overlays.length > 0) {
+            userSettings.gifOverlays = cloneGifOverlayList(activePreset.overlays);
+            dataObj.gifOverlays = cloneGifOverlayList(activePreset.overlays);
+            migrationNeeded = true;
+            console.log(`[GIF Settings] Snapshot workspace dipulihkan dari preset aktif (${activePreset.overlays.length} overlay).`);
+        }
+    }
+
     if (migrationNeeded) {
         console.log('[Main] Migrasi data (GIF Profiles) dari settings ke user-data.json dilakukan.');
-        saveUserDataToDisk(dataObj);
+        const { dataPayload } = splitSettingsAndData(userSettings);
+        saveUserDataToDisk(dataPayload);
     }
 
     console.log('[Main] Berhasil memuat user settings dan data dari disk.');
@@ -980,6 +1209,18 @@ ipcMain.on("save-settings", (event, data) => {
     console.log('[Main] Menyimpan pengaturan:', data);
     userSettings = { ...userSettings, ...data };
     normalizeUserSettings();
+
+    // Nilai global yang ikut diprofilkan perlu langsung dihitung ulang. Jika lagu
+    // aktif punya profil, profil tetap menang tanpa mengubah nilai global ini.
+    const profileAwareSettingChanged = [
+        'gifOverlayEnabled',
+        'rhythmOverlayEnabled',
+        'rhythmHideNowPlaying',
+        'dynamicThemeEnabled',
+        'dynamicThemeMode',
+        'playbackSpeed'
+    ].some((key) => Object.prototype.hasOwnProperty.call(data || {}, key));
+    if (profileAwareSettingChanged) applyMusicProfileForCurrentTrack({ force: true });
 
     // Jika miniPlayerHideOnCursor berubah, langsung terapkan ke mini-player
     if (data.miniPlayerHideOnCursor !== undefined) {
@@ -1037,6 +1278,101 @@ ipcMain.handle("load-settings", () => {
         rememberedSettingsSaved: getRememberedSettingsSavedStatus()
     };
 });
+
+// =================== Character Menu Editor - Save Media to aset/character ================== //
+const characterDirectory = path.join(__dirname, 'aset', 'character');
+
+// Ensure the character directory exists
+if (!fs.existsSync(characterDirectory)) {
+    fs.mkdirSync(characterDirectory, { recursive: true });
+}
+
+// Handler to save character media file (image/video) from base64 data
+ipcMain.handle('character-editor:save-media', async (event, { fileName, dataUrl, mediaType }) => {
+    try {
+        // Extract base64 data from data URL
+        const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (!matches) {
+            throw new Error('Invalid data URL format');
+        }
+
+        const base64Data = matches[2];
+        const buffer = Buffer.from(base64Data, 'base64');
+
+        // Sanitize filename to avoid path traversal
+        const safeFileName = path.basename(fileName).replace(/[^a-zA-Z0-9_\-\.]/g, '_');
+        const filePath = path.join(characterDirectory, safeFileName);
+
+        // Write file to disk
+        fs.writeFileSync(filePath, buffer);
+
+        // Return relative path for use in the app
+        const relativePath = './aset/character/' + safeFileName;
+        console.log('[CharacterEditor] Media saved:', relativePath);
+
+        return { success: true, path: relativePath };
+    } catch (error) {
+        console.error('[CharacterEditor] Error saving media:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// Handler to load custom character data from JSON file (for persistence)
+ipcMain.handle('character-editor:load-data', async () => {
+    try {
+        const jsonPath = path.join(characterDirectory, 'custom_character_data.json');
+        if (fs.existsSync(jsonPath)) {
+            const data = fs.readFileSync(jsonPath, 'utf-8');
+            return { success: true, data: JSON.parse(data) };
+        }
+        return { success: false, error: 'File not found' };
+    } catch (error) {
+        console.error('[CharacterEditor] Error loading data:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// Handler untuk menghapus file media karakter
+ipcMain.handle('character-editor:delete-media', async (event, { filePath }) => {
+    try {
+        // Pastikan path adalah file di folder aset/character
+        if (!filePath || !filePath.startsWith('./aset/character/')) {
+            console.log('[CharacterEditor] Melewati penghapusan - bukan file kustom:', filePath);
+            return { success: true, skipped: true };
+        }
+
+        const fileName = path.basename(filePath);
+        const fullPath = path.join(characterDirectory, fileName);
+
+        // Cek apakah file ada sebelum menghapus
+        if (fs.existsSync(fullPath)) {
+            fs.unlinkSync(fullPath);
+            console.log('[CharacterEditor] File media dihapus:', fullPath);
+            return { success: true, deleted: true };
+        } else {
+            console.log('[CharacterEditor] File tidak ditemukan, melewati:', fullPath);
+            return { success: true, skipped: true };
+        }
+    } catch (error) {
+        console.error('[CharacterEditor] Gagal menghapus file media:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// Handler to save custom character data to JSON file
+ipcMain.handle('character-editor:save-data', async (event, characterData) => {
+    try {
+        const jsonPath = path.join(characterDirectory, 'custom_character_data.json');
+        fs.writeFileSync(jsonPath, JSON.stringify(characterData, null, 2), 'utf-8');
+        console.log('[CharacterEditor] Character data saved to:', jsonPath);
+        return { success: true };
+    } catch (error) {
+        console.error('[CharacterEditor] Error saving data:', error);
+        return { success: false, error: error.message };
+    }
+});
+// =================== End Character Menu Editor ================== //
+
 // =================== Akhir Menyimpan dan Memuat Pengaturan Pengguna ================== //
 
 // =================== Logika Volume Global  ================== //
@@ -1129,38 +1465,133 @@ ipcMain.on('set-snow-feature-enabled', (event, enabled) => {
 // ======================================= Logika GIF Overlay =================================== //
 let gifOverlayWindows = new Map(); // Map<number, BrowserWindow> untuk ID unik
 let nextOverlayId = 1;
+const gifOverlayGeometry = new Map();
 
-// Helper: Sync Memory - menyimpan state overlay ke userSettings
-function updateGifOverlaysInMemory() {
+function cloneGifOverlayList(overlays) {
+    if (!Array.isArray(overlays)) return [];
+    return JSON.parse(JSON.stringify(overlays));
+}
+
+function registerGifOverlayGeometry(id, bounds) {
+    const geometry = createGifOverlayGeometry(bounds, { x: 0, y: 0, width: 200, height: 200 });
+    gifOverlayGeometry.set(id, geometry);
+    return geometry;
+}
+
+function getGifOverlayGeometry(id, win) {
+    const existing = gifOverlayGeometry.get(id);
+    if (existing) return existing;
+
+    const nativeBounds = win && !win.isDestroyed()
+        ? win.getBounds()
+        : { x: 0, y: 0, width: 200, height: 200 };
+    return registerGifOverlayGeometry(id, nativeBounds);
+}
+
+function getGifOverlayBoundsSnapshot(id, win) {
+    return { ...getGifOverlayGeometry(id, win) };
+}
+
+function logGifOverlaySizeDrift(id, nativeBounds, geometry, source) {
+    const win = gifOverlayWindows.get(id);
+    if (!win || win.isDestroyed()) return;
+    const now = Date.now();
+    if (now - (win.gifLastSizeDriftLogAt || 0) < 2000) return;
+    win.gifLastSizeDriftLogAt = now;
+    console.warn(
+        `[GIF Geometry] Size drift #${id} saat ${source}: native=${nativeBounds.width}x${nativeBounds.height}, `
+        + `canonical=${geometry.width}x${geometry.height}. Ukuran kanonik dipulihkan.`
+    );
+}
+
+function moveGifOverlayWindow(id, win, x, y, source = 'move') {
+    if (!win || win.isDestroyed()) return null;
+
+    const next = moveGifOverlayGeometry(getGifOverlayGeometry(id, win), x, y);
+    gifOverlayGeometry.set(id, next);
+
+    // Beberapa kombinasi transparent-window + mixed DPI dapat mengubah ukuran
+    // native saat window berpindah monitor. Ukuran native hanya diperiksa sebagai
+    // invariant; ia tidak pernah diadopsi sebagai ukuran frame berikutnya.
+    const nativeBounds = win.getBounds();
+    if (hasGifOverlaySizeDrift(nativeBounds, next)) {
+        logGifOverlaySizeDrift(id, nativeBounds, next, source);
+        win.setBounds(next);
+    } else {
+        win.setPosition(next.x, next.y);
+    }
+    return next;
+}
+
+function resizeGifOverlayWindow(id, win, bounds, source = 'resize') {
+    if (!win || win.isDestroyed()) return null;
+    const next = resizeGifOverlayGeometry(getGifOverlayGeometry(id, win), bounds);
+    gifOverlayGeometry.set(id, next);
+    win.setBounds(next);
+    if (DEBUG_GIF) console.log(`[GIF Geometry] Resize #${id} via ${source}: ${next.width}x${next.height}`);
+    return next;
+}
+
+function enforceGifOverlayCanonicalSize(id, win, source = 'native-resize') {
+    if (!win || win.isDestroyed() || win.gifGeometryCorrectionInProgress) return;
+    const geometry = getGifOverlayGeometry(id, win);
+    const nativeBounds = win.getBounds();
+    if (!hasGifOverlaySizeDrift(nativeBounds, geometry)) return;
+
+    logGifOverlaySizeDrift(id, nativeBounds, geometry, source);
+    win.gifGeometryCorrectionInProgress = true;
+    try {
+        win.setBounds(geometry);
+    } finally {
+        setTimeout(() => {
+            if (!win.isDestroyed()) win.gifGeometryCorrectionInProgress = false;
+        }, 0);
+    }
+}
+
+function captureGifOverlayWindows() {
     const overlays = [];
     gifOverlayWindows.forEach((win, id) => {
         if (!win.isDestroyed() && win.currentPath) {
-            const bounds = win.getBounds();
+            const bounds = getGifOverlayBoundsSnapshot(id, win);
             overlays.push({
-                id: id,
+                id,
                 path: win.currentPath,
+                sourcePath: win.sourcePath || win.currentPath,
+                mediaType: win.mediaType || inferMediaTypeMain(win.currentPath),
+                layer: win.gifLayer || 0,
+                hidden: win.gifHidden === true,
                 settings: win.gifSettings || { condition: 'always', value: '', opacity: 1, rotation: 0, hideOnCursor: false },
-                bounds: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height }
+                bounds
             });
         }
     });
-    userSettings.gifOverlays = overlays;
+    return overlays;
+}
 
-    // 1. Update global overlays (untuk restore boot)
-    userSettings.gifOverlays = overlays;
+function syncActiveGifPreset(overlays) {
+    if (!userSettings.activePresetId || !Array.isArray(userSettings.gifOverlayPresets)) return;
+    const activeIdx = userSettings.gifOverlayPresets.findIndex(p => p.presetId === userSettings.activePresetId);
+    if (activeIdx === -1) return;
 
-    // 2. CRITICAL: Update juga definisi Preset yang sedang Aktif
-    // Agar saat user pindah preset lalu kembali, perubahan posisi/setting tersimpan
-    if (userSettings.activePresetId && userSettings.gifOverlayPresets) {
-        const activeIdx = userSettings.gifOverlayPresets.findIndex(p => p.presetId === userSettings.activePresetId);
-        if (activeIdx !== -1) {
-            // Clone overlays untuk menghindari referensi silang
-            // Kita simpan state TERBARU ke dalam preset
-            userSettings.gifOverlayPresets[activeIdx].overlays = JSON.parse(JSON.stringify(overlays));
-            userSettings.gifOverlayPresets[activeIdx].updatedAt = Date.now();
-            if (DEBUG_GIF) console.log(`[GIF] Active preset synced: ${userSettings.activePresetId} (${overlays.length} items)`);
-        }
+    userSettings.gifOverlayPresets[activeIdx].overlays = cloneGifOverlayList(overlays);
+    userSettings.gifOverlayPresets[activeIdx].updatedAt = Date.now();
+    if (DEBUG_GIF) {
+        console.log(`[GIF] Active preset synced: ${userSettings.activePresetId} (${overlays.length} items)`);
     }
+}
+
+// Helper: Sync Memory - menyimpan state overlay ke userSettings
+function updateGifOverlaysInMemory({ preserveWhenNoWindows = false, syncActivePreset = true } = {}) {
+    const overlays = captureGifOverlayWindows();
+    if (preserveWhenNoWindows && overlays.length === 0) {
+        return cloneGifOverlayList(userSettings.gifOverlays);
+    }
+
+    // Update global overlays (untuk restore boot)
+    userSettings.gifOverlays = overlays;
+    if (syncActivePreset) syncActiveGifPreset(overlays);
+    return overlays;
 }
 
 let isGifOverlayEnabled = false;
@@ -1170,11 +1601,148 @@ let isGifOverlayLocked = false;
 let lastMusicState = {
     isPlaying: false,
     title: '',
-    artist: ''
+    artist: '',
+    coverSrc: ''
 };
 
 // State iklan terakhir untuk kondisional GIF (none, waiting, skippable)
 let lastAdState = 'none';
+let lastRhythmBreakState = false;
+let lastRhythmSubtitle = '';
+
+let lastAppliedMusicProfileFingerprint = '';
+
+function normalizeMusicProfilePart(value) {
+    return String(value || '')
+        .normalize('NFKC')
+        .trim()
+        .replace(/\s+/g, ' ')
+        .toLocaleLowerCase();
+}
+
+function getMusicProfileTrack(track = lastMusicState) {
+    const title = String(track?.title || '').trim();
+    const artist = String(track?.artist || '').trim();
+    const normalizedTitle = normalizeMusicProfilePart(title);
+    const ignoredTitles = new Set(['', 'loading...', 'no music', 'online music']);
+    const key = ignoredTitles.has(normalizedTitle)
+        ? ''
+        : `${normalizedTitle}::${normalizeMusicProfilePart(artist)}`;
+    const coverSrc = String(track?.coverSrc || track?.thumbnail || '').trim();
+    return { key, title, artist, coverSrc, isPlaying: track?.isPlaying === true };
+}
+
+function sanitizeMusicProfileOverrides(raw = {}) {
+    const mode = raw.dynamicThemeMode === 'unified' || raw.dynamicThemeMode === 'default'
+        ? 'default-optimized'
+        : raw.dynamicThemeMode;
+    return {
+        gifOverlayEnabled: raw.gifOverlayEnabled === true,
+        rhythmOverlayEnabled: raw.rhythmOverlayEnabled === true,
+        rhythmHideNowPlaying: raw.rhythmHideNowPlaying === true,
+        dynamicThemeEnabled: raw.dynamicThemeEnabled === true,
+        dynamicThemeMode: typeof mode === 'string' && mode ? mode : 'default-optimized',
+        playbackSpeed: sanitizeMusicPlaybackSpeed(raw.playbackSpeed)
+    };
+}
+
+function getMusicProfileState(track = lastMusicState) {
+    const normalizedTrack = getMusicProfileTrack(track);
+    const profile = normalizedTrack.key ? userSettings.musicProfiles?.[normalizedTrack.key] : null;
+    const overrides = profile?.overrides || {};
+    const effective = {
+        gifOverlayEnabled: overrides.gifOverlayEnabled ?? (userSettings.gifOverlayEnabled === true),
+        rhythmOverlayEnabled: overrides.rhythmOverlayEnabled ?? (userSettings.rhythmOverlayEnabled === true),
+        rhythmHideNowPlaying: overrides.rhythmHideNowPlaying ?? (userSettings.rhythmHideNowPlaying === true),
+        dynamicThemeEnabled: overrides.dynamicThemeEnabled ?? (userSettings.dynamicThemeEnabled === true),
+        dynamicThemeMode: overrides.dynamicThemeMode ?? userSettings.dynamicThemeMode ?? 'default-optimized',
+        playbackSpeed: overrides.playbackSpeed ?? userSettings.playbackSpeed ?? '1.0'
+    };
+
+    return {
+        track: normalizedTrack,
+        profile: profile ? { ...profile, overrides: { ...profile.overrides } } : null,
+        effective
+    };
+}
+
+function broadcastMusicProfileState(state = getMusicProfileState()) {
+    BrowserWindow.getAllWindows().forEach((win) => {
+        try {
+            if (!win.isDestroyed()) {
+                win.webContents.send('music-profile-state', state);
+                win.webContents.send('music-profile-effective-settings', state.effective);
+            }
+        } catch (_) { }
+    });
+}
+
+function applyMusicProfileForCurrentTrack({ force = false } = {}) {
+    const state = getMusicProfileState();
+    const fingerprint = JSON.stringify({
+        key: state.track.key,
+        isPlaying: state.track.isPlaying,
+        effective: state.effective
+    });
+    if (!force && fingerprint === lastAppliedMusicProfileFingerprint) return state;
+
+    lastAppliedMusicProfileFingerprint = fingerprint;
+    setGifOverlayRuntime(state.effective.gifOverlayEnabled === true);
+    setRhythmOverlayRuntime(state.effective.rhythmOverlayEnabled === true);
+    setRhythmHideNowPlayingRuntime(state.effective.rhythmHideNowPlaying === true);
+    broadcastMusicProfileState(state);
+    return state;
+}
+
+ipcMain.handle('music-profile-get-current', () => getMusicProfileState());
+
+ipcMain.handle('music-profile-list', () => Object.values(userSettings.musicProfiles || {})
+    .filter((profile) => profile && typeof profile === 'object' && profile.key)
+    .map((profile) => ({
+        key: profile.key,
+        title: String(profile.title || ''),
+        artist: String(profile.artist || ''),
+        coverSrc: String(profile.coverSrc || ''),
+        overrides: { ...(profile.overrides || {}) },
+        updatedAt: Number(profile.updatedAt) || 0
+    }))
+    .sort((left, right) => right.updatedAt - left.updatedAt));
+
+ipcMain.handle('music-profile-save', (_event, payload = {}) => {
+    const requestedTrack = getMusicProfileTrack(payload.track);
+    const activeTrack = getMusicProfileTrack(lastMusicState);
+    if (!activeTrack.key || !activeTrack.isPlaying) {
+        return { success: false, error: 'Putar musik yang memiliki judul terlebih dahulu.' };
+    }
+    if (!requestedTrack.key) return { success: false, error: 'Profil lagu tidak valid.' };
+    if (activeTrack.key && requestedTrack.key !== activeTrack.key) {
+        return { success: false, error: 'Lagu aktif sudah berubah. Buka lagi profil untuk lagu yang sedang diputar.' };
+    }
+
+    userSettings.musicProfiles[requestedTrack.key] = {
+        key: requestedTrack.key,
+        title: requestedTrack.title,
+        artist: requestedTrack.artist,
+        // Simpan referensi/alamat cover saja; tidak pernah menyalin data gambar ke settings.
+        coverSrc: activeTrack.coverSrc || requestedTrack.coverSrc || '',
+        overrides: sanitizeMusicProfileOverrides(payload.overrides),
+        updatedAt: Date.now()
+    };
+    scheduleSaveUserSettings();
+    const state = applyMusicProfileForCurrentTrack({ force: true });
+    return { success: true, state };
+});
+
+ipcMain.handle('music-profile-delete', (_event, payload = {}) => {
+    const requestedTrack = getMusicProfileTrack(payload.track);
+    if (!requestedTrack.key || !userSettings.musicProfiles?.[requestedTrack.key]) {
+        return { success: false, error: 'Profil lagu tidak ditemukan.' };
+    }
+    delete userSettings.musicProfiles[requestedTrack.key];
+    scheduleSaveUserSettings();
+    const state = applyMusicProfileForCurrentTrack({ force: true });
+    return { success: true, state };
+});
 
 // === DEBUG FLAG ===
 // Set to true untuk enable verbose logging saat development/debugging
@@ -1253,13 +1821,16 @@ function initAnimationState(id, settings) {
  * Update position GIF berdasarkan animation type
  */
 function updateGifPosition(id, win, settings, animState) {
-    if (!win || win.isDestroyed() || animState.paused) return;
+    // Resize manual dan animasi sama-sama menulis bounds window. Jangan biarkan
+    // keduanya berjalan bersamaan, karena hasilnya dapat membuat ukuran/posisi
+    // saling menimpa pada perangkat tertentu.
+    if (!win || win.isDestroyed() || animState.paused || activeResizeOverlayId === id || activeDragOverlayId === id) return;
 
     try {
-        const bounds = win.getBounds();
-        // Require screen inside function to avoid init issues
-        const { screen } = require('electron');
-        const display = screen.getDisplayNearestPoint({ x: bounds.x, y: bounds.y });
+        // Posisi dan ukuran animasi selalu berasal dari geometri kanonik. Native
+        // bounds hanya boleh menjadi target output, bukan input untuk frame baru.
+        const bounds = getGifOverlayBoundsSnapshot(id, win);
+        const display = screen.getDisplayNearestPoint(getGifOverlayGeometryCenter(bounds));
         const workArea = display.workArea;
 
         let newX = bounds.x;
@@ -1288,7 +1859,7 @@ function updateGifPosition(id, win, settings, animState) {
                 animState.vy = -Math.abs(animState.vy); // Bounce up
             }
 
-            win.setBounds({ x: Math.round(newX), y: Math.round(newY) });
+            moveGifOverlayWindow(id, win, newX, newY, 'animation:dvd');
 
         } else if (animState.type === 'linear') {
             // Linear - bergerak lurus, wrap around ke sisi lain saat keluar
@@ -1308,7 +1879,7 @@ function updateGifPosition(id, win, settings, animState) {
                 newY = workArea.y - bounds.height;
             }
 
-            win.setBounds({ x: Math.round(newX), y: Math.round(newY) });
+            moveGifOverlayWindow(id, win, newX, newY, 'animation:linear');
 
         } else if (animState.type === 'circular') {
             // Circular - bergerak melingkar (orbit) di tempat
@@ -1330,7 +1901,7 @@ function updateGifPosition(id, win, settings, animState) {
             newX = animState.centerX + Math.cos(animState.angle) * animState.radius - bounds.width / 2;
             newY = animState.centerY + Math.sin(animState.angle) * animState.radius - bounds.height / 2;
 
-            win.setBounds({ x: Math.round(newX), y: Math.round(newY) });
+            moveGifOverlayWindow(id, win, newX, newY, 'animation:circular');
 
         } else if (animState.type === 'random') {
             // Random Walk - ubah arah secara random
@@ -1369,7 +1940,7 @@ function updateGifPosition(id, win, settings, animState) {
                 animState.vy = (animState.vy / currentSpeed) * minSpeed;
             }
 
-            win.setBounds({ x: Math.round(newX), y: Math.round(newY) });
+            moveGifOverlayWindow(id, win, newX, newY, 'animation:random');
 
         } else if (animState.type === 'patrol' || animState.type === 'patrol-wave') {
             // Patroli: Gerak kiri-kanan sampai mentok, lalu flip
@@ -1422,7 +1993,7 @@ function updateGifPosition(id, win, settings, animState) {
                 newY = animState.baseY + Math.sin(animState.waveAngle) * amplitude;
             }
 
-            win.setBounds({ x: Math.round(newX), y: Math.round(newY) });
+            moveGifOverlayWindow(id, win, newX, newY, `animation:${animState.type}`);
 
         } else if (animState.type === 'patrol-vertical' || animState.type === 'patrol-wave-vertical') {
             // Patroli Vertikal: Gerak atas-bawah sampai mentok, lalu flip vertikal
@@ -1475,7 +2046,7 @@ function updateGifPosition(id, win, settings, animState) {
                 newX = animState.baseX + Math.sin(animState.waveAngle) * amplitude;
             }
 
-            win.setBounds({ x: Math.round(newX), y: Math.round(newY) });
+            moveGifOverlayWindow(id, win, newX, newY, `animation:${animState.type}`);
         }
         // Future: Tambahkan type lain (follow-mouse, figure-8, dll)
 
@@ -1556,6 +2127,25 @@ function removeGifAnimation(id) {
         clearTimeout(animState.resumeTimer);
         gifAnimations.delete(id);
         if (DEBUG_GIF) console.log(`[GIF Animation] Removed animation state for GIF #${id}`);
+    }
+}
+
+function resetGifAnimationAnchor(id) {
+    const animState = gifAnimations.get(id);
+    const win = gifOverlayWindows.get(id);
+    if (!animState || !win || win.isDestroyed()) return;
+    const bounds = getGifOverlayBoundsSnapshot(id, win);
+
+    if (animState.type === 'circular') {
+        animState.centerX = bounds.x + bounds.width / 2;
+        animState.centerY = bounds.y + bounds.height / 2;
+        animState.angle = 0;
+    } else if (animState.type === 'patrol-wave') {
+        animState.baseY = bounds.y;
+        animState.waveAngle = 0;
+    } else if (animState.type === 'patrol-wave-vertical') {
+        animState.baseX = bounds.x;
+        animState.waveAngle = 0;
     }
 }
 
@@ -1740,7 +2330,7 @@ function startGifAnimationLoop_OLD() {
                 const finalX = Math.round(state.x);
                 const finalY = Math.round(state.y);
 
-                win.setBounds({ x: finalX, y: finalY, width: state.width, height: state.height });
+                moveGifOverlayWindow(id, win, finalX, finalY, 'legacy-animation');
 
                 // Kirim event Flip jika berubah (dan belum pernah dikirim atau berubah state)
                 // Note: ipc 'set-flip' dan 'set-flip-vertical' harus dilisten di gif-overlay.html
@@ -1767,7 +2357,16 @@ function stopGifAnimationLoop_OLD() {
     }
 }
 
-function createGifOverlayWindow(initialPath = null, forcedId = null, initialSettings = null, initialBounds = null) {
+// Helper: deteksi tipe media dari ekstensi file (sisi main process)
+function inferMediaTypeMain(filePath = '') {
+    const ext = (filePath || '').split('.').pop()?.toLowerCase() || '';
+    if (['mp4', 'webm', 'mov', 'm4v'].includes(ext)) return 'video';
+    if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a'].includes(ext)) return 'audio';
+    if (['png', 'jpg', 'jpeg', 'webp', 'apng'].includes(ext)) return 'image';
+    return 'gif';
+}
+
+function createGifOverlayWindow(initialPath = null, forcedId = null, initialSettings = null, initialBounds = null, initialExtra = {}) {
     const id = forcedId || nextOverlayId++;
     if (forcedId && forcedId >= nextOverlayId) nextOverlayId = forcedId + 1;
 
@@ -1775,14 +2374,15 @@ function createGifOverlayWindow(initialPath = null, forcedId = null, initialSett
     const defaultWidth = 200;
     const defaultHeight = 200;
     const primaryDisplay = screen.getPrimaryDisplay();
-    const workArea = primaryDisplay.workAreaSize;
+    const workArea = primaryDisplay.workArea;
 
-    const bounds = initialBounds || {
-        x: Math.floor(workArea.width / 2 - defaultWidth / 2),
-        y: Math.floor(workArea.height / 2 - defaultHeight / 2),
+    const requestedBounds = initialBounds || {
+        x: Math.floor(workArea.x + (workArea.width - defaultWidth) / 2),
+        y: Math.floor(workArea.y + (workArea.height - defaultHeight) / 2),
         width: defaultWidth,
         height: defaultHeight
     };
+    const bounds = registerGifOverlayGeometry(id, requestedBounds);
 
     const win = new BrowserWindow({
         width: bounds.width,
@@ -1812,6 +2412,11 @@ function createGifOverlayWindow(initialPath = null, forcedId = null, initialSett
     // Simpan data di object window
     win.overlayId = id;
     win.currentPath = initialPath;
+    // Metadata media studio (sourcePath/mediaType/layer/hidden)
+    win.sourcePath = initialExtra.sourcePath || initialPath;
+    win.mediaType = initialExtra.mediaType || initialSettings?.mediaType || inferMediaTypeMain(win.sourcePath);
+    win.gifLayer = (initialExtra.layer != null) ? initialExtra.layer : (initialSettings?.layer ?? 0);
+    win.gifHidden = initialExtra.hidden === true || initialSettings?.hidden === true;
 
     // Ensure animation property exists (backward compatibility)
     const defaultSettings = {
@@ -1834,6 +2439,9 @@ function createGifOverlayWindow(initialPath = null, forcedId = null, initialSett
         win.webContents.send('init-overlay', {
             id: id,
             path: initialPath,
+            sourcePath: win.sourcePath,
+            mediaType: win.mediaType,
+            settings: win.gifSettings,
             locked: isGifOverlayLocked,
             bounds: bounds
         });
@@ -1847,35 +2455,32 @@ function createGifOverlayWindow(initialPath = null, forcedId = null, initialSett
         if (initialSettings && initialSettings.rotation !== undefined) {
             win.webContents.send('set-rotation', initialSettings.rotation);
         }
+
+        // Terapkan efek media (crop/chroma/sprite/object-fit/audio)
+        win.webContents.send('set-media-effects', win.gifSettings);
     });
 
-    // Simpan posisi saat window dipindahkan
+    // Event `moved` juga dipancarkan oleh animasi. Hanya adopsi x/y bila posisi
+    // native benar-benar berbeda dari target kanonik; width/height tidak pernah
+    // diambil dari event ini.
     win.on('moved', () => {
-        // Pause animation saat user drag window
-        pauseGifAnimation(id, 2000); // Auto-resume after 2s idle
+        if (win.isDestroyed() || gifOverlayWindows.get(id) !== win) return;
+        const nativeBounds = win.getBounds();
+        const geometry = getGifOverlayGeometry(id, win);
+        enforceGifOverlayCanonicalSize(id, win, 'moved-event');
+        if (nativeBounds.x === geometry.x && nativeBounds.y === geometry.y) return;
 
-        // Reset circular orbit center jika animation type adalah circular
-        const animState = gifAnimations.get(id);
-        if (animState) {
-            const currentBounds = win.getBounds();
-
-            if (animState.type === 'circular') {
-                animState.centerX = currentBounds.x + currentBounds.width / 2;
-                animState.centerY = currentBounds.y + currentBounds.height / 2;
-                animState.angle = 0; // Reset angle agar smooth dari posisi baru
-                console.log(`[GIF Animation] Circular orbit re-centered to (${Math.round(animState.centerX)}, ${Math.round(animState.centerY)})`);
-            } else if (animState.type === 'patrol-wave') {
-                animState.baseY = currentBounds.y;
-                animState.waveAngle = 0;
-                console.log(`[GIF Animation] Patrol Wave base Y reset to ${animState.baseY}`);
-            } else if (animState.type === 'patrol-wave-vertical') {
-                animState.baseX = currentBounds.x;
-                animState.waveAngle = 0;
-                console.log(`[GIF Animation] Patrol Wave Vertical base X reset to ${animState.baseX}`);
-            }
-        }
-
+        gifOverlayGeometry.set(id, moveGifOverlayGeometry(geometry, nativeBounds.x, nativeBounds.y));
+        pauseGifAnimation(id, 2000);
+        resetGifAnimationAnchor(id);
         updateGifOverlaysInMemory();
+        scheduleSaveUserSettings();
+    });
+
+    // Watchdog untuk perangkat yang mengubah ukuran native saat window hanya
+    // dipindahkan (umumnya saat melintasi monitor dengan scale factor berbeda).
+    win.on('resize', () => {
+        if (gifOverlayWindows.get(id) === win) enforceGifOverlayCanonicalSize(id, win, 'resize-event');
     });
 
     win.on('closed', () => {
@@ -1890,8 +2495,7 @@ function createGifOverlayWindow(initialPath = null, forcedId = null, initialSett
 
             // Cleanup animation state
             removeGifAnimation(id);
-
-            updateGifOverlaysInMemory();
+            gifOverlayGeometry.delete(id);
         } else {
             // Window ini sudah digantikan dengan window baru, skip delete
             console.log(`[Main] GIF Overlay #${id} ditutup (old window, skipped tracking cleanup).`);
@@ -1900,8 +2504,8 @@ function createGifOverlayWindow(initialPath = null, forcedId = null, initialSett
 
     gifOverlayWindows.set(id, win);
 
-    // Jika enabled secara global, tampilkan
-    if (isGifOverlayEnabled) {
+    // Jika enabled secara global, tampilkan (kecuali layer disembunyikan manual)
+    if (isGifOverlayEnabled && !win.gifHidden) {
         win.show();
     }
 
@@ -2017,8 +2621,8 @@ function createGifOverlayWindow_OLD(initialPath = null, forcedId = null, initial
 
     win.on('closed', () => {
         gifOverlayWindows.delete(id);
+        gifOverlayGeometry.delete(id);
         console.log(`[Main] GIF Overlay #${id} ditutup.`);
-        updateGifOverlaysInMemory();
     });
 
     gifOverlayWindows.set(id, win);
@@ -2033,17 +2637,38 @@ function createGifOverlayWindow_OLD(initialPath = null, forcedId = null, initial
 }
 
 // Handler: Buat Overlay Baru (mengembalikan ID)
-ipcMain.handle('create-new-gif-overlay', async (event, path) => {
-    const id = createGifOverlayWindow(path);
+// Mendukung 2 format: string path (lama) atau object { path, sourcePath, mediaType, settings } (studio)
+ipcMain.handle('create-new-gif-overlay', async (event, payload) => {
+    if (typeof payload === 'string' || payload == null) {
+        return createGifOverlayWindow(payload);
+    }
+    const { path: mediaPath, sourcePath, mediaType, settings } = payload;
+    const id = createGifOverlayWindow(mediaPath, null, settings || null, null, {
+        sourcePath: sourcePath || mediaPath,
+        mediaType: mediaType || inferMediaTypeMain(sourcePath || mediaPath),
+        layer: settings?.layer,
+        hidden: settings?.hidden
+    });
+    updateGifOverlaysInMemory();
+    scheduleSaveUserSettings();
     return id;
 });
 
 // Handler: Set Gambar pada Overlay Spesifik
-ipcMain.on('set-gif-overlay-image-by-id', (event, { id, path }) => {
+ipcMain.on('set-gif-overlay-image-by-id', (event, { id, path: mediaPath, sourcePath, mediaType }) => {
     const win = gifOverlayWindows.get(id);
     if (win && !win.isDestroyed()) {
-        win.currentPath = path; // Update path in window obj
-        win.webContents.send('init-overlay', { id: id, path: path }); // Re-init image logic (or repurpose init)
+        win.currentPath = mediaPath; // Update path in window obj
+        win.sourcePath = sourcePath || mediaPath;
+        win.mediaType = mediaType || inferMediaTypeMain(win.sourcePath);
+        // Re-init dengan metadata media lengkap agar renderer bisa muat video/audio/gambar
+        win.webContents.send('init-overlay', {
+            id: id,
+            path: mediaPath,
+            sourcePath: win.sourcePath,
+            mediaType: win.mediaType,
+            settings: win.gifSettings
+        });
         updateGifOverlaysInMemory();
     }
 });
@@ -2053,8 +2678,9 @@ function deleteGifFileFromDisk(filePath) {
     if (!filePath) return { success: false, reason: 'No path provided' };
 
     try {
-        // Hanya hapus file jika berada di folder gif-storage
-        if (!filePath.includes('gif-storage')) {
+        // Hanya hapus media yang benar-benar berada di storage milik aplikasi.
+        if (!isPathInsideDirectory(filePath, gifStorageDirectory)
+            && !isPathInsideDirectory(filePath, legacyGifStorageDirectory)) {
             console.log(`[GIF Storage] File bukan dari gif-storage, skip hapus: ${filePath}`);
             return { success: false, reason: 'File not in gif-storage folder' };
         }
@@ -2089,7 +2715,7 @@ function logGifSyncStatus(context) {
 
     // Warn jika tidak sinkron
     if (windowCount !== settingsCount) {
-        console.warn(`[GIF Sync][${context}] ⚠️ DESYNC: Windows (${windowCount}) != Settings (${settingsCount})`);
+        console.warn(`[GIF Sync][${context}] âš ï¸ DESYNC: Windows (${windowCount}) != Settings (${settingsCount})`);
     }
 
     return { windowCount, settingsCount, presetCount, activePreset };
@@ -2112,12 +2738,13 @@ ipcMain.on('close-gif-overlay-by-id', (event, idOrOptions) => {
 
     if (win && !win.isDestroyed()) {
         // Ambil path file sebelum close
-        filePath = win.gifPath;
+        filePath = win.currentPath;
         win.close();
         console.log(`[Main][GIF] Overlay #${id} closed, deleteFile: ${deleteFile}`);
     }
 
     gifOverlayWindows.delete(id);
+    gifOverlayGeometry.delete(id);
 
     // Hapus dari userSettings.gifOverlays
     if (userSettings.gifOverlays && Array.isArray(userSettings.gifOverlays)) {
@@ -2128,6 +2755,7 @@ ipcMain.on('close-gif-overlay-by-id', (event, idOrOptions) => {
             console.log(`[Main][GIF] Removed overlay #${id} from settings`);
         }
     }
+    syncActiveGifPreset(userSettings.gifOverlays || []);
 
     // Hapus file dari disk jika diminta
     if (deleteFile && filePath) {
@@ -2138,10 +2766,12 @@ ipcMain.on('close-gif-overlay-by-id', (event, idOrOptions) => {
     scheduleSaveUserSettings();
 });
 
-// Handler: Tutup SEMUA overlay window dan bersihkan state
-// Options: { deleteFiles: boolean } - jika true, hapus juga file GIF dari disk
+// Handler: Tutup semua window runtime. Metadata hanya dikosongkan bila aksi UI
+// memang meminta clearDocument; perpindahan profil/shutdown bukan penghapusan.
 ipcMain.handle('gif-overlay-close-all', async (event, options = {}) => {
     const deleteFiles = options?.deleteFiles === true;
+    const clearDocument = options?.clearDocument === true || deleteFiles;
+    const preserveActivePreset = options?.preserveActivePreset === true;
     const beforeCount = gifOverlayWindows.size;
 
     console.log(`[Main][GIF] === CLEANUP ALL START ===`);
@@ -2152,7 +2782,7 @@ ipcMain.handle('gif-overlay-close-all', async (event, options = {}) => {
     const filePaths = [];
     if (deleteFiles) {
         gifOverlayWindows.forEach((win, id) => {
-            if (win.gifPath) filePaths.push(win.gifPath);
+            if (win.currentPath) filePaths.push(win.currentPath);
         });
         // Juga dari settings
         (userSettings.gifOverlays || []).forEach(o => {
@@ -2169,13 +2799,16 @@ ipcMain.handle('gif-overlay-close-all', async (event, options = {}) => {
 
     // Bersihkan map
     gifOverlayWindows.clear();
+    gifOverlayGeometry.clear();
 
     // Reset counter
     nextOverlayId = 1;
 
-    // Bersihkan data di userSettings
-    userSettings.gifOverlays = [];
-    scheduleSaveUserSettings();
+    if (clearDocument) {
+        userSettings.gifOverlays = [];
+        if (!preserveActivePreset) syncActiveGifPreset([]);
+        scheduleSaveUserSettings();
+    }
 
     // Hapus file dari disk jika diminta
     if (deleteFiles && filePaths.length > 0) {
@@ -2188,13 +2821,13 @@ ipcMain.handle('gif-overlay-close-all', async (event, options = {}) => {
     logGifSyncStatus('close-all-after');
     console.log(`[Main][GIF] === CLEANUP ALL COMPLETE: ${beforeCount} windows closed ===`);
 
-    return { success: true, closedCount: beforeCount };
+    return { success: true, closedCount: beforeCount, documentCleared: clearDocument };
 });
 
 // Handler: Restore GIF Overlay Window saat boot
 // Dipanggil dari gif-overlay-standalone.html saat loadSettings()
-ipcMain.on('restore-gif-overlay-window', (event, { id, path, settings, bounds }) => {
-    console.log(`[Main][GIF] Restore window overlay #${id} dengan path: ${path}`);
+ipcMain.on('restore-gif-overlay-window', (event, { id, path: mediaPath, sourcePath, mediaType, settings, bounds, layer, hidden }) => {
+    console.log(`[Main][GIF] Restore window overlay #${id} dengan path: ${mediaPath}`);
 
     // Cek apakah window dengan ID ini sudah ada
     const existingWin = gifOverlayWindows.get(id);
@@ -2204,7 +2837,12 @@ ipcMain.on('restore-gif-overlay-window', (event, { id, path, settings, bounds })
     }
 
     // Buat window overlay dengan konfigurasi yang tersimpan
-    createGifOverlayWindow(path, id, settings, bounds);
+    createGifOverlayWindow(mediaPath, id, settings, bounds, {
+        sourcePath: sourcePath || mediaPath,
+        mediaType: mediaType || inferMediaTypeMain(sourcePath || mediaPath),
+        layer,
+        hidden
+    });
 
     logGifSyncStatus(`restore-window-#${id}`);
     console.log(`[Main][GIF] Berhasil restore overlay #${id}`);
@@ -2214,8 +2852,7 @@ ipcMain.on('restore-gif-overlay-window', (event, { id, path, settings, bounds })
 ipcMain.handle('get-gif-overlay-bounds', (event, id) => {
     const win = gifOverlayWindows.get(id);
     if (win && !win.isDestroyed()) {
-        const bounds = win.getBounds();
-        return { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height };
+        return getGifOverlayBoundsSnapshot(id, win);
     }
     return null;
 });
@@ -2225,6 +2862,11 @@ ipcMain.on('update-gif-overlay-settings', (event, { id, settings }) => {
     const win = gifOverlayWindows.get(id);
     if (win && !win.isDestroyed()) {
         win.gifSettings = settings;
+
+        // Sinkronkan metadata media studio dari settings
+        if (settings.mediaType) win.mediaType = settings.mediaType;
+        if (settings.layer != null) win.gifLayer = settings.layer;
+        win.gifHidden = settings.hidden === true;
 
         // Terapkan opacity (nilai sudah dalam format decimal 0.1 - 1.0)
         if (settings.opacity !== undefined) {
@@ -2236,11 +2878,14 @@ ipcMain.on('update-gif-overlay-settings', (event, { id, settings }) => {
             win.webContents.send('set-rotation', settings.rotation);
         }
 
+        // Terapkan efek media (objectFit/crop/chromaKey/sprite/audio)
+        win.webContents.send('set-media-effects', settings);
+
         const animInfo = settings.animation ? `animation=${settings.animation.type}(speed=${settings.animation.speed})` : 'animation=none';
         console.log(`[Main][GIF] Settings diperbarui untuk Overlay #${id}: kondisi=${settings.condition}, value="${settings.value || ''}", opacity=${settings.opacity}, rotation=${settings.rotation || 0}°, hideOnCursor=${settings.hideOnCursor || false}, ${animInfo}`);
 
         // Update animasi logic
-        initAnimationState(id, settings, win.getBounds());
+        initAnimationState(id, settings);
 
         updateGifOverlaysInMemory();
 
@@ -2290,6 +2935,9 @@ function evaluateGifOverlayVisibility() {
                 // Tampilkan saat ada iklan (waiting atau skippable)
                 shouldShow = lastAdState === 'waiting' || lastAdState === 'skippable';
                 break;
+            case 'break-time':
+                shouldShow = lastRhythmBreakState === true;
+                break;
             case 'music-title':
                 if (settings.value && lastMusicState.title) {
                     const settingsValueLower = settings.value.toLowerCase();
@@ -2317,6 +2965,11 @@ function evaluateGifOverlayVisibility() {
             shouldShow = false;
         }
 
+        // Jangan tampilkan jika layer disembunyikan manual (toggle "Sembunyikan layer ini")
+        if (win.gifHidden === true || settings.hidden === true) {
+            shouldShow = false;
+        }
+
         // Tampilkan atau sembunyikan berdasarkan evaluasi
         if (shouldShow) {
             if (!win.isVisible()) {
@@ -2332,12 +2985,10 @@ function evaluateGifOverlayVisibility() {
     });
 }
 
-// Handler: Toggle Semua Overlay + Restore
-ipcMain.on('set-gif-overlay-enabled', (event, enabled) => {
-    isGifOverlayEnabled = enabled;
-    userSettings.gifOverlayEnabled = enabled;
+function setGifOverlayRuntime(enabled) {
+    isGifOverlayEnabled = enabled === true;
 
-    if (enabled) {
+    if (isGifOverlayEnabled) {
         // Jika list kosong, coba restore dari settings
         if (gifOverlayWindows.size === 0) {
             if (userSettings.gifOverlays && Array.isArray(userSettings.gifOverlays) && userSettings.gifOverlays.length > 0) {
@@ -2345,7 +2996,12 @@ ipcMain.on('set-gif-overlay-enabled', (event, enabled) => {
                 let maxId = 0;
                 userSettings.gifOverlays.forEach(item => {
                     // Restore dengan settings dan bounds per-GIF
-                    createGifOverlayWindow(item.path, item.id, item.settings, item.bounds);
+                    createGifOverlayWindow(item.path, item.id, item.settings, item.bounds, {
+                        sourcePath: item.sourcePath || item.path,
+                        mediaType: item.mediaType || inferMediaTypeMain(item.sourcePath || item.path),
+                        layer: item.layer,
+                        hidden: item.hidden
+                    });
                     if (item.id > maxId) maxId = item.id;
                 });
                 // Pastikan next ID aman
@@ -2369,15 +3025,25 @@ ipcMain.on('set-gif-overlay-enabled', (event, enabled) => {
         gifOverlayWindows.forEach(win => win.hide());
         stopCursorTracking();
     }
+}
+
+// Handler global. Jika lagu aktif memiliki profil, runtime akan segera dikembalikan
+// ke override profil tanpa menimpa nilai global yang baru disimpan.
+ipcMain.on('set-gif-overlay-enabled', (_event, enabled) => {
+    userSettings.gifOverlayEnabled = enabled === true;
+    scheduleSaveUserSettings();
+    applyMusicProfileForCurrentTrack({ force: true });
 });
 
 // --- GIF Overlay Handlers ---
 ipcMain.handle('gif-overlay-browse-file', async () => {
     const result = await dialog.showOpenDialog({
-        title: 'Pilih File GIF',
+        title: 'Pilih File Media',
         filters: [
-            { name: 'GIF Images', extensions: ['gif'] },
-            { name: 'All Images', extensions: ['gif', 'png', 'jpg', 'jpeg', 'webp'] }
+            { name: 'Semua Media', extensions: ['gif', 'png', 'jpg', 'jpeg', 'webp', 'apng', 'mp4', 'webm', 'mov', 'm4v', 'mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a'] },
+            { name: 'Gambar/GIF', extensions: ['gif', 'png', 'jpg', 'jpeg', 'webp', 'apng'] },
+            { name: 'Video', extensions: ['mp4', 'webm', 'mov', 'm4v'] },
+            { name: 'Audio', extensions: ['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a'] }
         ],
         properties: ['openFile']
     });
@@ -2386,8 +3052,16 @@ ipcMain.handle('gif-overlay-browse-file', async () => {
 });
 
 // ======================== GIF Storage & Preset System ======================== //
-// Direktori penyimpanan GIF internal aplikasi
-const gifStorageDirectory = path.join(__dirname, 'aset', 'gif-storage');
+// Media adalah data pengguna, bukan aset instalasi. Menaruhnya di __dirname
+// membuatnya rawan read-only atau hilang saat aplikasi di-update/rebuild.
+const legacyGifStorageDirectory = path.join(__dirname, 'aset', 'gif-storage');
+const gifStorageDirectory = path.join(app.getPath('userData'), 'gif-storage');
+
+function isPathInsideDirectory(filePath, directory) {
+    if (!filePath || !directory) return false;
+    const relative = path.relative(path.resolve(directory), path.resolve(filePath));
+    return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+}
 
 // Pastikan folder gif-storage ada
 function ensureGifStorageDirectory() {
@@ -2395,6 +3069,48 @@ function ensureGifStorageDirectory() {
         fs.mkdirSync(gifStorageDirectory, { recursive: true });
         console.log('[GIF Storage] Folder penyimpanan GIF dibuat:', gifStorageDirectory);
     }
+    return gifStorageDirectory;
+}
+
+function migrateLegacyGifStorage() {
+    ensureGifStorageDirectory();
+    if (!fs.existsSync(legacyGifStorageDirectory)
+        || path.resolve(legacyGifStorageDirectory) === path.resolve(gifStorageDirectory)) {
+        return false;
+    }
+
+    let changed = false;
+    const migratedPaths = new Map();
+    for (const entry of fs.readdirSync(legacyGifStorageDirectory, { withFileTypes: true })) {
+        if (!entry.isFile()) continue;
+        const oldPath = path.join(legacyGifStorageDirectory, entry.name);
+        const newPath = path.join(gifStorageDirectory, entry.name);
+        if (!fs.existsSync(newPath)) fs.copyFileSync(oldPath, newPath);
+        migratedPaths.set(path.resolve(oldPath).toLowerCase(), newPath);
+    }
+
+    const migrateOverlay = (overlay) => {
+        if (!overlay || typeof overlay !== 'object') return;
+        for (const key of ['path', 'sourcePath']) {
+            const value = overlay[key];
+            if (!value || !isPathInsideDirectory(value, legacyGifStorageDirectory)) continue;
+            const migrated = migratedPaths.get(path.resolve(value).toLowerCase());
+            if (migrated && fs.existsSync(migrated)) {
+                overlay[key] = migrated;
+                changed = true;
+            }
+        }
+    };
+
+    (userSettings.gifOverlays || []).forEach(migrateOverlay);
+    (userSettings.gifOverlayPresets || []).forEach(preset => {
+        (preset.overlays || []).forEach(migrateOverlay);
+    });
+
+    if (changed) {
+        console.log('[GIF Storage] Referensi media lama dimigrasikan ke userData.');
+    }
+    return changed;
 }
 
 // Inisialisasi folder saat aplikasi dimulai
@@ -2410,11 +3126,12 @@ ipcMain.handle('gif-overlay-import-file', async (event, externalPath) => {
         ensureGifStorageDirectory();
 
         // Cek apakah file sudah ada di folder internal
-        if (externalPath.startsWith(gifStorageDirectory)) {
+        if (isPathInsideDirectory(externalPath, gifStorageDirectory)) {
             console.log('[GIF Storage] File sudah ada di folder internal, tidak perlu copy');
             return {
                 success: true,
                 internalPath: externalPath,
+                mediaType: inferMediaTypeMain(externalPath),
                 warning: null
             };
         }
@@ -2443,6 +3160,7 @@ ipcMain.handle('gif-overlay-import-file', async (event, externalPath) => {
         return {
             success: true,
             internalPath: internalPath,
+            mediaType: inferMediaTypeMain(internalPath),
             warning: warning
         };
     } catch (e) {
@@ -2466,24 +3184,19 @@ ipcMain.handle('gif-overlay-check-file-exists', async (event, filePath) => {
 // ======================== Sistem Preset GIF Overlay ======================== //
 
 // Handler: Simpan konfigurasi saat ini sebagai preset baru
-ipcMain.handle('gif-preset-save', async (event, { name }) => {
+ipcMain.handle('gif-preset-save', async (event, payload = {}) => {
     try {
+        const name = String(payload.name || '').trim();
+        if (!name) return { success: false, error: 'Nama profile tidak boleh kosong.' };
         const presetId = `preset_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const now = Date.now();
 
-        // Ambil data dari semua overlay yang aktif
-        const overlays = [];
-        gifOverlayWindows.forEach((win, id) => {
-            if (!win.isDestroyed() && win.currentPath) {
-                const bounds = win.getBounds();
-                overlays.push({
-                    id: id,
-                    path: win.currentPath,
-                    settings: win.gifSettings || { condition: 'always', value: '', opacity: 1, rotation: 0, hideOnCursor: false },
-                    bounds: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height }
-                });
-            }
-        });
+        // Snapshot dari Save Settings adalah dokumen otoritatif. BrowserWindow
+        // bisa sedang ditutup/ditransisikan dan tidak boleh menentukan isi preset.
+        const sourceOverlays = Array.isArray(payload.overlays)
+            ? payload.overlays
+            : (userSettings.gifOverlays || []);
+        const overlays = cloneGifOverlayList(sourceOverlays);
 
         const newPreset = {
             presetId: presetId,
@@ -2500,10 +3213,16 @@ ipcMain.handle('gif-preset-save', async (event, { name }) => {
         userSettings.gifOverlayPresets.push(newPreset);
 
         // Set preset baru sebagai preset aktif
+        const previousActivePresetId = userSettings.activePresetId;
         userSettings.activePresetId = presetId;
+        userSettings.gifOverlays = cloneGifOverlayList(overlays);
 
-        // Simpan ke disk
-        scheduleSaveUserSettings();
+        // Jangan laporkan sukses sebelum user-data.json benar-benar durable.
+        if (!flushUserSettingsToDisk()) {
+            userSettings.gifOverlayPresets = userSettings.gifOverlayPresets.filter(p => p.presetId !== presetId);
+            userSettings.activePresetId = previousActivePresetId;
+            return { success: false, error: 'Gagal menulis profile ke penyimpanan aplikasi.' };
+        }
 
         console.log(`[GIF Preset] Preset baru disimpan: "${name}" (ID: ${presetId}, ${overlays.length} overlay)`);
         return { success: true, preset: newPreset };
@@ -2567,6 +3286,7 @@ ipcMain.handle('gif-preset-delete', async (event, presetIdOrOptions, optionsPara
                 }
             });
             gifOverlayWindows.clear();
+            gifOverlayGeometry.clear();
             nextOverlayId = 1;
 
             // Reset state
@@ -2609,7 +3329,14 @@ ipcMain.handle('gif-preset-apply', async (event, presetId) => {
             return { success: false, error: 'Preset tidak ditemukan' };
         }
 
-        console.log(`[GIF Preset] Menerapkan preset: "${preset.name}" (${preset.overlays.length} overlay)`);
+        // Commit preset lama satu kali sebelum lifecycle window ditutup. Event
+        // `closed` sendiri tidak boleh lagi mengubah dokumen tersimpan.
+        if (gifOverlayWindows.size > 0 && userSettings.activePresetId && userSettings.activePresetId !== presetId) {
+            updateGifOverlaysInMemory();
+        }
+        const targetOverlays = cloneGifOverlayList(preset.overlays || []);
+
+        console.log(`[GIF Preset] Menerapkan preset: "${preset.name}" (${targetOverlays.length} overlay)`);
 
         // Tutup semua overlay yang ada
         const closedCount = gifOverlayWindows.size;
@@ -2619,6 +3346,7 @@ ipcMain.handle('gif-preset-apply', async (event, presetId) => {
             }
         });
         gifOverlayWindows.clear();
+        gifOverlayGeometry.clear();
         nextOverlayId = 1;
         console.log(`[GIF Preset] Closed ${closedCount} existing windows`);
 
@@ -2626,15 +3354,20 @@ ipcMain.handle('gif-preset-apply', async (event, presetId) => {
         const missingFiles = [];
         let maxId = 0;
 
-        for (const overlay of preset.overlays) {
+        for (const overlay of targetOverlays) {
             // Cek apakah file masih ada
-            if (!fs.existsSync(overlay.path)) {
+            if (!overlay.path || !fs.existsSync(overlay.path)) {
                 missingFiles.push(overlay.path);
                 console.warn(`[GIF Preset] File tidak ditemukan: ${overlay.path}`);
                 continue;
             }
 
-            createGifOverlayWindow(overlay.path, overlay.id, overlay.settings, overlay.bounds);
+            createGifOverlayWindow(overlay.path, overlay.id, overlay.settings, overlay.bounds, {
+                sourcePath: overlay.sourcePath || overlay.path,
+                mediaType: overlay.mediaType || inferMediaTypeMain(overlay.sourcePath || overlay.path),
+                layer: overlay.layer,
+                hidden: overlay.hidden
+            });
             if (overlay.id > maxId) maxId = overlay.id;
         }
 
@@ -2642,11 +3375,13 @@ ipcMain.handle('gif-preset-apply', async (event, presetId) => {
         if (maxId >= nextOverlayId) nextOverlayId = maxId + 1;
 
         // Update gifOverlays di userSettings untuk sinkronisasi
-        userSettings.gifOverlays = preset.overlays.filter(o => fs.existsSync(o.path));
+        userSettings.gifOverlays = targetOverlays.filter(o => o.path && fs.existsSync(o.path));
 
         // Set sebagai preset aktif
         userSettings.activePresetId = presetId;
-        scheduleSaveUserSettings();
+        if (!flushUserSettingsToDisk()) {
+            return { success: false, error: 'Preset diterapkan, tetapi state aktif gagal disimpan ke disk.' };
+        }
 
         // Evaluasi visibilitas
         evaluateGifOverlayVisibility();
@@ -2684,6 +3419,9 @@ ipcMain.handle('gif-preset-get-active', async () => {
 // Handler: Set preset aktif (tanpa menerapkan - hanya update state)
 ipcMain.on('gif-preset-set-active', (event, presetId) => {
     const previousPreset = userSettings.activePresetId;
+    if (previousPreset && previousPreset !== presetId && gifOverlayWindows.size > 0) {
+        updateGifOverlaysInMemory();
+    }
     userSettings.activePresetId = presetId;
     scheduleSaveUserSettings();
     console.log(`[GIF Preset] Preset aktif diset: ${previousPreset || 'null'} -> ${presetId || 'null'}`);
@@ -2708,7 +3446,10 @@ ipcMain.handle('gif-settings-save', async (event, settings) => {
             userSettings.gifOverlayLocked = settings.gifOverlayLocked;
         }
         if (settings.gifOverlays !== undefined) {
-            userSettings.gifOverlays = settings.gifOverlays;
+            if (!Array.isArray(settings.gifOverlays)) {
+                return { success: false, error: 'Format daftar overlay tidak valid.' };
+            }
+            userSettings.gifOverlays = cloneGifOverlayList(settings.gifOverlays);
         }
         if (settings.activePresetId !== undefined) {
             userSettings.activePresetId = settings.activePresetId;
@@ -2718,18 +3459,241 @@ ipcMain.handle('gif-settings-save', async (event, settings) => {
         if (userSettings.activePresetId && userSettings.gifOverlayPresets) {
             const presetIndex = userSettings.gifOverlayPresets.findIndex(p => p.presetId === userSettings.activePresetId);
             if (presetIndex !== -1) {
-                userSettings.gifOverlayPresets[presetIndex].overlays = userSettings.gifOverlays || [];
+                userSettings.gifOverlayPresets[presetIndex].overlays = cloneGifOverlayList(userSettings.gifOverlays || []);
                 userSettings.gifOverlayPresets[presetIndex].updatedAt = Date.now();
                 console.log(`[GIF Settings] Preset "${userSettings.gifOverlayPresets[presetIndex].name}" updated with ${userSettings.gifOverlays.length} overlays.`);
             }
         }
         // ----------------------------------------------
 
-        scheduleSaveUserSettings();
-        console.log('[GIF Settings] Settings berhasil disimpan ke main process');
+        if (!flushUserSettingsToDisk()) {
+            return { success: false, error: 'Gagal menulis user-data.json ke penyimpanan aplikasi.' };
+        }
+        console.log('[GIF Settings] Settings berhasil disimpan ke disk');
         return { success: true };
     } catch (e) {
         console.error('[GIF Settings] Gagal menyimpan settings:', e);
+        return { success: false, error: e.message };
+    }
+});
+
+// ======================== Studio Tools: Duplicate / Layer / Align / Pack ======================== //
+
+// Handler: Gandakan overlay yang ada (mengembalikan { success, overlay })
+ipcMain.handle('gif-overlay-duplicate', async (event, id) => {
+    try {
+        const src = gifOverlayWindows.get(id);
+        if (!src || src.isDestroyed()) {
+            return { success: false, error: 'Overlay yang akan digandakan tidak ditemukan' };
+        }
+
+        const b = getGifOverlayBoundsSnapshot(id, src);
+        // Offset sedikit agar duplikat tidak menumpuk persis di atas aslinya
+        const newBounds = { x: b.x + 24, y: b.y + 24, width: b.width, height: b.height };
+        const settings = JSON.parse(JSON.stringify(src.gifSettings || {}));
+
+        const newId = createGifOverlayWindow(src.currentPath, null, settings, newBounds, {
+            sourcePath: src.sourcePath || src.currentPath,
+            mediaType: src.mediaType,
+            layer: src.gifLayer,
+            hidden: src.gifHidden
+        });
+
+        updateGifOverlaysInMemory();
+        evaluateGifOverlayVisibility();
+        scheduleSaveUserSettings();
+
+        return {
+            success: true,
+            overlay: {
+                id: newId,
+                path: src.currentPath,
+                sourcePath: src.sourcePath || src.currentPath,
+                mediaType: src.mediaType || inferMediaTypeMain(src.currentPath),
+                settings: settings,
+                layer: src.gifLayer || 0,
+                hidden: src.gifHidden === true,
+                bounds: newBounds
+            }
+        };
+    } catch (e) {
+        console.error('[GIF Studio] Gagal menggandakan overlay:', e);
+        return { success: false, error: e.message };
+    }
+});
+
+// Handler: Set urutan layer (z-order) berdasarkan array id terurut (bawah -> atas)
+ipcMain.on('gif-overlay-set-layer-order', (event, orderedIds) => {
+    if (!Array.isArray(orderedIds)) return;
+
+    orderedIds.forEach((rawId, index) => {
+        const id = parseInt(rawId);
+        const win = gifOverlayWindows.get(id);
+        if (win && !win.isDestroyed()) {
+            win.gifLayer = index;
+            if (win.gifSettings) win.gifSettings.layer = index;
+            // Re-assert always-on-top lalu bawa ke depan secara berurutan
+            win.setAlwaysOnTop(true, 'screen-saver');
+            win.moveTop();
+        }
+    });
+
+    updateGifOverlaysInMemory();
+    scheduleSaveUserSettings();
+    console.log(`[GIF Studio] Urutan layer diperbarui untuk ${orderedIds.length} overlay`);
+});
+
+// Handler: Align overlay (center / snap-grid)
+ipcMain.handle('gif-overlay-align', async (event, { ids, action, gridSize = 32 } = {}) => {
+    try {
+        const targetIds = Array.isArray(ids) ? ids : [];
+        targetIds.forEach(rawId => {
+            const id = parseInt(rawId);
+            const win = gifOverlayWindows.get(id);
+            if (!win || win.isDestroyed()) return;
+
+            const b = getGifOverlayBoundsSnapshot(id, win);
+            if (action === 'center') {
+                const wa = screen.getDisplayNearestPoint(getGifOverlayGeometryCenter(b)).workArea;
+                moveGifOverlayWindow(
+                    id,
+                    win,
+                    wa.x + (wa.width - b.width) / 2,
+                    wa.y + (wa.height - b.height) / 2,
+                    'align:center'
+                );
+            } else if (action === 'snap-grid') {
+                const g = Math.max(1, parseInt(gridSize) || 32);
+                moveGifOverlayWindow(
+                    id,
+                    win,
+                    Math.round(b.x / g) * g,
+                    Math.round(b.y / g) * g,
+                    'align:snap-grid'
+                );
+            }
+        });
+
+        updateGifOverlaysInMemory();
+        scheduleSaveUserSettings();
+        return { success: true };
+    } catch (e) {
+        console.error('[GIF Studio] Gagal align overlay:', e);
+        return { success: false, error: e.message };
+    }
+});
+
+// Handler: Export Pack - bundel media (base64) + settings ke satu file .gapack (JSON mandiri)
+ipcMain.handle('gif-pack-export', async (event, { name, presetId, overlays } = {}) => {
+    try {
+        const safeName = (name || 'overlay-pack').replace(/[^\w\-]+/g, '_');
+        const { canceled, filePath } = await dialog.showSaveDialog({
+            title: 'Export Overlay Pack',
+            defaultPath: `${safeName}.gapack`,
+            filters: [{ name: 'GAP Overlay Pack', extensions: ['gapack', 'json'] }]
+        });
+        if (canceled || !filePath) return { canceled: true };
+
+        const list = Array.isArray(overlays) && overlays.length > 0
+            ? overlays
+            : (userSettings.gifOverlays || []);
+
+        const packOverlays = [];
+        for (const o of list) {
+            const srcPath = o.sourcePath || o.path;
+            let media = null, fileName = null;
+            if (srcPath && fs.existsSync(srcPath)) {
+                media = fs.readFileSync(srcPath).toString('base64');
+                fileName = path.basename(srcPath);
+            }
+            packOverlays.push({
+                id: o.id,
+                fileName,
+                mediaType: o.mediaType || inferMediaTypeMain(srcPath),
+                settings: o.settings || {},
+                layer: o.layer || 0,
+                hidden: o.hidden === true,
+                bounds: o.bounds || null,
+                media
+            });
+        }
+
+        const pack = {
+            format: 'gap-overlay-pack',
+            version: 1,
+            name: name || 'Overlay Pack',
+            presetId: presetId || null,
+            exportedAt: Date.now(),
+            overlays: packOverlays
+        };
+
+        fs.writeFileSync(filePath, JSON.stringify(pack));
+        console.log(`[GIF Pack] Pack diekspor ke ${filePath} (${packOverlays.length} media)`);
+        return { success: true, overlayCount: packOverlays.length, filePath };
+    } catch (e) {
+        console.error('[GIF Pack] Gagal export pack:', e);
+        return { success: false, error: e.message };
+    }
+});
+
+// Handler: Import Pack - baca .gapack, decode media ke gif-storage, buat preset baru
+ipcMain.handle('gif-pack-import', async () => {
+    try {
+        const { canceled, filePaths } = await dialog.showOpenDialog({
+            title: 'Import Overlay Pack',
+            filters: [{ name: 'GAP Overlay Pack', extensions: ['gapack', 'json'] }],
+            properties: ['openFile']
+        });
+        if (canceled || !filePaths || filePaths.length === 0) return { canceled: true };
+
+        const raw = fs.readFileSync(filePaths[0], 'utf-8');
+        const pack = JSON.parse(raw);
+        if (!pack || !Array.isArray(pack.overlays)) {
+            return { success: false, error: 'Format pack tidak valid' };
+        }
+
+        ensureGifStorageDirectory();
+
+        const overlays = [];
+        let nid = 1;
+        for (const o of pack.overlays) {
+            let internalPath = null;
+            if (o.media && o.fileName) {
+                const ext = path.extname(o.fileName) || '';
+                const base = path.basename(o.fileName, ext);
+                const unique = `${base}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}${ext}`;
+                internalPath = path.join(gifStorageDirectory, unique);
+                fs.writeFileSync(internalPath, Buffer.from(o.media, 'base64'));
+            }
+            overlays.push({
+                id: nid++,
+                path: internalPath,
+                sourcePath: internalPath,
+                mediaType: o.mediaType || inferMediaTypeMain(internalPath),
+                settings: o.settings || {},
+                layer: o.layer || 0,
+                hidden: o.hidden === true,
+                bounds: o.bounds || { x: 100, y: 100, width: 200, height: 200 }
+            });
+        }
+
+        const presetId = `preset_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const newPreset = {
+            presetId,
+            name: pack.name || 'Imported Pack',
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            overlays
+        };
+
+        if (!userSettings.gifOverlayPresets) userSettings.gifOverlayPresets = [];
+        userSettings.gifOverlayPresets.push(newPreset);
+        scheduleSaveUserSettings();
+
+        console.log(`[GIF Pack] Pack diimport sebagai preset "${newPreset.name}" (${overlays.length} media)`);
+        return { success: true, preset: newPreset };
+    } catch (e) {
+        console.error('[GIF Pack] Gagal import pack:', e);
         return { success: false, error: e.message };
     }
 });
@@ -2786,8 +3750,12 @@ ipcMain.on('gif-overlay-image-loaded', (event, { id, path, naturalWidth, natural
         newHeight = Math.round(newHeight * scale);
     }
 
-    // Resize window
-    win.setSize(newWidth, newHeight);
+    // Resize resmi memperbarui ukuran kanonik sebelum menyentuh BrowserWindow.
+    resizeGifOverlayWindow(id, win, {
+        ...getGifOverlayBoundsSnapshot(id, win),
+        width: newWidth,
+        height: newHeight
+    }, 'media-natural-size');
     updateGifOverlaysInMemory();
 
     console.log(`[Main][GIF] Overlay #${id} resized to ${newWidth}x${newHeight} (original: ${naturalWidth}x${naturalHeight})`);
@@ -2803,6 +3771,71 @@ let resizeStartBounds = null;
 let resizeInterval = null;
 let lastCursorPos = null;
 let cursorIdleTime = 0;
+let resizeStartedAt = 0;
+const RESIZE_IDLE_TIMEOUT_MS = 250;
+const RESIZE_MAX_DURATION_MS = 10000;
+
+let activeDragOverlayId = null;
+let dragStartMousePos = null;
+let dragStartBounds = null;
+let dragInterval = null;
+let lastDragCursorPos = null;
+let dragCursorIdleTime = 0;
+let dragStartedAt = 0;
+const DRAG_IDLE_TIMEOUT_MS = 500;
+const DRAG_MAX_DURATION_MS = 15000;
+
+function finishGifOverlayResize(id, reason) {
+    if (activeResizeOverlayId !== id) return;
+
+    if (resizeInterval) {
+        clearInterval(resizeInterval);
+        resizeInterval = null;
+    }
+
+    activeResizeOverlayId = null;
+    resizeStartMousePos = null;
+    resizeStartBounds = null;
+    lastCursorPos = null;
+    cursorIdleTime = 0;
+    resizeStartedAt = 0;
+
+    const win = gifOverlayWindows.get(id);
+    if (win && !win.isDestroyed()) {
+        resetGifAnimationAnchor(id);
+        updateGifOverlaysInMemory();
+        // Simpan juga resize yang berakhir melalui fallback, bukan hanya melalui IPC.
+        scheduleSaveUserSettings();
+    }
+
+    console.log(`[Main][GIF] Resize ended (${reason}) for overlay #${id}`);
+}
+
+function finishGifOverlayDrag(id, reason) {
+    if (activeDragOverlayId !== id) return;
+
+    if (dragInterval) {
+        clearInterval(dragInterval);
+        dragInterval = null;
+    }
+
+    activeDragOverlayId = null;
+    dragStartMousePos = null;
+    dragStartBounds = null;
+    lastDragCursorPos = null;
+    dragCursorIdleTime = 0;
+    dragStartedAt = 0;
+
+    const win = gifOverlayWindows.get(id);
+    if (win && !win.isDestroyed()) {
+        resetGifAnimationAnchor(id);
+        pauseGifAnimation(id, 2000);
+        updateGifOverlaysInMemory();
+        scheduleSaveUserSettings();
+    }
+
+    console.log(`[Main][GIF] Drag ended (${reason}) for overlay #${id}`);
+}
 
 // Handler: Resize start - mulai polling
 ipcMain.on('gif-overlay-resize-start', (event, id) => {
@@ -2812,7 +3845,7 @@ ipcMain.on('gif-overlay-resize-start', (event, id) => {
     // Jika sudah ada resize aktif, jangan mulai yang baru
     if (activeResizeOverlayId !== null) return;
 
-    const bounds = win.getBounds();
+    const bounds = getGifOverlayBoundsSnapshot(id, win);
     const cursorPos = screen.getCursorScreenPoint();
 
     activeResizeOverlayId = id;
@@ -2820,6 +3853,7 @@ ipcMain.on('gif-overlay-resize-start', (event, id) => {
     resizeStartBounds = { width: bounds.width, height: bounds.height, x: bounds.x, y: bounds.y };
     lastCursorPos = { x: cursorPos.x, y: cursorPos.y };
     cursorIdleTime = 0;
+    resizeStartedAt = Date.now();
 
     // Mulai polling untuk tracking mouse global
     if (resizeInterval) clearInterval(resizeInterval);
@@ -2832,9 +3866,16 @@ ipcMain.on('gif-overlay-resize-start', (event, id) => {
 
         const targetWin = gifOverlayWindows.get(activeResizeOverlayId);
         if (!targetWin || targetWin.isDestroyed()) {
-            clearInterval(resizeInterval);
-            resizeInterval = null;
-            activeResizeOverlayId = null;
+            finishGifOverlayResize(activeResizeOverlayId, 'window-destroyed');
+            return;
+        }
+
+        // Mouseup normal akan menghentikan resize secara eksplisit dari renderer.
+        // Ini hanya sabuk pengaman untuk mouseup yang hilang saat pointer keluar
+        // dari transparent BrowserWindow. Batas durasi mencegah polling tertinggal
+        // aktif karena micro-movement touchpad/mouse.
+        if (Date.now() - resizeStartedAt >= RESIZE_MAX_DURATION_MS) {
+            finishGifOverlayResize(activeResizeOverlayId, 'safety-timeout');
             return;
         }
 
@@ -2843,15 +3884,9 @@ ipcMain.on('gif-overlay-resize-start', (event, id) => {
         // Cek apakah cursor masih bergerak
         if (lastCursorPos && currentCursor.x === lastCursorPos.x && currentCursor.y === lastCursorPos.y) {
             cursorIdleTime += 16;
-            // Jika cursor tidak bergerak selama 150ms, anggap resize selesai
-            if (cursorIdleTime >= 150) {
-                console.log(`[Main][GIF] Resize auto-ended (cursor idle) for overlay #${activeResizeOverlayId}`);
-                clearInterval(resizeInterval);
-                resizeInterval = null;
-                updateGifOverlaysInMemory();
-                activeResizeOverlayId = null;
-                resizeStartMousePos = null;
-                resizeStartBounds = null;
+            // Fallback jika mouseup tidak pernah tiba di renderer.
+            if (cursorIdleTime >= RESIZE_IDLE_TIMEOUT_MS) {
+                finishGifOverlayResize(activeResizeOverlayId, 'cursor-idle');
                 return;
             }
         } else {
@@ -2865,80 +3900,114 @@ ipcMain.on('gif-overlay-resize-start', (event, id) => {
         const newWidth = Math.max(80, resizeStartBounds.width + deltaX);
         const newHeight = Math.max(80, resizeStartBounds.height + deltaY);
 
-        // Gunakan setBounds() karena setSize() bermasalah dengan transparent window
-        // Posisi window tetap sama (resizeStartBounds.x, resizeStartBounds.y)
-        targetWin.setBounds({
+        // Hanya jalur resize resmi ini yang boleh mengubah ukuran kanonik.
+        resizeGifOverlayWindow(activeResizeOverlayId, targetWin, {
             x: resizeStartBounds.x,
             y: resizeStartBounds.y,
             width: Math.round(newWidth),
             height: Math.round(newHeight)
-        });
+        }, 'manual-resize');
     }, 16); // ~60fps
 
     console.log(`[Main][GIF] Resize started for overlay #${id}, start pos: ${cursorPos.x},${cursorPos.y}, bounds: ${bounds.width}x${bounds.height}`);
 });
 
-// Handler: Resize move - fallback jika polling tidak aktif
+// Handler lama untuk kompatibilitas renderer lama. Resize selalu dilakukan oleh
+// polling berbasis titik awal agar delta tidak terakumulasi dan membesarkan window.
 ipcMain.on('gif-overlay-resize-move', (event, { id, deltaX, deltaY }) => {
-    // Resize sekarang di-handle oleh polling, skip ini
-    if (activeResizeOverlayId !== null) return;
-
-    const win = gifOverlayWindows.get(id);
-    if (!win || win.isDestroyed() || isGifOverlayLocked) return;
-
-    const bounds = win.getBounds();
-    const newWidth = Math.max(80, bounds.width + deltaX);
-    const newHeight = Math.max(80, bounds.height + deltaY);
-
-    win.setSize(newWidth, newHeight);
+    // Intentionally no-op. Handler ini tetap terdaftar supaya versi renderer lama
+    // tidak error, tetapi tidak boleh mengubah ukuran di luar sesi resize aktif.
 });
 
 // Handler: Resize end - stop polling (jika masih aktif)
 ipcMain.on('gif-overlay-resize-end', (event, id) => {
-    // Hanya proses jika ini adalah resize yang aktif
-    if (activeResizeOverlayId !== id) return;
-
-    const win = gifOverlayWindows.get(id);
-
-    // Stop polling
-    if (resizeInterval) {
-        clearInterval(resizeInterval);
-        resizeInterval = null;
-    }
-    activeResizeOverlayId = null;
-    resizeStartMousePos = null;
-    resizeStartBounds = null;
-    lastCursorPos = null;
-    cursorIdleTime = 0;
-
-    if (!win || win.isDestroyed()) return;
-    updateGifOverlaysInMemory();
-
-    console.log(`[Main][GIF] Resize ended via IPC for overlay #${id}`);
+    finishGifOverlayResize(id, 'mouseup');
 });
 
 // Handler: Drag start
 ipcMain.on('gif-overlay-drag-start', (event, id) => {
     const win = gifOverlayWindows.get(id);
     if (!win || win.isDestroyed() || isGifOverlayLocked) return;
-    // Tidak perlu menyimpan state khusus untuk drag
+
+    // Jika sesi resize lama tidak sempat menerima mouseup, jangan biarkan ia
+    // meneruskan polling ukuran ketika pengguna mulai menggeser overlay.
+    if (activeResizeOverlayId !== null) {
+        finishGifOverlayResize(activeResizeOverlayId, 'drag-start');
+    }
+
+    if (activeDragOverlayId !== null) return;
+
+    // screen.getCursorScreenPoint() dan BrowserWindow bounds sama-sama memakai
+    // DIP. Menghitung drag di sini menghindari delta screenX renderer yang bisa
+    // berbeda skala pada perangkat dengan DPI/scaling tertentu.
+    const bounds = getGifOverlayBoundsSnapshot(id, win);
+    const cursorPos = screen.getCursorScreenPoint();
+    pauseGifAnimation(id, DRAG_MAX_DURATION_MS + 2000);
+    activeDragOverlayId = id;
+    dragStartMousePos = { x: cursorPos.x, y: cursorPos.y };
+    dragStartBounds = { ...bounds };
+    lastDragCursorPos = { ...cursorPos };
+    dragCursorIdleTime = 0;
+    dragStartedAt = Date.now();
+
+    if (dragInterval) clearInterval(dragInterval);
+    dragInterval = setInterval(() => {
+        const activeId = activeDragOverlayId;
+        if (activeId === null) {
+            clearInterval(dragInterval);
+            dragInterval = null;
+            return;
+        }
+
+        const targetWin = gifOverlayWindows.get(activeId);
+        if (!targetWin || targetWin.isDestroyed()) {
+            finishGifOverlayDrag(activeId, 'window-destroyed');
+            return;
+        }
+
+        if (isGifOverlayLocked) {
+            finishGifOverlayDrag(activeId, 'locked');
+            return;
+        }
+
+        if (Date.now() - dragStartedAt >= DRAG_MAX_DURATION_MS) {
+            finishGifOverlayDrag(activeId, 'safety-timeout');
+            return;
+        }
+
+        const currentCursor = screen.getCursorScreenPoint();
+        if (lastDragCursorPos && currentCursor.x === lastDragCursorPos.x && currentCursor.y === lastDragCursorPos.y) {
+            dragCursorIdleTime += 16;
+            // Fallback untuk mouseup yang hilang setelah pointer keluar dari
+            // transparent BrowserWindow.
+            if (dragCursorIdleTime >= DRAG_IDLE_TIMEOUT_MS) {
+                finishGifOverlayDrag(activeId, 'cursor-idle');
+                return;
+            }
+        } else {
+            dragCursorIdleTime = 0;
+        }
+        lastDragCursorPos = { ...currentCursor };
+
+        moveGifOverlayWindow(
+            activeId,
+            targetWin,
+            dragStartBounds.x + currentCursor.x - dragStartMousePos.x,
+            dragStartBounds.y + currentCursor.y - dragStartMousePos.y,
+            'manual-drag'
+        );
+    }, 16);
 });
 
-// Handler: Drag move (delta based)
+// Kompatibilitas untuk renderer versi lama. Drag aktif selalu ditangani oleh
+// polling main process agar delta tidak bergantung pada skala renderer.
 ipcMain.on('gif-overlay-drag-move', (event, { id, deltaX, deltaY }) => {
-    const win = gifOverlayWindows.get(id);
-    if (!win || win.isDestroyed() || isGifOverlayLocked) return;
-
-    const bounds = win.getBounds();
-    win.setPosition(bounds.x + deltaX, bounds.y + deltaY);
+    // Intentionally no-op.
 });
 
 // Handler: Drag end
 ipcMain.on('gif-overlay-drag-end', (event, id) => {
-    const win = gifOverlayWindows.get(id);
-    if (!win || win.isDestroyed()) return;
-
-    updateGifOverlaysInMemory();
+    finishGifOverlayDrag(id, 'mouseup');
 });
 
 // Global Lock - setIgnoreMouseEvents tanpa forward, karena window sudah berukuran pas
@@ -2992,7 +4061,7 @@ function startCursorTracking() {
             const settings = win.gifSettings || {};
             if (!settings.hideOnCursor) return; // Fitur tidak diaktifkan untuk GIF ini
 
-            const bounds = win.getBounds();
+            const bounds = getGifOverlayBoundsSnapshot(id, win);
             const centerX = bounds.x + bounds.width / 2;
             const centerY = bounds.y + bounds.height / 2;
 
@@ -3042,7 +4111,7 @@ function stopCursorTracking() {
 // ======================================= Akhir Logika GIF Overlay =================================== //
 
 // ======================== Logika Version Overlay (BrowserView) =======================//
-const VERSION_TEXT = 'versi 0.0.0.8 | Versi Eksperimental, tidak mengindikasikan hasil akhir aplikasi...';
+const VERSION_TEXT = 'versi 0.0.0.9 | Versi Eksperimental, tidak mengindikasikan hasil akhir aplikasi...';
 const VERSION_OVERLAY_WIDTH = 548;
 const VERSION_OVERLAY_HEIGHT = 30;
 const VERSION_OVERLAY_MARGIN = 0;
@@ -3242,6 +4311,112 @@ function createMiniPlayerWindow() {
     console.log('[Main] Jendela Mini Player dibuat dengan setShape DAN ignoreMouseEvents.');
 }
 
+// ======================== Logika Rhythm Overlay Gamifikasi =======================//
+function createRhythmOverlayWindow() {
+    if (rhythmOverlayWindow) return;
+
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const workArea = primaryDisplay.workAreaSize;
+
+    // Overlay full-screen transparan, click-through
+    rhythmOverlayWindow = new BrowserWindow({
+        width: workArea.width,
+        height: workArea.height,
+        x: 0,
+        y: 0,
+        frame: false,
+        transparent: true,
+        skipTaskbar: true,
+        focusable: false,
+        resizable: false,
+        hasShadow: false,
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false,
+        },
+        show: false,
+    });
+
+    rhythmOverlayWindow.setAlwaysOnTop(true, 'screen-saver');
+    rhythmOverlayWindow.setIgnoreMouseEvents(true);
+
+    rhythmOverlayWindow.loadFile(path.join(__dirname, 'rhythm-overlay.html'));
+
+    // Sinkronkan preferensi visibilitas panel Now Playing setelah halaman siap
+    rhythmOverlayWindow.webContents.on('did-finish-load', () => {
+        if (rhythmOverlayWindow && !rhythmOverlayWindow.isDestroyed()) {
+            rhythmOverlayWindow.webContents.send(
+                'rhythm-set-nowplaying-visible',
+                runtimeRhythmHideNowPlaying !== true
+            );
+            rhythmOverlayWindow.webContents.send('rhythm-ad-state', {
+                active: lastAdState === 'waiting' || lastAdState === 'skippable'
+            });
+            rhythmOverlayWindow.webContents.send('rhythm-subtitle', {
+                text: lastRhythmSubtitle
+            });
+        }
+    });
+
+    rhythmOverlayWindow.on('closed', () => {
+        rhythmOverlayWindow = null;
+    });
+
+    console.log('[Main] Jendela Rhythm Overlay Gamifikasi dibuat.');
+}
+
+function setRhythmOverlayRuntime(enabled) {
+    isRhythmOverlayEnabled = enabled === true;
+    if (isRhythmOverlayEnabled) {
+        if (!rhythmOverlayWindow) createRhythmOverlayWindow();
+        if (rhythmOverlayWindow && !rhythmOverlayWindow.isDestroyed()) {
+            rhythmOverlayWindow.show();
+            lastRhythmTrackTitle = lastMusicState.title || null;
+        }
+    } else if (rhythmOverlayWindow && !rhythmOverlayWindow.isDestroyed()) {
+        rhythmOverlayWindow.hide();
+        lastRhythmBreakState = false;
+        evaluateGifOverlayVisibility();
+    }
+}
+
+function setRhythmHideNowPlayingRuntime(hidden) {
+    runtimeRhythmHideNowPlaying = hidden === true;
+    if (rhythmOverlayWindow && !rhythmOverlayWindow.isDestroyed()) {
+        rhythmOverlayWindow.webContents.send('rhythm-set-nowplaying-visible', !runtimeRhythmHideNowPlaying);
+    }
+}
+
+ipcMain.on('toggle-rhythm-overlay', (_event, enabled) => {
+    userSettings.rhythmOverlayEnabled = enabled === true;
+    scheduleSaveUserSettings();
+    applyMusicProfileForCurrentTrack({ force: true });
+});
+
+ipcMain.on('set-rhythm-hide-nowplaying', (_event, hidden) => {
+    userSettings.rhythmHideNowPlaying = hidden === true;
+    scheduleSaveUserSettings();
+    applyMusicProfileForCurrentTrack({ force: true });
+});
+
+ipcMain.on('rhythm-break-state', (_event, active) => {
+    const nextState = active === true;
+    if (lastRhythmBreakState === nextState) return;
+    lastRhythmBreakState = nextState;
+    evaluateGifOverlayVisibility();
+});
+
+// Caption berasal dari CC YouTube Music yang diaktifkan manual oleh user.
+// Simpan nilai terakhir agar overlay yang baru dibuka langsung sinkron.
+ipcMain.on('subtitle-update', (_event, payload) => {
+    lastRhythmSubtitle = String(payload?.text || '').trim();
+    if (isRhythmOverlayEnabled && rhythmOverlayWindow && !rhythmOverlayWindow.isDestroyed()) {
+        rhythmOverlayWindow.webContents.send('rhythm-subtitle', {
+            text: lastRhythmSubtitle
+        });
+    }
+});
+
 // Logika Mini Player (Sync ke Overlay)
 ipcMain.on('set-mini-player-feature-enabled', (event, enabled) => {
     isMiniPlayerFeatureEnabled = enabled;
@@ -3282,460 +4457,7 @@ ipcMain.on('set-mini-player-feature-enabled', (event, enabled) => {
     scheduleSaveUserSettings();
 });
 
-// ======================== Logika Preview Window ======================= //
-let previewWindow = null;
-
-function createPreviewWindow() {
-    if (previewWindow && !previewWindow.isDestroyed()) {
-        previewWindow.show();
-        previewWindow.focus();
-        return;
-    }
-
-    previewWindow = new BrowserWindow({
-        width: 1280,
-        height: 720,
-        title: "Preview - Special Event",
-        autoHideMenuBar: true,
-        webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false, // Memudahkan komunikasi IPC langsung
-            webSecurity: false // Mengizinkan akses file lokal
-        }
-    });
-
-    // Load template player standar
-    previewWindow.loadFile(path.join(__dirname, 'vn_player_template.html'));
-
-    previewWindow.on('closed', () => {
-        previewWindow = null;
-    });
-}
-
-// Handler IPC untuk membuka/memicu preview
-ipcMain.on('vn-engine:preview-special-event', (event, payload) => {
-    console.log('[Main] Membuka Preview Special Event (Full Context):', payload);
-
-    // Perkaya payload path aset jika relatif (optional, tapi disarankan)
-    // Payload dari editor mungkin path relatif seperti 'background.jpg'.
-    // Player butuh path yang resolve dengan benar.
-    // Namun karena struktur folder player sama, biasanya path relatif 'visual_novels/...' aman.
-
-    if (!previewWindow || previewWindow.isDestroyed()) {
-        createPreviewWindow();
-
-        previewWindow.webContents.once('did-finish-load', () => {
-            // Kirim Full Update Display
-            // Karena payload sekarang berisi semua data entri (bg, sprite, text, dll) + specialEvent
-            // Kita cukup kirim ini sebagai update-display.
-            // Player akan merender aset DAN memicu special event karena ada properti 'specialEvent'.
-
-            // Sedikit delay biar window tampil smooth
-            setTimeout(() => {
-                // Tandai payload ini adalah preview mode
-                previewWindow.webContents.send('vn-engine:update-display', { ...payload, isPreview: true });
-            }, 500);
-        });
-    } else {
-        previewWindow.show();
-        // Langsung kirim update dengan flag preview
-        previewWindow.webContents.send('vn-engine:update-display', { ...payload, isPreview: true });
-    }
-});
-
-// Handler untuk menutup preview window dari tombol back
-ipcMain.on('vn-engine:close-preview-window', () => {
-    console.log('[Main] Menerima perintah tutup preview window.');
-
-    // Jika sedang dalam mode preview label, restore state engine
-    if (isLabelPreviewMode) {
-        console.log('[Main] Menutup preview label, me-restore state engine...');
-        restoreLabelPreviewState();
-    }
-
-    if (previewWindow && !previewWindow.isDestroyed()) {
-        previewWindow.close();
-    }
-});
-
-// ---------------------------- Handler Preview Label ----------------------------  //
-// Flag untuk menandai apakah sedang dalam mode preview label
-let isLabelPreviewMode = false;
-let labelPreviewScriptBackup = null; // Backup skrip asli saat preview
-let labelPreviewStateBackup = null; // Backup state engine asli
-let labelPreviewIndexBackup = 0; // Backup index asli
-let labelPreviewHistoryBackup = []; // Backup history asli
-let labelPreviewLabelName = ''; // Nama label yang sedang di-preview
-
-// Handler IPC untuk preview label secara keseluruhan
-// Menggunakan engine VN yang sudah ada untuk kompatibilitas penuh
-ipcMain.on('vn-engine:preview-label', (event, payload) => {
-    console.log('[Main] Membuka Preview Label menggunakan Engine VN:', payload.labelName);
-
-    // Simpan nama label untuk ditampilkan di akhir
-    labelPreviewLabelName = payload.labelName;
-
-    // Bangun skrip sementara dari entri label
-    // Format: [label header, ...entries]
-    const tempScript = [];
-
-    // Tambahkan label header dengan konteks (background, bgm, dll)
-    const labelHeader = {
-        type: 'label',
-        name: payload.labelName,
-        ...payload.context // background, bgm, transition, dll
-    };
-    tempScript.push(labelHeader);
-
-    // Tambahkan semua entri dari label
-    if (payload.entries && payload.entries.length > 0) {
-        tempScript.push(...payload.entries);
-    }
-
-    console.log('[Main] Preview Label: Skrip sementara dibuat dengan', tempScript.length, 'baris');
-
-    // Backup state engine saat ini (jika ada game yang sedang berjalan)
-    labelPreviewScriptBackup = currentVNScript;
-    labelPreviewStateBackup = { ...currentVNState };
-    labelPreviewIndexBackup = currentVNIndex;
-    labelPreviewHistoryBackup = [...vnDialogueHistory];
-
-    // Set mode preview label
-    isLabelPreviewMode = true;
-
-    // Muat skrip sementara ke engine
-    currentVNScript = tempScript;
-    currentVNIndex = 0;
-    currentVNState = {
-        backgroundStack: [{ type: null, src: null }],
-        bgmState: { src: null, volume: undefined, pan: undefined, delay: undefined },
-        lastSpeaker: null,
-        isLabelPreviewMode: true // Tandai di state juga
-    };
-    vnDialogueHistory = [];
-
-    // Buka atau fokus preview window
-    if (!previewWindow || previewWindow.isDestroyed()) {
-        createPreviewWindow();
-        // Preview window akan mengirim 'vn-engine:ready' saat siap
-        // yang akan memicu processAndSendVNUpdate()
-    } else {
-        previewWindow.show();
-        previewWindow.focus();
-        // Langsung mulai preview karena window sudah siap
-        processPreviewLabelUpdate();
-    }
-});
-
-// Fungsi khusus untuk memproses update di mode preview label
-// Mirip processAndSendVNUpdate tapi mengirim ke previewWindow
-function processPreviewLabelUpdate() {
-    if (!previewWindow || previewWindow.isDestroyed()) return;
-    if (!isLabelPreviewMode) return;
-
-    // Cek apakah sudah mencapai akhir skrip preview
-    if (currentVNIndex >= currentVNScript.length) {
-        console.log('[Main] Preview Label: Semua entri telah selesai diputar.');
-        previewWindow.webContents.send('vn-engine:preview-label-finished', {
-            labelName: labelPreviewLabelName
-        });
-        return;
-    }
-
-    const currentLine = currentVNScript[currentVNIndex];
-
-    // Proses label header (entri pertama)
-    if (currentLine.type === 'label') {
-        // Update state dengan aset dari label
-        if (currentLine.background || currentLine.video) {
-            let newBackgroundState = {};
-            if (currentLine.background) {
-                newBackgroundState = { type: 'image', src: currentLine.background };
-                newBackgroundState.mode = currentLine.backgroundMode || 'cover';
-            } else if (currentLine.video) {
-                newBackgroundState = { type: 'video', src: currentLine.video };
-            }
-            currentVNState.backgroundStack = [newBackgroundState];
-        }
-
-        if (currentLine.bgm) {
-            currentVNState.lastBgmState = {
-                src: currentLine.bgm,
-                volume: currentLine.bgmVolume,
-                pan: currentLine.bgmPan,
-                delay: currentLine.bgmDelay,
-                loop: currentLine.bgmLoop,
-                fade: currentLine.bgmFade
-            };
-        }
-
-        // Lanjut ke entri berikutnya
-        currentVNIndex++;
-        processPreviewLabelUpdate();
-        return;
-    }
-
-    // ===== Penanganan entri Jump =====
-    // Jump dengan target khusus menandakan akhir dari preview
-    if (currentLine.type === 'jump') {
-        const target = currentLine.target;
-        console.log('[Preview Label] Menemukan entri jump dengan target:', target);
-
-        // Cek target-target khusus yang menandakan akhir preview
-        if (target === '##FINISH_PARENT##' ||
-            target === '##SKIP_ALL_LABEL##' ||
-            target.startsWith('fase:') ||
-            target.startsWith('phase:')) {
-            // Target ini menunjukkan keluar dari label, akhiri preview
-            console.log('[Preview Label] Jump target keluar dari label, mengakhiri preview.');
-            previewWindow.webContents.send('vn-engine:preview-label-finished', {
-                labelName: labelPreviewLabelName,
-                finishedBy: 'jump',
-                jumpTarget: target
-            });
-            return;
-        }
-
-        // Cek apakah target adalah label/sub-label yang ada di dalam skrip preview
-        const targetIndex = currentVNScript.findIndex(d => d.type === 'label' && d.name === target);
-        if (targetIndex !== -1) {
-            // Target ada di dalam skrip preview, lompat ke sana
-            console.log('[Preview Label] Jump ke label dalam preview:', target);
-            currentVNIndex = targetIndex;
-            processPreviewLabelUpdate();
-            return;
-        }
-
-        // Target tidak ditemukan di skrip preview, akhiri preview
-        console.log('[Preview Label] Jump target tidak ada di skrip preview, mengakhiri preview.');
-        previewWindow.webContents.send('vn-engine:preview-label-finished', {
-            labelName: labelPreviewLabelName,
-            finishedBy: 'jump-external',
-            jumpTarget: target
-        });
-        return;
-    }
-
-    // ===== Penanganan entri Phase =====
-    // Phase di dalam preview juga menandakan perpindahan ke bagian lain
-    if (currentLine.type === 'phase') {
-        console.log('[Preview Label] Menemukan entri phase, mengakhiri preview.');
-        previewWindow.webContents.send('vn-engine:preview-label-finished', {
-            labelName: labelPreviewLabelName,
-            finishedBy: 'phase',
-            phaseName: currentLine.name
-        });
-        return;
-    }
-
-    // Untuk tipe lain (dialogue, choice, scene), bangun payload seperti engine asli
-    const payload = { ...currentLine };
-
-    // Tambahkan BGM dari state jika tidak ada di entri
-    if (!payload.bgm && currentVNState.lastBgmState) {
-        payload.bgm = currentVNState.lastBgmState.src;
-        if (payload.bgmVolume === undefined) payload.bgmVolume = currentVNState.lastBgmState.volume;
-        if (payload.bgmPan === undefined) payload.bgmPan = currentVNState.lastBgmState.pan;
-        if (payload.bgmDelay === undefined) payload.bgmDelay = currentVNState.lastBgmState.delay;
-        if (payload.bgmLoop === undefined) payload.bgmLoop = currentVNState.lastBgmState.loop;
-        if (payload.bgmFade === undefined) payload.bgmFade = currentVNState.lastBgmState.fade;
-    }
-
-    // Tambahkan background dari state jika tidak ada di entri
-    const currentBackgroundDefault = currentVNState.backgroundStack[currentVNState.backgroundStack.length - 1];
-    if (currentBackgroundDefault) {
-        if (currentBackgroundDefault.type === 'image' && !payload.background) {
-            payload.background = currentBackgroundDefault.src;
-            payload.backgroundMode = currentBackgroundDefault.mode;
-        } else if (currentBackgroundDefault.type === 'video' && !payload.video) {
-            payload.video = currentBackgroundDefault.src;
-        }
-    }
-
-    // Handle speaker
-    if (currentLine.speaker) {
-        currentVNState.lastSpeaker = currentLine.speaker;
-    } else {
-        payload.speaker = currentVNState.lastSpeaker;
-    }
-
-    // Update background state untuk entri berikutnya
-    const shouldPersist = currentLine.type === 'dialogue' ||
-        (currentLine.type === 'scene' && currentLine.persistBackground !== false);
-    if (shouldPersist) {
-        let newState = {};
-        if (currentLine.background) {
-            newState = {
-                type: 'image',
-                src: currentLine.background,
-                mode: currentLine.backgroundMode || 'cover'
-            };
-        } else if (currentLine.video) {
-            newState = { type: 'video', src: currentLine.video };
-        }
-        if (newState.type) {
-            currentVNState.backgroundStack[currentVNState.backgroundStack.length - 1] = newState;
-        }
-    }
-
-    // Tandai sebagai preview mode
-    payload.isPreview = true;
-    payload.isLabelPreview = true;
-    payload.labelPreviewInfo = {
-        labelName: labelPreviewLabelName,
-        currentIndex: currentVNIndex,
-        totalEntries: currentVNScript.length
-    };
-
-    console.log(`[Preview Label] Mengirim entri [${currentVNIndex}/${currentVNScript.length}]:`, payload.type);
-
-    // Kirim ke preview window
-    previewWindow.webContents.send('vn-engine:update-display', payload);
-
-    // Simpan ke history jika ada teks
-    if ((currentLine.type === 'dialogue' || currentLine.type === 'choice') && payload.text) {
-        vnDialogueHistory.push({ speaker: payload.speaker || "Narasi", text: payload.text });
-    }
-}
-
-// Handler untuk request entri berikutnya dari preview label
-ipcMain.on('vn-engine:preview-label-next', () => {
-    if (!isLabelPreviewMode) return;
-    console.log('[Main] Preview Label: Request entri berikutnya.');
-
-    // Cek jika ada pending jump dari autoDialogue choice
-    if (currentVNState.pendingJump) {
-        const target = currentVNState.pendingJump;
-        delete currentVNState.pendingJump;
-        // Di mode preview, jump sederhana: cari target di skrip preview
-        const targetIndex = currentVNScript.findIndex(d => d.type === 'label' && d.name === target);
-        if (targetIndex !== -1) {
-            currentVNIndex = targetIndex;
-        } else {
-            console.log('[Preview Label] pendingJump target tidak ada di skrip preview, lanjut ke entri berikutnya');
-            currentVNIndex++;
-        }
-    } else {
-        currentVNIndex++;
-    }
-
-    processPreviewLabelUpdate();
-});
-
-// Handler untuk choice di mode preview label
-ipcMain.on('vn-engine:preview-label-choice-made', (event, choice) => {
-    if (!isLabelPreviewMode) return;
-    console.log('[Main] Preview Label: Choice made:', choice);
-
-    const originalChoiceLine = currentVNScript[currentVNIndex];
-    if (!originalChoiceLine) {
-        console.error('[Main] Preview Label: originalChoiceLine tidak ditemukan!');
-        currentVNIndex++;
-        processPreviewLabelUpdate();
-        return;
-    }
-
-    // Handle autoDialogue jika ada
-    if (originalChoiceLine.autoDialogue && choice.text) {
-        const autoDialoguePayload = {
-            type: 'dialogue',
-            text: choice.text,
-            bgm: currentVNState.lastBgmState?.src,
-            bgmVolume: currentVNState.lastBgmState?.volume,
-            background: currentVNState.backgroundStack[currentVNState.backgroundStack.length - 1]?.src,
-            backgroundMode: currentVNState.backgroundStack[currentVNState.backgroundStack.length - 1]?.mode,
-            sprite: originalChoiceLine.sprite,
-            sprite2: originalChoiceLine.sprite2,
-            spriteCenter: originalChoiceLine.spriteCenter,
-            charSprites: originalChoiceLine.charSprites,
-            isPreview: true,
-            isLabelPreview: true
-        };
-
-        if (originalChoiceLine.autoDialogue === 'character' && currentVNState.lastSpeaker) {
-            autoDialoguePayload.speaker = currentVNState.lastSpeaker;
-        }
-
-        if (autoDialoguePayload.speaker) {
-            vnDialogueHistory.push({ speaker: autoDialoguePayload.speaker, text: autoDialoguePayload.text });
-        }
-
-        previewWindow.webContents.send('vn-engine:update-display', autoDialoguePayload);
-
-        // Simpan jump target untuk diproses setelah auto dialogue
-        currentVNState.pendingJump = choice.jump;
-        return;
-    }
-
-    // Handle jump dari choice
-    if (choice.jump) {
-        // Di mode preview, jump ke label lain tidak didukung sepenuhnya
-        // Cari target di dalam skrip preview saja
-        const targetIndex = currentVNScript.findIndex(d => d.type === 'label' && d.name === choice.jump);
-        if (targetIndex !== -1) {
-            currentVNIndex = targetIndex;
-        } else {
-            console.log('[Preview Label] Jump target tidak ada di skrip preview, lanjut ke entri berikutnya');
-            currentVNIndex++;
-        }
-    } else {
-        currentVNIndex++;
-    }
-
-    processPreviewLabelUpdate();
-});
-
-// Handler untuk reset preview label (ulang dari awal)
-ipcMain.on('vn-engine:preview-label-reset', () => {
-    if (!isLabelPreviewMode) return;
-    console.log('[Main] Preview Label: Reset ke awal.');
-
-    // Reset index dan state
-    currentVNIndex = 0;
-    currentVNState = {
-        backgroundStack: [{ type: null, src: null }],
-        bgmState: { src: null, volume: undefined, pan: undefined, delay: undefined },
-        lastSpeaker: null,
-        isLabelPreviewMode: true
-    };
-    vnDialogueHistory = [];
-
-    processPreviewLabelUpdate();
-});
-
-// Handler untuk menutup preview dan restore state
-ipcMain.on('vn-engine:preview-label-close', () => {
-    console.log('[Main] Preview Label: Menutup dan restore state.');
-    restoreLabelPreviewState();
-});
-
-// Fungsi untuk restore state engine setelah preview selesai
-function restoreLabelPreviewState() {
-    if (!isLabelPreviewMode) return;
-
-    console.log('[Main] Restoring engine state setelah preview label.');
-
-    // Restore state engine asli
-    if (labelPreviewScriptBackup) {
-        currentVNScript = labelPreviewScriptBackup;
-    }
-    if (labelPreviewStateBackup) {
-        currentVNState = labelPreviewStateBackup;
-    }
-    currentVNIndex = labelPreviewIndexBackup;
-    vnDialogueHistory = labelPreviewHistoryBackup;
-
-    // Reset flag dan backup
-    isLabelPreviewMode = false;
-    labelPreviewScriptBackup = null;
-    labelPreviewStateBackup = null;
-    labelPreviewIndexBackup = 0;
-    labelPreviewHistoryBackup = [];
-    labelPreviewLabelName = '';
-}
-// ----------------------------  Akhir Handler Preview Label ---------------------------- //
-
-// ======================================= Akhir Logika Preview =================================== //
+// ============ Preview Window (dipindah ke vn-engine/preview-manager.js) ============ //
 
 // menerima update data mini player dari renderer
 ipcMain.on('update-mini-player-data', (event, data) => {
@@ -3915,17 +4637,44 @@ ipcMain.on('update-shared-player-state', (event, state) => {
 
     // Update lastMusicState untuk kondisional GIF Overlay
     if (state) {
+        const previousTitle = lastMusicState.title;
+        const previousArtist = lastMusicState.artist;
         lastMusicState.isPlaying = state.isPlaying === true;
         lastMusicState.title = state.title || '';
         lastMusicState.artist = state.artist || '';
+        lastMusicState.coverSrc = state.coverSrc || state.thumbnail || '';
+
+        if (previousTitle !== lastMusicState.title || previousArtist !== lastMusicState.artist) {
+            lastRhythmBreakState = false;
+            lastRhythmSubtitle = '';
+            if (isRhythmOverlayEnabled && rhythmOverlayWindow && !rhythmOverlayWindow.isDestroyed()) {
+                rhythmOverlayWindow.webContents.send('rhythm-subtitle', { text: '' });
+                if (lastRhythmTrackTitle !== null && lastRhythmTrackTitle !== lastMusicState.title) {
+                    rhythmOverlayWindow.webContents.send('rhythm-track-changed', {
+                        oldTitle: lastRhythmTrackTitle,
+                        newTitle: lastMusicState.title
+                    });
+                }
+                lastRhythmTrackTitle = lastMusicState.title;
+            }
+        }
 
         // Evaluasi ulang visibilitas GIF overlay
         evaluateGifOverlayVisibility();
+        applyMusicProfileForCurrentTrack();
     }
 
     // Siarkan ke jendela overlay jika ada dan terlihat
     if (overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()) {
         overlayWindow.webContents.send('shared-player-state-updated', latestPlayerState);
+    }
+
+    if (isRhythmOverlayEnabled && rhythmOverlayWindow && !rhythmOverlayWindow.isDestroyed() && state) {
+        rhythmOverlayWindow.webContents.send('rhythm-track-info', {
+            title: lastMusicState.title,
+            artist: lastMusicState.artist,
+            coverSrc: state.thumbnail || state.coverSrc || ''
+        });
     }
 });
 
@@ -3962,6 +4711,11 @@ ipcMain.on('visualizer-data-stream', (event, data) => {
     // Langsung teruskan ke jendela overlay jika ada dan terlihat
     if (overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()) {
         overlayWindow.webContents.send('visualizer-data-stream', data);
+    }
+    // Mode Game memakai stream visualizer ini; teruskan juga agar Rhythm
+    // Gamification menerima beat yang sama seperti mode Native.
+    if (isRhythmOverlayEnabled && rhythmOverlayWindow && !rhythmOverlayWindow.isDestroyed()) {
+        rhythmOverlayWindow.webContents.send('rhythm-analyser-data', { data });
     }
 });
 
@@ -4025,6 +4779,14 @@ ipcMain.on('ad-status-update', (event, { state, targetBounds, webviewBounds, det
     // Update lastAdState untuk kondisional GIF overlay
     const previousAdState = lastAdState;
     lastAdState = state;
+
+    // Rhythm overlay harus tetap tahu status iklan meski UI Ad Skipper dinonaktifkan.
+    // Dengan begitu analyser iklan tidak menambah combo, score, maupun subtitle.
+    if (isRhythmOverlayEnabled && rhythmOverlayWindow && !rhythmOverlayWindow.isDestroyed()) {
+        rhythmOverlayWindow.webContents.send('rhythm-ad-state', {
+            active: state === 'waiting' || state === 'skippable'
+        });
+    }
 
     // Evaluasi ulang visibility GIF overlay jika ad state berubah
     if (previousAdState !== state) {
@@ -4203,6 +4965,11 @@ function getSubfolders(directory) {
 app.on('ready', () => {
     // Load remembered settings snapshot (if it exists)
     loadUserSettingsFromDisk();
+    try {
+        if (migrateLegacyGifStorage()) flushUserSettingsToDisk();
+    } catch (error) {
+        console.error('[GIF Storage] Migrasi media lama gagal; path lama tetap dipertahankan:', error);
+    }
 
     // === Quick Boot Detection ===
     const quickBootArg = process.argv.find(arg => arg.startsWith('--quick-boot-base64='));
@@ -4327,6 +5094,28 @@ app.on('ready', () => {
             mainWindow.webContents.send("fullscreen-status-changed", isFullscreen);
         }
     });
+
+    // Set fullscreen eksplisit (on/off) — dipakai UI Settings kustom Hub via
+    // VNHub.settings.setFullscreen(bool). Berbeda dari toggle yang membalik state.
+    ipcMain.on("vn-engine:set-fullscreen", (event, on) => {
+        if (mainWindow) {
+            isFullscreen = !!on;
+            mainWindow.setFullScreen(isFullscreen);
+            mainWindow.webContents.send("fullscreen-status-changed", isFullscreen);
+        }
+    });
+
+    // Set ukuran window (resolusi windowed) — dipakai VNHub.settings.setResolution(w,h).
+    // Keluar fullscreen dulu bila aktif (fullscreen mengabaikan ukuran), lalu center.
+    ipcMain.on("vn-engine:set-window-size", (event, size) => {
+        if (mainWindow && size && size.width && size.height) {
+            try {
+                if (mainWindow.isFullScreen()) { isFullscreen = false; mainWindow.setFullScreen(false); }
+                mainWindow.setContentSize(Math.round(size.width), Math.round(size.height));
+                mainWindow.center();
+            } catch (e) { console.error("[Main] set-window-size gagal:", e); }
+        }
+    });
     globalShortcut.unregisterAll();
 });
 
@@ -4368,7 +5157,7 @@ ipcMain.on('create-quick-boot', (event, data) => {
         `;
 
     const ps = spawn('powershell.exe', ['-Command', psScript]);
-        
+    
     let stderrOutput = '';
 
     ps.stderr.on('data', (data) => {
@@ -4392,7 +5181,6 @@ ipcMain.on('create-quick-boot', (event, data) => {
             });
         }
     });
-
 
     ps.on('error', (err) => {
         console.error(`[QuickBoot] Gagal menjalankan PowerShell:`, err);
@@ -4461,6 +5249,8 @@ function setupGifOverlayStandaloneWindow(data) {
             gifOverlays: userSettings.gifOverlays || [],
             gifOverlayLocked: userSettings.gifOverlayLocked || false,
         });
+        // Pengecekan update otomatis setelah GIF Overlay Studio terbuka.
+        setTimeout(() => updater.autoCheckAndPrompt('gif-overlay'), 1200);
     });
 
     // Handle window controls
@@ -4487,11 +5277,17 @@ function setupGifOverlayStandaloneWindow(data) {
 
     mainWindow.on('closed', () => {
         mainWindow = null;
+        // Ambil snapshot satu kali selagi overlay masih hidup. Penutupan window
+        // sesudah ini murni teardown runtime dan tidak boleh mengosongkan preset.
+        if (gifOverlayWindows.size > 0) updateGifOverlaysInMemory({ preserveWhenNoWindows: true });
+        flushUserSettingsToDisk();
+
         // Tutup semua GIF overlay windows saat standalone window ditutup
         gifOverlayWindows.forEach((win, id) => {
             if (win && !win.isDestroyed()) win.close();
         });
         gifOverlayWindows.clear();
+        gifOverlayGeometry.clear();
     });
 
     // Initialize RPC if enabled (sama seperti mode lain)
@@ -4542,6 +5338,12 @@ function setupNativeYTMusicWindow(data) {
 
     mainWindow.loadFile('native-player.html');
 
+    // Pengecekan update otomatis segera setelah native player terbuka.
+    // Diberi jeda singkat agar tidak bersaing dengan proses load webview/login.
+    mainWindow.webContents.once('did-finish-load', () => {
+        setTimeout(() => updater.autoCheckAndPrompt('native'), 1200);
+    });
+
     if (userSettings.adSkipperEnabled === true) {
         createAdSkipperWindow();
     }
@@ -4563,6 +5365,17 @@ function setupNativeYTMusicWindow(data) {
                 miniPlayerWindow.show();
             }
         }, 200);
+    }
+    // Apply remembered Rhythm Overlay state on boot
+    runtimeRhythmHideNowPlaying = userSettings.rhythmHideNowPlaying === true;
+    isRhythmOverlayEnabled = userSettings.rhythmOverlayEnabled === true;
+    if (isRhythmOverlayEnabled) {
+        if (!rhythmOverlayWindow) createRhythmOverlayWindow();
+        setTimeout(() => {
+            if (rhythmOverlayWindow && !rhythmOverlayWindow.isDestroyed()) {
+                rhythmOverlayWindow.show();
+            }
+        }, 300);
     }
 
     // --- Overlay Mode Logic ---
@@ -4843,7 +5656,7 @@ function setupNativeYTMusicWindow(data) {
         }
     });
 
-    mainWindow.on('close', () => { app.quit(); });
+    pasangPenjagaTutup(mainWindow, 'jendela YT Music');
 
     mainWindow.webContents.on('did-finish-load', () => {
         // Kita tidak perlu insertCSS drag region lagi karena sudah ada di Title Bar custom
@@ -4876,24 +5689,55 @@ function setupNativeYTMusicWindow(data) {
             lastMusicState.isPlaying = playbackData.isPlaying === true;
             lastMusicState.title = playbackData.title || '';
             lastMusicState.artist = playbackData.artist || '';
+            lastMusicState.coverSrc = playbackData.thumbnail || playbackData.coverSrc || '';
 
             // Log perubahan hanya jika judul atau artis berubah
             if (oldTitle !== lastMusicState.title || oldArtist !== lastMusicState.artist) {
+                lastRhythmBreakState = false;
+                lastRhythmSubtitle = '';
                 console.log(`[Main][GIF] Musik berubah: "${lastMusicState.title}" by ${lastMusicState.artist}`);
+
+                // Kirim sinyal ganti lagu ke rhythm overlay agar reset score/combo
+                if (isRhythmOverlayEnabled && rhythmOverlayWindow && !rhythmOverlayWindow.isDestroyed()) {
+                    rhythmOverlayWindow.webContents.send('rhythm-subtitle', { text: '' });
+                    if (lastRhythmTrackTitle !== null && lastRhythmTrackTitle !== lastMusicState.title) {
+                        rhythmOverlayWindow.webContents.send('rhythm-track-changed', {
+                            oldTitle: lastRhythmTrackTitle,
+                            newTitle: lastMusicState.title
+                        });
+                        console.log('[Main][Rhythm] Track berubah, sinyal reset dikirim ke overlay');
+                    }
+                    lastRhythmTrackTitle = lastMusicState.title;
+                }
             }
 
             // Evaluasi ulang visibilitas GIF overlay
             evaluateGifOverlayVisibility();
+            applyMusicProfileForCurrentTrack();
         }
 
         if (userSettings.rpcEnabled !== false) {
-            updateRpcActivity({
-                details: `Mendengarkan: ${playbackData.title}`,
-                state: `by ${playbackData.artist}`,
-                largeImageKey: 'main_icon',
-                smallImageKey: 'play_icon',
-                smallImageText: 'Playing'
-            });
+            if (playbackData.title && playbackData.title !== 'Loading...') {
+                // Mode native: kirim data kaya → "Listening to" + thumbnail + progress bar
+                updateRpcActivity({
+                    songTitle: playbackData.title,
+                    songArtist: playbackData.artist,
+                    album: playbackData.album,                             // untuk teks hover gambar
+                    largeImageKey: playbackData.thumbnail,                 // URL cover → large image dinamis
+                    smallImageKey: playbackData.isPlaying ? 'play_icon' : 'pause_icon',
+                    smallImageText: playbackData.isPlaying ? 'Memutar' : 'Dijeda',
+                    currentTime: playbackData.currentTime,                 // detik
+                    duration: playbackData.duration,                       // detik
+                    isPlaying: playbackData.isPlaying
+                });
+            } else {
+                // Idle bersih: belum ada lagu / masih memuat
+                updateRpcActivity({
+                    details: 'GAP Music Player',
+                    state: 'Menjelajah musik 🎧',
+                    largeImageKey: 'main_icon'
+                });
+            }
         }
         if (isMiniPlayerFeatureEnabled && miniPlayerWindow) {
             miniPlayerWindow.webContents.send('mini-player-data-update', {
@@ -4906,12 +5750,29 @@ function setupNativeYTMusicWindow(data) {
                 duration: playbackData.duration
             });
         }
+
+        // Kirim identitas lagu (judul, artis, cover) ke rhythm overlay untuk kartu Now-Playing.
+        // Dikirim tiap update agar cover/judul tetap sinkron walau overlay baru dibuka di tengah lagu.
+        if (isRhythmOverlayEnabled && rhythmOverlayWindow && !rhythmOverlayWindow.isDestroyed()) {
+            rhythmOverlayWindow.webContents.send('rhythm-track-info', {
+                title: playbackData.title || '',
+                artist: playbackData.artist || '',
+                coverSrc: playbackData.thumbnail || ''
+            });
+        }
     });
 
     ipcMain.on('analyser-data', (event, analyserData) => {
         if (isMiniPlayerFeatureEnabled && miniPlayerWindow) {
             miniPlayerWindow.webContents.send('mini-player-data-update', {
                 visualizerData: analyserData.data
+            });
+        }
+
+        // Teruskan data analyser ke rhythm overlay untuk deteksi bass beat
+        if (isRhythmOverlayEnabled && rhythmOverlayWindow && !rhythmOverlayWindow.isDestroyed()) {
+            rhythmOverlayWindow.webContents.send('rhythm-analyser-data', {
+                data: analyserData.rawData || analyserData.data
             });
         }
     });
@@ -4993,13 +5854,140 @@ function setupNativeYTMusicWindow(data) {
     });
 }
 
+// =============================================================================
+// PENJAGA TUTUP JENDELA UTAMA
+//
+// Bug yang ditutup: aplikasi TIDAK BISA DITUTUP sama sekali. Tombol X ditekan
+// berkali-kali, log memuntahkan "[Main] hentikan semua." dan "[App] Aplikasi
+// akan keluar" berulang-ulang, dan jendelanya tetap berdiri.
+//
+// Rantainya, urut:
+//
+//   1. vnManager.html memasang `beforeunload` yang memanggil preventDefault()
+//      selama masih ada perubahan editor yang belum disimpan (scriptEditor.js,
+//      _anyNovelDirty). Itu memang disengaja.
+//   2. Di Electron, event `close` milik BrowserWindow menyala SEBELUM
+//      `beforeunload` renderer. Jadi handler close sempat berjalan — itulah
+//      "[Main] hentikan semua." yang terlihat di log — lalu barulah renderer
+//      mengajukan keberatannya.
+//   3. Keberatan itu sampai ke main sebagai `will-prevent-unload` pada
+//      webContents. TIDAK ADA yang mendengarkannya (hanya jendela Hub Code
+//      Editor yang punya), dan perilaku bawaan Electron saat tak ada pendengar
+//      adalah: BATALKAN penutupan, diam-diam. Nol dialog, nol pesan.
+//   4. Pembatalan itu memanggil Browser::OnWindowCloseCancelled() di dalam
+//      Electron, yang me-reset `is_quitting_` jadi false. Akibatnya app.quit()
+//      berikutnya memancarkan `before-quit` lagi dari nol — itulah kenapa
+//      "[App] Aplikasi akan keluar" berulang tanpa pernah benar-benar keluar.
+//
+// Jadi aplikasinya tidak menggantung: ia PATUH pada penolakan yang tak pernah
+// diberi tahu kepada siapa pun. Yang diperbaiki adalah memberi penolakan itu
+// suara — dan memberi pengguna keputusannya.
+// =============================================================================
+function pasangPenjagaTutup(win, namaJendela) {
+    if (!win || win.isDestroyed()) return;
+
+    // Sekali saja, walau kedua jendela utama sempat hidup bersamaan.
+    let sudahMemintaKeluar = false;
+
+    win.webContents.on('will-prevent-unload', (event) => {
+        const pilihan = dialog.showMessageBoxSync(win, {
+            type: 'question',
+            buttons: ['Keluar Tanpa Menyimpan', 'Batal'],
+            defaultId: 1,
+            cancelId: 1,
+            title: 'Perubahan Belum Disimpan',
+            message: 'Ada perubahan di editor novel yang belum disimpan.',
+            detail: 'Kalau kamu keluar sekarang, perubahan itu hilang. Pilih Batal untuk kembali, lalu simpan lewat tombol Simpan di editor.'
+        });
+        if (pilihan === 0) {
+            // preventDefault() di sini berarti "abaikan keberatan renderer",
+            // yaitu LANJUTKAN penutupan — kebalikan dari arti biasanya.
+            event.preventDefault();
+            return;
+        }
+        // Pengguna memilih tinggal. Electron membatalkan penutupan; tak ada yang
+        // perlu dibereskan di sini justru KARENA app.quit() tidak lagi dipanggil
+        // dari `close` (lihat di bawah).
+        console.log(`[Main] Penutupan ${namaJendela} dibatalkan: masih ada perubahan belum disimpan.`);
+    });
+
+    // `close` HANYA mencatat. Dulu ia memanggil app.quit() langsung, dan itu
+    // punya cacat kedua di luar rantai di atas: `close` menyala sebelum
+    // beforeunload, jadi `before-quit` — yang MENGHANCURKAN Mini Player, jendela
+    // salju, dan Ad Skipper — sudah berjalan sebelum pengguna sempat menjawab
+    // dialog. Menekan "Batal" berarti tetap tinggal, tetapi dengan jendela-jendela
+    // itu sudah terlanjur lenyap.
+    win.on('close', () => {
+        console.log('[Main] hentikan semua.');
+    });
+
+    // Keluar dipicu SESUDAH jendela benar-benar hancur. Di titik ini negosiasi
+    // beforeunload pasti sudah selesai dan pasti berakhir dengan "tutup", jadi
+    // tak ada lagi before-quit yang berjalan untuk penutupan yang batal.
+    //
+    // app.quit() tetap diperlukan (bukan mengandalkan `window-all-closed`) karena
+    // jendela pendamping seperti Mini Player dan GIF overlay bisa masih hidup,
+    // sehingga `window-all-closed` tak akan pernah menyala sendiri.
+    win.on('closed', () => {
+        if (sudahMemintaKeluar) return;
+        sudahMemintaKeluar = true;
+        app.quit();
+    });
+}
+
+// Izin akses internet mode game. DIANGKAT ke module scope (dulu variabel lokal
+// di dalam setupGameWindow) karena tiga hal butuh membacanya dari luar fungsi itu:
+// penyaring webRequest, panel Options di index.html, dan kartu Gambar Discord di
+// editor novel. Nilai awal & reset per-masuk-mode tetap dilakukan di dalam
+// setupGameWindow, jadi perilakunya tidak berubah.
+let internetConnectionAllowed = false;
+
+// Satu corong untuk mengubahnya, supaya setiap permukaan yang menampilkan status
+// ikut tahu. Tanpa siaran ini, tombol di editor dan tombol di Options bisa
+// menampilkan dua keadaan berbeda untuk satu variabel yang sama.
+function setInternetAllowed(allowed, sumber) {
+    const baru = !!allowed;
+    if (internetConnectionAllowed === baru) return internetConnectionAllowed;
+    internetConnectionAllowed = baru;
+    console.log('[Internet] Akses ' + (baru ? 'DIIZINKAN' : 'diputus') + ' (dari: ' + (sumber || 'tak disebut') + ')');
+    BrowserWindow.getAllWindows().forEach((w) => {
+        if (!w.isDestroyed()) {
+            try { w.webContents.send('internet:status-changed', { allowed: internetConnectionAllowed }); }
+            catch (e) { /* window sedang ditutup */ }
+        }
+    });
+    return internetConnectionAllowed;
+}
+
+// Uji gambar RPC langsung dari editor. Tanpa ini, satu-satunya cara memeriksa
+// hasilnya adalah menyimpan → keluar editor → memainkan novel → melihat Discord,
+// dan bila gambarnya tidak muncul kreator tak punya cara membedakan "URL-nya
+// salah", "Discord tak tersambung", atau "nilainya tak tersimpan".
+ipcMain.handle('novel-rpc:test', (event, { novelTitle, largeImage } = {}) => {
+    if (!isRpcEnabled) return { ok: false, alasan: 'nonaktif' };
+    if (!rpc || !isRpcReady) return { ok: false, alasan: 'belum-tersambung' };
+
+    const bersih = sanitizeRpcLargeImage(largeImage);
+    updateRpcActivity({
+        details: 'Test Ikon Novel : ' + (novelTitle || 'novel'),
+        state: 'Pratinjau dari editor',
+        largeImageKey: largeImage || undefined
+    });
+    // `terkirim` adalah yang BENAR-BENAR masuk payload sesudah penyaring — kalau
+    // ia 'main_icon' padahal kreator mengisi URL, penyaringnyalah yang menolak.
+    return { ok: true, terkirim: bersih || 'main_icon', ditolakPenyaring: !!largeImage && !bersih };
+});
+
+ipcMain.handle('internet:status', () => ({ allowed: internetConnectionAllowed }));
+ipcMain.handle('internet:allow', (event) => ({ allowed: setInternetAllowed(true, 'editor') }));
+
 function setupGameWindow(data) {
     currentAppMode = 'game';
 
     let skipScene = data.skipScene || false;
     let selectedPlaylist = data.selectedPlaylist || '';
     let selectedWallpaper = data.selectedWallpaper || '';
-    let internetConnectionAllowed = false;
+    internetConnectionAllowed = false;
 
     if (typeof data === 'object' && data !== null) {
         skipScene = data.skipScene || false;
@@ -5043,8 +6031,15 @@ function setupGameWindow(data) {
     });
 
     ipcMain.on('connect-to-internet', () => {
-        internetConnectionAllowed = true;
-        console.log('User mengizinkan koneksi internet.');
+        setInternetAllowed(true, 'panel Options');
+    });
+
+    // Dulu TIDAK ada handler-nya: tombol "Disconnect" di Options mengirim sinyal
+    // ini, main process mengabaikannya, dan penyaring webRequest tetap terbuka.
+    // Tombolnya hanya membalik flag di renderer-nya sendiri — kontrol yang
+    // berbohong. Sekarang ia benar-benar menutup kembali aksesnya.
+    ipcMain.on('disconnect-from-internet', () => {
+        setInternetAllowed(false, 'panel Options');
     });
 
     // Buat mainWindow
@@ -5077,11 +6072,9 @@ function setupGameWindow(data) {
         }
     });
 
-    // Jika tombol close
-    mainWindow.on('close', (e) => {
-        console.log('[Main] hentikan semua.');
-        app.quit();
-    });
+    // Jika tombol close — lihat pasangPenjagaTutup() untuk rantai lengkap bug
+    // "aplikasi tidak bisa ditutup" yang ditutup di sana.
+    pasangPenjagaTutup(mainWindow, 'jendela game');
 
     mainWindow.loadFile('index.html');
     mainWindow.setMenu(null);
@@ -5283,7 +6276,7 @@ function setupGameWindow(data) {
                         align-items: center; justify-content: center;
                     }
                     .back-button::before {
-                        content: '✿';
+                        content: '←';
                         color: #ea759b;
                     }
                     .back-button:hover {
@@ -5499,336 +6492,11 @@ ipcMain.on('apply-settings', (event, config) => {
     }
 });
 
-// 5. HANDLER Saat chapter dipilih dari vnManager.html
-// State untuk tracking novel permissions
-let novelSecurityPermissions = {};
-
-async function showSecurityWarningDialog(scanResult, novelInfo = {}) {
-    const { storyTitle, chapter, script, folder } = scanResult;
-
-    // Build warning message
-    let message = `Novel "${storyTitle}" (${chapter}) mengandung konten yang perlu perhatian:\n\n`;
-
-    const concerns = [];
-
-    if (script.hasDangerousCode) {
-        let dangerSection = '⚠️ KODE BERBAHAYA TERDETEKSI:\n';
-        script.dangerousPatterns.forEach(p => {
-            dangerSection += `   • ${p.type} (entry #${p.index + 1}, tipe: ${p.entryType})\n`;
-        });
-        concerns.push(dangerSection.trim());
-    }
-
-    if (script.hasCustomJs) {
-        let jsSection = 'Script/HTML Kustom:\n';
-        script.details.forEach(d => {
-            // Format berdasarkan tipe
-            let detailLine = '';
-            switch (d.type) {
-                case 'script_tag':
-                    detailLine = `   • <script> tag di property "${d.property}" (entry #${d.index + 1})`;
-                    break;
-                case 'custom_html':
-                    detailLine = `   • HTML kustom di "${d.property}" (entry #${d.index + 1})`;
-                    if (d.preview) detailLine += `\n     Preview: ${d.preview}`;
-                    break;
-                case 'html_content':
-                    detailLine = `   • HTML content di "${d.property}" (entry #${d.index + 1})`;
-                    break;
-                case 'special_event_js':
-                    detailLine = `   • JS di specialEvent "${d.eventType}" (entry #${d.index + 1})`;
-                    break;
-                case 'external_resource':
-                    detailLine = `   • External resource "${d.url}" (entry #${d.index + 1})`;
-                    break;
-                default:
-                    detailLine = `   • ${d.type} (entry #${d.index + 1})`;
-            }
-            jsSection += detailLine + '\n';
-        });
-        concerns.push(jsSection.trim());
-    }
-
-    // Pisahkan URL berdasarkan sumber
-    if (script.hasExternalUrls || folder.externalResources.length > 0) {
-        let urlSection = 'Akses Internet Eksternal:\n';
-
-        // URL dari script.json
-        if (script.externalUrls && script.externalUrls.length > 0) {
-            urlSection += `   [Dari script.json]\n`;
-            script.externalUrls.slice(0, 3).forEach(url => {
-                urlSection += `   • ${url}\n`;
-            });
-            if (script.externalUrls.length > 3) {
-                urlSection += `   ... +${script.externalUrls.length - 3} URL lainnya\n`;
-            }
-        }
-
-        // URL dari index.html (VN Player)
-        if (folder.externalResources && folder.externalResources.length > 0) {
-            urlSection += `   [Dari VN Player HTML]\n`;
-            folder.externalResources.slice(0, 3).forEach(url => {
-                urlSection += `   • ${url}\n`;
-            });
-            if (folder.externalResources.length > 3) {
-                urlSection += `   ... +${folder.externalResources.length - 3} URL lainnya\n`;
-            }
-        }
-
-        concerns.push(urlSection.trim());
-    }
-
-    if (folder.customScripts.length > 0) {
-        concerns.push(`Script kustom di VN Player (${folder.customScripts.length} file)`);
-    }
-
-    message += concerns.join('\n\n');
-    message += '\n\n─────────────────────────────────\n';
-
-    // Buat kalimat peringatan dengan VN Mapper jika ada
-    if (novelInfo.vnMapper) {
-        message += `Pastikan kamu mempercayai "${novelInfo.vnMapper}" sebagai mapper visual novel ini sebelum melanjutkan.`;
-    } else {
-        message += 'Pastikan kamu mempercayai pembuat novel ini sebelum melanjutkan.';
-    }
-
-    // Determine buttons based on concerns
-    let buttons = ['Lanjutkan Tetap', 'Batalkan'];
-    let hasExternalUrls = script.hasExternalUrls || folder.externalResources.length > 0;
-
-    if (hasExternalUrls) {
-        buttons = ['Izinkan Akses Internet', 'Jalankan Tanpa Internet', 'Batalkan'];
-    }
-
-    const result = await dialog.showMessageBox(mainWindow, {
-        type: 'warning',
-        title: '⚠️ Peringatan Keamanan Novel',
-        message: `Peringatan Keamanan`,
-        detail: message,
-        buttons: buttons,
-        defaultId: buttons.length - 1, // Cancel as default
-        cancelId: buttons.length - 1,
-        noLink: true
-    });
-
-    return {
-        proceed: result.response !== buttons.length - 1,
-        allowInternet: hasExternalUrls ? result.response === 0 : true,
-        buttonClicked: buttons[result.response],
-        cancelled: result.response === buttons.length - 1
-    };
-}
-
-// Fungsi untuk membaca metadata kreator dari novel hub index.html
-function readNovelMetadata(storyTitle) {
-    const novelInfo = { author: null, illustrator: null, genre: null, vnMapper: null };
-    try {
-        const hubPath = path.join(visualNovelsDirectory, storyTitle, 'index.html');
-        if (fs.existsSync(hubPath)) {
-            const content = fs.readFileSync(hubPath, 'utf-8');
-
-            // Extract author
-            const authorMatch = content.match(/class="author"[^>]*>([^<]+)</i);
-            if (authorMatch) novelInfo.author = authorMatch[1].trim();
-
-            // Extract illustrator
-            const illustratorMatch = content.match(/class="illustrator"[^>]*>([^<]+)</i);
-            if (illustratorMatch) novelInfo.illustrator = illustratorMatch[1].trim();
-
-            // Extract genre
-            const genreMatch = content.match(/class="genre"[^>]*>([^<]+)</i);
-            if (genreMatch) novelInfo.genre = genreMatch[1].trim();
-
-            // Extract VN Mapper
-            const vnMapperMatch = content.match(/class="vn-mapper"[^>]*>([^<]+)</i);
-            if (vnMapperMatch) novelInfo.vnMapper = vnMapperMatch[1].trim();
-        }
-    } catch (e) {
-        console.error('[Security] Error reading novel metadata:', e.message);
-    }
-    return novelInfo;
-}
-
-function proceedToPlayChapter(storyTitle, chapter, allowInternet = true) {
-    currentStoryTitle = storyTitle;
-    currentChapter = chapter;
-    console.log(`[Main] Menyimpan info: Story='${storyTitle}', Chapter='${chapter}', Internet=${allowInternet}`);
-
-    // Store permission for this novel session
-    const novelKey = `${storyTitle}::${chapter}`;
-    novelSecurityPermissions[novelKey] = { allowInternet };
-
-    updateRpcActivity({
-        details: `Bermain: ${storyTitle}`,
-        state: `Chapter: ${chapter}`,
-    });
-
-    const chapterPath = path.join(__dirname, 'aset', 'game', 'visual_novels', storyTitle, chapter);
-    const scriptPath = path.join(chapterPath, 'script.json');
-
-    try {
-        // 1. Muat script ke memori main process
-        const scriptContent = fs.readFileSync(scriptPath, 'utf-8');
-        currentVNScript = JSON.parse(scriptContent);
-        currentVNIndex = 0;
-        currentVNState = {
-            backgroundStack: [{ type: null, src: null }],
-            bgmState: { src: null, volume: undefined },
-            lastSpeaker: null
-        };
-        vnDialogueHistory = [];
-        console.log(`[VN Engine] Skrip untuk ${chapter} berhasil dimuat.`);
-
-        // 2. Muat file HTML-nya
-        mainWindow.loadFile(path.join(chapterPath, 'index.html'));
-
-        // 3. Setelah HTML selesai dimuat, engine akan dimulai oleh renderer
-        // (lihat handler 'vn-engine:ready' di bawah)
-
-    } catch (error) {
-        console.error(`[VN Engine] Gagal memuat skrip atau file chapter:`, error);
-        dialog.showErrorBox('Error', `Gagal memuat chapter: ${error.message}`);
-    }
-}
-
-// kembali ke VN Hub
-function returnToNovelHub(storyTitle) {
-    if (!mainWindow) return;
-    const hubPath = path.join(__dirname, 'aset', 'game', 'visual_novels', storyTitle, 'index.html');
-    if (fs.existsSync(hubPath)) {
-        mainWindow.loadFile(hubPath);
-        console.log(`[Security] Returned to hub: ${storyTitle}`);
-    } else {
-        // Fallback ke VN Manager jika hub tidak ada
-        mainWindow.loadFile(path.join(__dirname, 'aset', 'game', 'vnManager.html'));
-        console.log('[Security] Hub not found, returned to VN Manager');
-    }
-}
-
-ipcMain.on('play-chapter', async (event, { storyTitle, chapter }) => {
-    if (!mainWindow) return;
-
-    console.log(`[Security] Initiating security scan for: ${storyTitle} / ${chapter}`);
-
-    // Perform security scan
-    const novelPath = path.join(visualNovelsDirectory, storyTitle);
-    const scriptPath = path.join(novelPath, chapter, 'script.json');
-
-    const scriptWarnings = scanNovelScript(scriptPath);
-    const folderWarnings = scanNovelFolder(novelPath);
-
-    const scanResult = {
-        storyTitle,
-        chapter,
-        hasSecurityConcerns: scriptWarnings.hasCustomJs ||
-            scriptWarnings.hasDangerousCode ||
-            scriptWarnings.hasExternalUrls ||
-            folderWarnings.externalResources.length > 0,
-        script: scriptWarnings,
-        folder: folderWarnings
-    };
-
-    console.log('[Security] Scan completed:', scanResult.hasSecurityConcerns ? 'CONCERNS FOUND' : 'CLEAN');
-
-    if (scanResult.hasSecurityConcerns) {
-        // Read novel metadata for creator info
-        const novelInfo = readNovelMetadata(storyTitle);
-
-        // Show warning dialog
-        const userDecision = await showSecurityWarningDialog(scanResult, novelInfo);
-
-        if (userDecision.proceed) {
-            console.log(`[Security] User chose to proceed. Internet access: ${userDecision.allowInternet}`);
-            proceedToPlayChapter(storyTitle, chapter, userDecision.allowInternet);
-        } else {
-            console.log('[Security] User cancelled playing the novel. Returning to hub.');
-            // Kembali ke VN Hub alih-alih tidak melakukan apa-apa
-            returnToNovelHub(storyTitle);
-        }
-    } else {
-        // No concerns, proceed directly
-        proceedToPlayChapter(storyTitle, chapter, true);
-    }
-});
-
-// Handler IPC untuk mengecek permission internet saat ini
-ipcMain.handle('security:get-novel-permission', async (event, { storyTitle, chapter }) => {
-    const novelKey = `${storyTitle}::${chapter}`;
-    return novelSecurityPermissions[novelKey] || { allowInternet: true };
-});
+// play-chapter, security dialog, proceedToPlayChapter, returnToNovelHub
+// sudah dipindah ke vn-engine/ipc-handlers.js & security-scanner.js
 
 
-// 6. HANDLER Untuk memuat chapter selanjutnya
-function getChapterListData(storyTitle) {
-    const decodedTitle = decodeURIComponent(storyTitle);
-    const storyPath = path.join(visualNovelsDirectory, decodedTitle);
-    const mainChapters = [];
-    const sideStories = [];
-    try {
-        const folders = fs.readdirSync(storyPath);
-        folders.forEach((folder) => {
-            const folderPath = path.join(storyPath, folder);
-            if (fs.statSync(folderPath).isDirectory()) {
-                if (folder.toLowerCase() === 'sidestories') {
-                    const subfolders = fs.readdirSync(folderPath);
-                    subfolders.forEach((subfolder) => {
-                        const subfolderPath = path.join(folderPath, subfolder);
-                        if (fs.statSync(subfolderPath).isDirectory()) {
-                            const indexPath = path.join(subfolderPath, 'index.html');
-                            if (fs.existsSync(indexPath)) {
-                                sideStories.push(subfolder);
-                            }
-                        }
-                    });
-                } else {
-                    const indexPath = path.join(folderPath, 'index.html');
-                    if (fs.existsSync(indexPath)) {
-                        mainChapters.push(folder);
-                    }
-                }
-            }
-        });
-    } catch (err) {
-        console.error('Error reading chapters:', err);
-    }
-    return { mainChapters, sideStories };
-}
-ipcMain.handle('get-next-chapter', async () => {
-    if (!currentStoryTitle || !currentChapter) {
-        console.log('[Main] Tidak ada info story/chapter saat ini untuk menemukan chapter selanjutnya.');
-        return null;
-    }
-
-    try {
-        // Panggil fungsi internal, BUKAN ipcMain.handle
-        const chaptersResponse = getChapterListData(currentStoryTitle);
-
-        // Logika sorting
-        const mainChapters = chaptersResponse.mainChapters.sort((a, b) => {
-            const getNumber = (name) => {
-                if (name.toLowerCase().includes('prolog') || name.toLowerCase().includes('pengenalan')) return 0;
-                const match = name.match(/\d+/);
-                return match ? parseInt(match[0], 10) : Infinity;
-            };
-            return getNumber(a) - getNumber(b);
-        });
-
-        console.log('[Main] Mengecek urutan chapter untuk "selanjutnya":', mainChapters);
-        const currentIndex = mainChapters.indexOf(currentChapter);
-
-        if (currentIndex > -1 && currentIndex < mainChapters.length - 1) {
-            const nextChapter = mainChapters[currentIndex + 1];
-            console.log(`[Main] Chapter selanjutnya ditemukan: ${nextChapter}`);
-            return nextChapter;
-        } else {
-            console.log('[Main] Tidak ada chapter selanjutnya (chapter terakhir).');
-            return null;
-        }
-    } catch (err) {
-        console.error('Error saat mencari chapter selanjutnya:', err);
-        return null;
-    }
-});
+// getChapterListData + get-next-chapter sudah dipindah ke vn-engine/core.js & ipc-handlers.js
 
 ipcMain.handle('get-window-size', () => {
     if (mainWindow && !mainWindow.isFullScreen() && !mainWindow.isDestroyed()) {
@@ -5888,6 +6556,9 @@ ipcMain.on('navigate-to-vn', () => {
         if (overlayWindow && !overlayWindow.isDestroyed()) {
             overlayWindow.close();
         }
+        if (hubCodeEditorWindow && !hubCodeEditorWindow.isDestroyed()) {
+            hubCodeEditorWindow.close();
+        }
 
         updateRpcActivity({
             details: 'Memilih Visual Novel',
@@ -5900,67 +6571,150 @@ ipcMain.on('navigate-to-vn', () => {
     }
 });
 
-// 3) Handler untuk mengambil daftar story (visual novels)
-ipcMain.handle('get-story-list', async () => {
-    const visualNovelsDirectory = path.join(__dirname, 'aset', 'game', 'visual_novels');
-    const stories = [];
+// =============================================
+// Hub Code Editor (Advanced) — window terpisah
+// =============================================
+function openHubCodeEditorWindow(initData) {
+    if (hubCodeEditorWindow && !hubCodeEditorWindow.isDestroyed()) {
+        hubCodeEditorWindow.show();
+        hubCodeEditorWindow.focus();
+        hubCodeEditorWindow.webContents.send('hub-code-editor:init', initData);
+        return;
+    }
+
+    const workArea = screen.getPrimaryDisplay().workArea;
+    const width = Math.round(workArea.width / 2);
+    const height = Math.round(workArea.height / 2);
+    const x = workArea.x + workArea.width - width;
+    const y = workArea.y + workArea.height - height;
+
+    hubCodeEditorWindow = new BrowserWindow({
+        width: width,
+        height: height,
+        x: x,
+        y: y,
+        minWidth: 480,
+        minHeight: 360,
+        title: 'Hub Code Editor — Advanced',
+        icon: path.join(__dirname, 'aset', 'ikon.jpg'),
+        // Selalu di atas window utama agar tidak "tenggelam" saat user mengklik
+        // scene di window utama. parent: mainWindow membuatnya ikut minimize/restore
+        // bersama editor utama tanpa menutupi aplikasi lain di luar editor.
+        alwaysOnTop: true,
+        parent: (mainWindow && !mainWindow.isDestroyed()) ? mainWindow : undefined,
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false,
+        },
+    });
+    hubCodeEditorWindow.setMenu(null);
+    hubCodeEditorWindow.loadFile(path.join(__dirname, 'aset', 'game', 'vnManager-codeEditor.html'));
+
+    hubCodeEditorWindow.webContents.once('did-finish-load', () => {
+        if (hubCodeEditorWindow && !hubCodeEditorWindow.isDestroyed()) {
+            hubCodeEditorWindow.webContents.send('hub-code-editor:init', initData);
+        }
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('hub-code-editor:opened');
+        }
+    });
+
+    // Tampilkan konfirmasi bila ada perubahan belum disimpan saat window ditutup.
+    hubCodeEditorWindow.webContents.on('will-prevent-unload', (event) => {
+        const choice = dialog.showMessageBoxSync(hubCodeEditorWindow, {
+            type: 'question',
+            buttons: ['Tutup Tanpa Menyimpan', 'Batal'],
+            defaultId: 1,
+            cancelId: 1,
+            title: 'Perubahan Belum Disimpan',
+            message: 'Ada perubahan kode hub yang belum disimpan. Tutup window ini tanpa menyimpan?'
+        });
+        if (choice === 0) {
+            event.preventDefault();
+        }
+    });
+
+    hubCodeEditorWindow.on('closed', () => {
+        hubCodeEditorWindow = null;
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('hub-code-editor:closed');
+        }
+    });
+}
+
+ipcMain.on('hub-code-editor:open', (event, data) => {
+    openHubCodeEditorWindow(data || {});
+});
+
+ipcMain.on('hub-code-editor:load-scene', (event, data) => {
+    if (hubCodeEditorWindow && !hubCodeEditorWindow.isDestroyed()) {
+        hubCodeEditorWindow.show();
+        hubCodeEditorWindow.focus();
+        hubCodeEditorWindow.webContents.send('hub-code-editor:load-scene', data);
+    }
+});
+
+ipcMain.on('hub-code-editor:reload', () => {
+    if (hubCodeEditorWindow && !hubCodeEditorWindow.isDestroyed()) {
+        hubCodeEditorWindow.webContents.send('hub-code-editor:reload');
+    }
+});
+
+ipcMain.on('hub-code-editor:draft-update', (event, data) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('hub-code-editor:draft-update', data);
+    }
+});
+
+ipcMain.on('hub-code-editor:saved', (event, data) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('hub-code-editor:saved', data);
+    }
+});
+
+ipcMain.on('hub-code-editor:close-all', () => {
+    if (hubCodeEditorWindow && !hubCodeEditorWindow.isDestroyed()) {
+        hubCodeEditorWindow.close();
+    }
+});
+
+// Sebelum mutasi hub.html sisi main window (tambah/hapus scene), simpan dulu
+// editan yang masih dirty di window Hub Code Editor (bila terbuka).
+ipcMain.handle('hub-code-editor:flush-if-dirty', async () => {
     try {
-        const folders = fs.readdirSync(visualNovelsDirectory, { withFileTypes: true });
-
-        for (const folder of folders) {
-            if (folder.isDirectory()) {
-                const novelPath = path.join(visualNovelsDirectory, folder.name);
-                const indexPath = path.join(novelPath, 'index.html');
-
-                if (fs.existsSync(indexPath)) {
-                    // Cari cover image dengan berbagai ekstensi secara dinamis
-                    let coverFilename = 'cover.jpg'; // Default fallback
-                    let storyDesc = ''; // Story description yang dikustomisasi
-
-                    try {
-                        const files = fs.readdirSync(novelPath);
-                        // Cari file yang diawali dengan 'cover.' dan memiliki ekstensi gambar yang didukung
-                        const foundCover = files.find(file =>
-                            file.toLowerCase().startsWith('cover.') &&
-                            ['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(path.extname(file).toLowerCase())
-                        );
-
-                        if (foundCover) {
-                            coverFilename = foundCover;
-                        }
-
-                        // Baca storyDesc dari novel-meta.json jika ada
-                        const metaPath = path.join(novelPath, 'novel-meta.json');
-                        if (fs.existsSync(metaPath)) {
-                            try {
-                                const metaData = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
-                                storyDesc = metaData.storyDesc || '';
-                            } catch (metaErr) {
-                                console.error(`[Main] Error reading novel-meta.json for ${folder.name}:`, metaErr);
-                            }
-                        }
-                    } catch (e) {
-                        console.error(`[Main] Error finding cover for ${folder.name}:`, e);
-                    }
-
-                    stories.push({
-                        title: folder.name,
-                        playPath: `./visual_novels/${encodeURIComponent(folder.name)}/index.html`,
-                        cover: coverFilename,
-                        storyDesc: storyDesc  // Tambahkan storyDesc ke data story
-                    });
-                }
+        if (hubCodeEditorWindow && !hubCodeEditorWindow.isDestroyed()) {
+            const saved = await hubCodeEditorWindow.webContents.executeJavaScript(
+                '(window.VNCodeEditor && window.VNCodeEditor.isDirty() ? window.VNCodeEditor.save() : Promise.resolve(true))'
+            );
+            if (saved !== true) {
+                return { success: false, message: 'Draft Hub Code Editor gagal disimpan.' };
             }
         }
-    } catch (err) {
-        console.error('Error reading stories:', err);
+        return { success: true, dirty: false };
+    } catch (error) {
+        console.error('[HubCodeEditor] Gagal flush draft:', error);
+        return { success: false, message: error.message };
     }
-    return stories;
 });
+
+ipcMain.on('hub-code-editor:dirty-state', (event, data) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('hub-code-editor:dirty-state', data);
+    }
+});
+
+// =============================================
+// Novel CRUD, Hub Config, dan Asset handlers
+// sudah dipindah ke modul terpisah:
+// - vn-engine/novel-crud.js
+// - vn-engine/hub-config-manager.js
+// - vn-engine/asset-manager.js
+// Diregistrasi melalui vn-engine/index.js → initVNEngine()
+// =============================================
 
 // 4) Handler untuk mengambil daftar chapter di satu story
 ipcMain.handle('get-chapter-list', async (event, storyTitle) => {
-    return getChapterListData(storyTitle);
+    return vnEngine.core.getChapterListData(storyTitle);
 });
 
 ipcMain.on('return-to-index', (event) => {
@@ -5985,1477 +6739,6 @@ ipcMain.on('return-to-index', (event) => {
     }
 });
 
-// ----------------------------------------------- Buat Visual Novel ----------------------------------------- //
-ipcMain.handle('create-new-novel', async (event, novelData) => {
-    const { title, storyDesc, cover } = novelData;
-    const { name: coverName, buffer: coverArrayBuffer } = cover;
-    const coverBuffer = Buffer.from(coverArrayBuffer);
-    const visualNovelsPath = path.join(__dirname, 'aset', 'game', 'visual_novels');
-    const newNovelPath = path.join(visualNovelsPath, title);
-
-    if (fs.existsSync(newNovelPath)) {
-        return { success: false, message: 'Novel dengan judul ini sudah ada.' };
-    }
-
-    // Buat folder utama novel
-    fs.mkdirSync(newNovelPath, { recursive: true });
-
-    // Simpan file gambar cover
-    const extension = path.extname(coverName);
-    const coverFileName = 'cover' + extension;
-    fs.writeFileSync(path.join(newNovelPath, coverFileName), coverBuffer);
-
-    // Simpan storyDesc ke novel-meta.json
-    const metaData = {
-        storyDesc: storyDesc || '',
-        createdAt: new Date().toISOString()
-    };
-    fs.writeFileSync(path.join(newNovelPath, 'novel-meta.json'), JSON.stringify(metaData, null, 2));
-    console.log(`[Main] novel-meta.json disimpan untuk novel '${title}' dengan storyDesc: "${storyDesc}"`);
-
-    try {
-        // 1. Baca isi file template sebagai string
-        const templatePath = path.join(__dirname, 'hub_template.html');
-        let templateContent = fs.readFileSync(templatePath, 'utf-8');
-
-        // 2. Siapkan data pengganti
-        const initialDescription = `Ini adalah halaman informasi untuk novel ${title}. Edit deskripsi ini dan tambahkan lebih banyak gambar dari menu editor.`;
-        const initialImageTags = [`<img src="./${coverFileName}" alt="${title}">`];
-
-        // 3. Ganti semua placeholder di dalam template dengan data asli
-        let finalHtmlContent = templateContent
-            .replaceAll('{NOVEL_TITLE}', title)
-            .replace('{NOVEL_DESCRIPTION}', initialDescription.replace(/\n/g, '<br>')) // Mengganti baris baru dengan <br>
-            .replace('{NOVEL_GENRE}', '-')
-            .replace('{NOVEL_AUTHOR}', '-')
-            .replace('{NOVEL_ILLUSTRATOR}', '-')
-            .replace('{NOVEL_VN_MAPPER}', '-')
-            .replace('{IMAGE_TAGS}', initialImageTags.join('\n      '));
-
-        // 4. Tulis konten final ke file index.html baru
-        fs.writeFileSync(path.join(newNovelPath, 'index.html'), finalHtmlContent);
-
-        console.log(`[Main] Berhasil membuat hub untuk novel '${title}' menggunakan template.`);
-        return { success: true, message: 'Novel baru berhasil dibuat!' };
-
-    } catch (error) {
-        console.error(`[Main] Gagal membuat hub dari template: ${error}`);
-        return { success: false, message: `Gagal membuat file hub dari template: ${error.message}` };
-    }
-});
-
-ipcMain.handle('update-novel-details', async (event, data) => {
-    const { novelTitle, description, genre, author, illustrator, vnMapper, slideshowImages, backgroundVideo } = data;
-    const novelPath = path.join(__dirname, 'aset', 'game', 'visual_novels', novelTitle);
-
-    try {
-        const hubHtmlPath = path.join(novelPath, 'index.html');
-        let htmlContent = fs.readFileSync(hubHtmlPath, 'utf-8');
-
-        // Ekstrak tag gambar yang sudah ada
-        let existingImageTags = [];
-        const imageContainerRegex = /<div class="image-container"[^>]*>([\s\S]*?)<\/div>/;
-        const match = htmlContent.match(imageContainerRegex);
-        if (match && match[1]) {
-            const imgTagRegex = /<img[^>]*>/g;
-            existingImageTags = match[1].match(imgTagRegex) || [];
-        }
-
-        const allImageTags = [...existingImageTags];
-
-        // Simpan gambar slideshow baru
-        for (const image of slideshowImages) {
-            const extension = path.extname(image.name);
-            const imageName = `slide_${Date.now()}_${Math.random().toString(36).substr(2, 5)}${extension}`;
-            fs.writeFileSync(path.join(novelPath, imageName), Buffer.from(image.buffer));
-            allImageTags.push(`<img src="./${imageName}" alt="Slideshow Image">`);
-        }
-
-        if (backgroundVideo) {
-            const videoBuffer = Buffer.from(backgroundVideo.buffer);
-            // Selalu simpan dengan nama 'video.mp4' agar mudah diakses oleh vnManager
-            const videoFilename = 'video.mp4';
-            fs.writeFileSync(path.join(novelPath, videoFilename), videoBuffer);
-            console.log(`[Main] Video latar belakang untuk novel '${novelTitle}' telah disimpan sebagai ${videoFilename}.`);
-        }
-
-        // Ganti deskripsi
-        htmlContent = htmlContent.replace(
-            /<div class="description">[\s\S]*?<\/div>/,
-            `<div class="description">${description.replace(/\n/g, '<br>')}</div>`
-        );
-
-        // Ganti Genre
-        if (genre) {
-            htmlContent = htmlContent.replace(
-                /<span class="genre">.*?<\/span>/,
-                `<span class="genre">${genre}</span>`
-            );
-        }
-        // Ganti Author
-        if (author) {
-            htmlContent = htmlContent.replace(
-                /<span class="author">.*?<\/span>/,
-                `<span class="author">${author}</span>`
-            );
-        }
-        // Ganti Illustrator
-        if (illustrator) {
-            // Regex diubah: hanya whitespace (spasi, tab, newline) antara span dan class - bukan [\s\S] yang terlalu greedy
-            htmlContent = htmlContent.replace(
-                /<span\s+class="illustrator">[^<]*<\/span>/,
-                `<span class="illustrator">${illustrator}</span>`
-            );
-        }
-        // Ganti VN Mapper
-        if (vnMapper) {
-            // Cek apakah sudah ada vnMapper di HTML
-            if (htmlContent.includes('class="vn-mapper"')) {
-                htmlContent = htmlContent.replace(
-                    /<span class="vn-mapper">.*?<\/span>/,
-                    `<span class="vn-mapper">${vnMapper}</span>`
-                );
-            } else {
-                // Tambahkan vnMapper setelah illustrator jika belum ada
-                htmlContent = htmlContent.replace(
-                    /(<div><strong>Ilustrator:<\/strong> <span class="illustrator">.*?<\/span><\/div>)/,
-                    `$1\n          <div><strong>VN Mapper:</strong> <span class="vn-mapper">${vnMapper}</span></div>`
-                );
-            }
-        }
-
-        // Ganti isi image-container
-        if (allImageTags.length > 0) {
-            htmlContent = htmlContent.replace(
-                imageContainerRegex,
-                `<div class="image-container" style="align-self: flex-start;">${allImageTags.join('\n      ')}</div>`
-            );
-        }
-
-        fs.writeFileSync(hubHtmlPath, htmlContent);
-
-        return { success: true, message: 'Detail novel berhasil diperbarui!' };
-    } catch (error) {
-        console.error(`[Main] Gagal memperbarui detail novel: ${error}`);
-        return { success: false, message: `Terjadi kesalahan: ${error.message}` };
-    }
-});
-
-// Handler untuk menghapus folder novel (misal saat proses pembuatan dibatalkan)
-ipcMain.handle('delete-novel-folder', async (event, novelTitle) => {
-    try {
-        const novelPath = path.join(__dirname, 'aset', 'game', 'visual_novels', novelTitle);
-        if (fs.existsSync(novelPath)) {
-            fs.rmSync(novelPath, { recursive: true, force: true });
-            console.log(`[Main] Folder novel '${novelTitle}' dihapus karena pembatalan.`);
-            return { success: true, message: 'Novel yang belum selesai dihapus.' };
-        }
-        return { success: true, message: 'Folder novel tidak ditemukan, tidak ada yang dihapus.' };
-    } catch (error) {
-        console.error(`Gagal menghapus folder novel '${novelTitle}':`, error);
-        return { success: false, message: `Gagal menghapus folder: ${error.message}` };
-    }
-});
-
-// ----------------------------------------------- End Buat Visual Novel ----------------------------------------- //
-
-// ------------------------------------------- Get & Update Story Description -------------------------------------- //
-// Handler untuk mendapatkan storyDesc dari novel-meta.json
-ipcMain.handle('get-story-desc', async (event, novelTitle) => {
-    try {
-        const metaPath = path.join(__dirname, 'aset', 'game', 'visual_novels', novelTitle, 'novel-meta.json');
-        if (fs.existsSync(metaPath)) {
-            const metaData = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
-            return { success: true, storyDesc: metaData.storyDesc || '' };
-        }
-        return { success: true, storyDesc: '' };
-    } catch (error) {
-        console.error(`[Main] Gagal membaca storyDesc untuk '${novelTitle}':`, error);
-        return { success: false, message: error.message, storyDesc: '' };
-    }
-});
-
-// Handler untuk memperbarui storyDesc di novel-meta.json
-ipcMain.handle('update-story-desc', async (event, { novelTitle, storyDesc }) => {
-    try {
-        const metaPath = path.join(__dirname, 'aset', 'game', 'visual_novels', novelTitle, 'novel-meta.json');
-        let metaData = {};
-
-        // Baca data yang sudah ada jika file ada
-        if (fs.existsSync(metaPath)) {
-            metaData = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
-        }
-
-        // Update storyDesc
-        metaData.storyDesc = storyDesc;
-
-        // Tulis kembali ke file
-        fs.writeFileSync(metaPath, JSON.stringify(metaData, null, 2));
-        console.log(`[Main] storyDesc untuk '${novelTitle}' diperbarui: "${storyDesc}"`);
-
-        return { success: true, message: 'Deskripsi novel berhasil diperbarui!' };
-    } catch (error) {
-        console.error(`[Main] Gagal memperbarui storyDesc untuk '${novelTitle}':`, error);
-        return { success: false, message: `Gagal memperbarui: ${error.message}` };
-    }
-});
-
-// ----------------------------------------------------- Edit Novel -----------------------------------------------//
-ipcMain.handle('get-hub-details', async (event, novelTitle) => {
-    try {
-        const hubPath = path.join(__dirname, 'aset', 'game', 'visual_novels', novelTitle, 'index.html');
-        if (!fs.existsSync(hubPath)) {
-            return { success: false, message: 'File index.html tidak ditemukan.' };
-        }
-
-        const content = fs.readFileSync(hubPath, 'utf-8');
-
-        // Ekstrak Judul dari tag <title>
-        const titleMatch = content.match(/<title>(.*?)<\/title>/);
-        const title = titleMatch ? titleMatch[1] : novelTitle;
-
-        // Ekstrak Deskripsi dari dalam <div class="description">
-        const descriptionMatch = content.match(/<div class="description">([\s\S]*?)<\/div>/);
-        // Ganti <br> kembali menjadi baris baru untuk textarea, dan trim untuk menghilangkan indentasi HTML
-        const description = descriptionMatch ? descriptionMatch[1].replace(/<br\s*\/?>/gi, '\n').trim() : '';
-
-        // Ekstrak Genre
-        const genreMatch = content.match(/<span class="genre">(.*?)<\/span>/);
-        const genre = genreMatch ? genreMatch[1] : '';
-
-        // Ekstrak Author
-        const authorMatch = content.match(/<span class="author">(.*?)<\/span>/);
-        const author = authorMatch ? authorMatch[1] : '';
-
-        // Ekstrak Illustrator
-        const illustratorMatch = content.match(/<span class="illustrator">(.*?)<\/span>/);
-        const illustrator = illustratorMatch ? illustratorMatch[1] : '';
-
-        // Ekstrak VN Mapper
-        const vnMapperMatch = content.match(/<span class="vn-mapper">(.*?)<\/span>/);
-        const vnMapper = vnMapperMatch ? vnMapperMatch[1] : '';
-
-        return { success: true, title, description, genre, author, illustrator, vnMapper };
-    } catch (error) {
-        return { success: false, message: `Gagal membaca detail hub: ${error.message}` };
-    }
-});
-
-ipcMain.handle('update-hub-details', async (event, { originalTitle, newTitle, newDescription, newGenre, newAuthor, newIllustrator, newVnMapper }) => {
-    try {
-        let currentNovelPath = path.join(__dirname, 'aset', 'game', 'visual_novels', originalTitle);
-        const hubPath = path.join(currentNovelPath, 'index.html');
-
-        if (!fs.existsSync(hubPath)) {
-            return { success: false, message: 'File index.html tidak ditemukan.' };
-        }
-
-        // 1: Ubah nama folder jika judulnya berubah
-        if (originalTitle !== newTitle) {
-            const newNovelPath = path.join(__dirname, 'aset', 'game', 'visual_novels', newTitle);
-            if (fs.existsSync(newNovelPath)) {
-                return { success: false, message: 'Novel dengan judul baru tersebut sudah ada.' };
-            }
-            fs.renameSync(currentNovelPath, newNovelPath);
-            currentNovelPath = newNovelPath;
-            console.log(`[Main] Folder novel diubah dari '${originalTitle}' menjadi '${newTitle}'`);
-        }
-
-        // 2: Baca konten HTML
-        const finalHubPath = path.join(currentNovelPath, 'index.html');
-        let content = fs.readFileSync(finalHubPath, 'utf-8');
-
-        // 3: Ganti judul di dalam tag <title> (untuk tab jendela)
-        content = content.replace(/<title>(.*?)<\/title>/, `<title>${newTitle}</title>`);
-
-        // Ganti judul utama yang terlihat di halaman (tag <h1>)
-        const h1Regex = /(<h1[^>]*>)([\s\S]*?)(<\/h1>)/;
-        content = content.replace(h1Regex, `$1${newTitle}$3`);
-
-        // 4: Ganti deskripsi di dalam <div class="description">
-        const descRegex = /(<div class="description">)([\s\S]*?)(<\/div>)/;
-        const finalDescription = newDescription.replace(/\n/g, '<br>');
-        content = content.replace(descRegex, `$1${finalDescription}$3`);
-
-        // 5: Ganti Genre, Author, Illustrator, VN Mapper
-        if (newGenre) content = content.replace(/<span class="genre">.*?<\/span>/, `<span class="genre">${newGenre}</span>`);
-        if (newAuthor) content = content.replace(/<span class="author">.*?<\/span>/, `<span class="author">${newAuthor}</span>`);
-        if (newIllustrator) content = content.replace(/<span class="illustrator">.*?<\/span>/, `<span class="illustrator">${newIllustrator}</span>`);
-        if (newVnMapper) {
-            // Cek apakah sudah ada vnMapper di HTML
-            if (content.includes('class="vn-mapper"')) {
-                content = content.replace(/<span class="vn-mapper">.*?<\/span>/, `<span class="vn-mapper">${newVnMapper}</span>`);
-            } else {
-                // Tambahkan vnMapper setelah illustrator jika belum ada
-                content = content.replace(
-                    /(<div><strong>Ilustrator:<\/strong> <span class="illustrator">.*?<\/span><\/div>)/,
-                    `$1\n          <div><strong>VN Mapper:</strong> <span class="vn-mapper">${newVnMapper}</span></div>`
-                );
-            }
-        }
-
-        // 6: Tulis kembali file index.html yang sudah diperbarui
-        fs.writeFileSync(finalHubPath, content);
-
-        if (mainWindow) {
-            mainWindow.webContents.send('hub-html-updated', { novelTitle: newTitle });
-        }
-
-        return { success: true, message: 'Detail novel berhasil disimpan!' };
-    } catch (error) {
-        return { success: false, message: `Gagal menyimpan detail: ${error.message}` };
-    }
-});
-
-ipcMain.handle('get-global-novel-assets', async (event, novelTitle) => {
-    const novelPath = path.join(__dirname, 'aset', 'game', 'visual_novels', novelTitle);
-    const assets = { images: [], audios: [], videos: [] }; // Tambahkan kategori video
-    const imageExts = ['.png', '.jpg', '.jpeg', '.webp', '.gif'];
-    const audioExts = ['.mp3', '.ogg', '.wav', '.m4a'];
-    const videoExts = ['.mp4', '.webm', '.ogv']; // Definisikan ekstensi video
-
-    try {
-        if (!fs.existsSync(novelPath)) return assets;
-
-        const files = fs.readdirSync(novelPath, { withFileTypes: true });
-        for (const file of files) {
-            if (file.isDirectory()) continue;
-
-            const ext = path.extname(file.name).toLowerCase();
-            const fullPath = `file://${path.join(novelPath, file.name).replace(/\\/g, '/')}`;
-
-            if (imageExts.includes(ext)) {
-                assets.images.push({ fileName: file.name, relativePath: file.name, fullPath });
-            } else if (audioExts.includes(ext)) {
-                assets.audios.push({ fileName: file.name, relativePath: file.name, fullPath });
-            } else if (videoExts.includes(ext)) { // Tambahkan kondisi untuk video
-                assets.videos.push({ fileName: file.name, relativePath: file.name, fullPath });
-            }
-        }
-    } catch (error) {
-        console.error(`Gagal memindai aset global untuk ${novelTitle}:`, error);
-    }
-    return assets;
-});
-
-ipcMain.handle('get-chapter-assets', async (event, { novelTitle, chapterName }) => {
-    const chapterPath = path.join(__dirname, 'aset', 'game', 'visual_novels', novelTitle, chapterName);
-    const assets = { images: [], audios: [], videos: [] }; // Tambahkan kategori video
-    const imageExts = ['.png', '.jpg', '.jpeg', '.webp', '.gif'];
-    const audioExts = ['.mp3', '.ogg', '.wav', '.m4a'];
-    const videoExts = ['.mp4', '.webm', '.ogv']; // Definisikan ekstensi video
-
-    try {
-        if (!fs.existsSync(chapterPath)) return assets;
-
-        const files = fs.readdirSync(chapterPath);
-        for (const file of files) {
-            const ext = path.extname(file).toLowerCase();
-            const relativePath = `${chapterName}/${file}`;
-            const fullPath = `file://${path.join(chapterPath, file).replace(/\\/g, '/')}`;
-
-            if (imageExts.includes(ext)) {
-                assets.images.push({ fileName: file, relativePath, fullPath });
-            } else if (audioExts.includes(ext)) {
-                assets.audios.push({ fileName: file, relativePath, fullPath });
-            } else if (videoExts.includes(ext)) { // Tambahkan kondisi untuk video
-                assets.videos.push({ fileName: file, relativePath, fullPath });
-            }
-        }
-    } catch (error) {
-        console.error(`Gagal memindai aset untuk chapter ${chapterName}:`, error);
-    }
-    return assets;
-});
-
-// Handler untuk mengganti nama chapter
-ipcMain.handle('rename-chapter', async (event, { novelTitle, oldChapterName, newChapterName }) => {
-    try {
-        const novelPath = path.join(__dirname, 'aset', 'game', 'visual_novels', novelTitle);
-        const oldPath = path.join(novelPath, oldChapterName);
-        const newPath = path.join(novelPath, newChapterName);
-
-        if (fs.existsSync(newPath)) {
-            return { success: false, message: 'Nama chapter tersebut sudah ada.' };
-        }
-        fs.renameSync(oldPath, newPath);
-        return { success: true, message: 'Nama chapter berhasil diubah.' };
-    } catch (error) {
-        return { success: false, message: `Gagal mengubah nama: ${error.message}` };
-    }
-});
-
-// Handler untuk menghapus chapter
-ipcMain.handle('delete-chapter', async (event, { novelTitle, chapterName }) => {
-    try {
-        const chapterPath = path.join(__dirname, 'aset', 'game', 'visual_novels', novelTitle, chapterName);
-        if (fs.existsSync(chapterPath)) {
-            fs.rmSync(chapterPath, { recursive: true, force: true });
-            return { success: true, message: `Chapter '${chapterName}' berhasil dihapus.` };
-        }
-        return { success: false, message: 'Chapter tidak ditemukan.' };
-    } catch (error) {
-        return { success: false, message: `Gagal menghapus chapter: ${error.message}` };
-    }
-});
-
-ipcMain.handle('get-script-content', async (event, { storyTitle, chapterName }) => {
-    const scriptPath = path.join(__dirname, 'aset', 'game', 'visual_novels', storyTitle, chapterName, 'script.json');
-    try {
-        if (fs.existsSync(scriptPath)) {
-            const content = fs.readFileSync(scriptPath, 'utf-8');
-            return { success: true, data: JSON.parse(content) };
-        } else {
-            return { success: true, data: [] };
-        }
-    } catch (error) {
-        console.error(`Gagal membaca script.json untuk ${storyTitle}/${chapterName}:`, error);
-        return { success: false, message: error.message };
-    }
-});
-
-ipcMain.handle('open-file-dialog', async (event, { fileType, storyTitle, chapterName }) => {
-    let filters = [];
-    if (fileType === 'image') {
-        filters = [{ name: 'Gambar', extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif'] }];
-    } else if (fileType === 'audio') {
-        filters = [{ name: 'Audio', extensions: ['mp3', 'ogg', 'wav', 'm4a'] }];
-    } else if (fileType === 'video') {
-        filters = [{ name: 'Video', extensions: ['mp4', 'webm', 'mkv', 'avi', 'mov'] }];
-    } else if (fileType === 'all-media') {
-        filters = [{ name: 'Media (Gambar & Video)', extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'mp4', 'webm', 'mkv', 'avi', 'mov'] }];
-    }
-
-    try {
-        const { canceled, filePaths } = await dialog.showOpenDialog({
-            // biar pengguna bebas memilih dari mana saja
-            properties: ['openFile'],
-            filters: filters
-        });
-
-        if (canceled || filePaths.length === 0) {
-            return null; // membatalkan, tidak ada yang perlu dilakukan
-        }
-
-        const sourcePath = filePaths[0]; // Path lengkap file yang dipilih
-        const filename = path.basename(sourcePath);
-
-        // folder tujuan di dalam direktori novel bagian folder cerita.
-        const destDir = path.join(__dirname, 'aset', 'game', 'visual_novels', storyTitle, chapterName);
-        const destPath = path.join(destDir, filename);
-
-        // Pastikan folder tujuan ada. Jika tidak, buat folder tersebut secara rekursif.
-        fs.mkdirSync(destDir, { recursive: true });
-
-        // Salin file dari sumber ke tujuan
-        fs.copyFileSync(sourcePath, destPath);
-        console.log(`Aset disalin: ${filename} -> ${destDir}`);
-
-        // Kembalikan HANYA nama filenya ke editor, karena alur kerja editor sudah benar
-        return filename;
-
-    } catch (error) {
-        console.error('Gagal menyalin aset:', error);
-        dialog.showErrorBox('Error Menyalin Aset', `Terjadi kesalahan saat mencoba menyalin file. Pastikan Anda memiliki izin yang cukup.\n\nError: ${error.message}`);
-        return null;
-    }
-});
-
-ipcMain.handle('create-new-chapter', async (event, { storyTitle, newChapterName }) => {
-    // Validasi nama chapter agar tidak kosong
-    if (!newChapterName || !newChapterName.trim()) {
-        return { success: false, message: 'Nama chapter tidak boleh kosong.' };
-    }
-
-    const newChapterPath = path.join(__dirname, 'aset', 'game', 'visual_novels', storyTitle, newChapterName);
-
-    if (fs.existsSync(newChapterPath)) {
-        return { success: false, message: `Chapter '${newChapterName}' sudah ada.` };
-    }
-
-    try {
-        // 1. Buat folder chapter baru
-        fs.mkdirSync(newChapterPath, { recursive: true });
-
-        // 2. Buat file script.json kosong
-        const scriptPath = path.join(newChapterPath, 'script.json');
-        fs.writeFileSync(scriptPath, JSON.stringify([], null, 2), 'utf-8');
-
-        // 3. Baca konten dari file template
-        const templatePath = path.join(__dirname, 'vn_player_template.html');
-        let templateContent = fs.readFileSync(templatePath, 'utf-8');
-
-        // 4. GANTI PLACEHOLDER DENGAN DATA YANG RELEVAN
-        const finalHtmlContent = templateContent
-            .replaceAll('{NOVEL_TITLE}', storyTitle)
-            .replaceAll('{CHAPTER_NAME}', newChapterName);
-
-        // 5. Tulis konten final ke file index.html di dalam folder chapter
-        const indexPath = path.join(newChapterPath, 'index.html');
-        fs.writeFileSync(indexPath, finalHtmlContent, 'utf-8');
-
-        console.log(`[Editor] Chapter baru dibuat dari template: ${newChapterPath}`);
-        return { success: true, message: `Chapter '${newChapterName}' berhasil dibuat!` };
-
-    } catch (error) {
-        console.error('Gagal membuat chapter baru:', error);
-        return { success: false, message: `Gagal membuat chapter: ${error.message}` };
-    }
-});
-
-ipcMain.handle('replace-asset-file', async (event, { novelTitle, relativePath, buffer }) => {
-    try {
-        const assetPath = path.join(__dirname, 'aset', 'game', 'visual_novels', novelTitle, relativePath);
-
-        if (!fs.existsSync(path.dirname(assetPath))) {
-            return { success: false, message: 'Direktori aset tidak ditemukan.' };
-        }
-
-        fs.writeFileSync(assetPath, Buffer.from(buffer));
-        console.log(`[Main] Aset berhasil diganti: ${assetPath}`);
-        return { success: true, message: `Aset ${path.basename(assetPath)} berhasil diperbarui!` };
-
-    } catch (error) {
-        console.error(`Gagal mengganti aset: ${error}`);
-        return { success: false, message: `Gagal memperbarui aset: ${error.message}` };
-    }
-});
-
-ipcMain.handle('open-and-read-file', async (event, { filters }) => {
-    try {
-        const { canceled, filePaths } = await dialog.showOpenDialog({
-            properties: ['openFile'],
-            filters: filters
-        });
-        if (canceled || filePaths.length === 0) return null;
-
-        const filePath = filePaths[0];
-        const buffer = fs.readFileSync(filePath);
-        return { name: path.basename(filePath), buffer: buffer };
-
-    } catch (error) {
-        console.error('Gagal membuka atau membaca file:', error);
-        return null;
-    }
-});
-
-// Handler untuk menambah file aset baru
-ipcMain.handle('add-asset-file', async (event, { novelTitle, chapterName, file }) => {
-    try {
-        const destDir = path.join(__dirname, 'aset', 'game', 'visual_novels', novelTitle, chapterName);
-
-        let newFileName;
-        const extension = path.extname(file.name);
-
-        if (chapterName === '' && ['.mp4', '.webm', '.ogv'].includes(extension.toLowerCase())) {
-            newFileName = 'video.mp4';
-        } else {
-            // Gunakan nama file yang unik untuk semua aset gambar atau aset di dalam chapter
-            newFileName = `asset_${Date.now()}${extension}`;
-        }
-
-        const destPath = path.join(destDir, newFileName);
-        fs.writeFileSync(destPath, Buffer.from(file.buffer));
-
-        // Cek apakah ini adalah gambar global yang perlu ditambahkan ke slideshow hub
-        const imageExts = ['.png', '.jpg', '.jpeg', '.webp', '.gif'];
-        if (chapterName === '' && imageExts.includes(extension.toLowerCase())) {
-
-            // 1. Dapatkan path ke file index.html
-            const hubHtmlPath = path.join(__dirname, 'aset', 'game', 'visual_novels', novelTitle, 'index.html');
-
-            if (fs.existsSync(hubHtmlPath)) {
-                console.log(`[Main] Aset gambar global terdeteksi. Memperbarui ${hubHtmlPath}...`);
-                let htmlContent = fs.readFileSync(hubHtmlPath, 'utf-8');
-
-                // 2. Buat tag <img> yang baru
-                const newImgTag = `<img src="./${newFileName}" alt="Slideshow Image">`;
-
-                // 3. Cari kontainer gambar dan injeksikan tag baru sebelum penutup </div>
-                const imageContainerRegex = /(<div class="image-container"[^>]*>)([\s\S]*?)(<\/div>)/;
-                if (htmlContent.match(imageContainerRegex)) {
-                    // $1: <div...>, $2: konten lama, $3: </div>
-                    // Kita sisipkan konten lama, lalu tag baru, lalu penutup div
-                    htmlContent = htmlContent.replace(imageContainerRegex, `$1$2\n        ${newImgTag}\n    $3`);
-
-                    // 4. Tulis kembali file index.html yang sudah diperbarui
-                    fs.writeFileSync(hubHtmlPath, htmlContent);
-                    console.log(`[Main] Berhasil menambahkan ${newFileName} ke slideshow di index.html.`);
-                    if (mainWindow) mainWindow.webContents.send('hub-html-updated', { novelTitle });
-                } else {
-                    console.warn(`[Main] Gagal menemukan .image-container di dalam ${hubHtmlPath}.`);
-                }
-            }
-        }
-        console.log(`[Main] Aset berhasil ditambahkan/diperbarui: ${newFileName}`);
-        return { success: true, message: 'Aset berhasil ditambahkan!' };
-
-    } catch (error) {
-        console.error('Gagal menambah aset:', error);
-        return { success: false, message: `Gagal menambah aset: ${error.message}` };
-    }
-});
-
-// Handler untuk menghapus file aset
-ipcMain.handle('delete-asset-file', async (event, { novelTitle, relativePath }) => {
-    try {
-        const assetPath = path.join(__dirname, 'aset', 'game', 'visual_novels', novelTitle, relativePath);
-
-        if (fs.existsSync(assetPath)) {
-            // Simpan informasi file sebelum dihapus
-            const deletedFileExt = path.extname(relativePath).toLowerCase();
-            const isGlobalAsset = path.dirname(relativePath) === '.';
-
-            // Hapus file fisik dari sistem
-            fs.unlinkSync(assetPath);
-
-            // Cek apakah yang dihapus adalah gambar global yang perlu dibersihkan dari slideshow hub
-            const imageExts = ['.png', '.jpg', '.jpeg', '.webp', '.gif'];
-            if (isGlobalAsset && imageExts.includes(deletedFileExt)) {
-
-                const novelFolderPath = path.join(__dirname, 'aset', 'game', 'visual_novels', novelTitle);
-                const hubHtmlPath = path.join(novelFolderPath, 'index.html');
-
-                if (fs.existsSync(hubHtmlPath)) {
-                    console.log(`[Main] Aset gambar global dihapus. Memperbarui ${hubHtmlPath}...`);
-                    let htmlContent = fs.readFileSync(hubHtmlPath, 'utf-8');
-
-                    // 2. Buat Regular Expression untuk menemukan tag <img> yang spesifik berdasarkan src-nya
-                    // Ini akan mencari sesuatu seperti <img ... src="./asset_12345.jpg" ...> beserta spasi di sekitarnya
-                    const imgTagRegex = new RegExp(`<img[^>]*src\\s*=\\s*["']\\.\\/${relativePath}["'][^>]*>\\s*`, 'i');
-
-                    // 3. Hapus tag <img> yang cocok dari konten HTML
-                    htmlContent = htmlContent.replace(imgTagRegex, '');
-
-                    // 4. Tulis kembali file index.html yang sudah bersih
-                    fs.writeFileSync(hubHtmlPath, htmlContent);
-                    console.log(`[Main] Berhasil menghapus referensi ${relativePath} dari index.html.`);
-                    if (mainWindow) mainWindow.webContents.send('hub-html-updated', { novelTitle });
-                }
-            }
-
-            console.log(`[Main] Aset berhasil dihapus: ${assetPath}`);
-            return { success: true, message: 'Aset berhasil dihapus.' };
-        }
-        return { success: false, message: 'File tidak ditemukan.' };
-    } catch (error) {
-        console.error('Gagal menghapus aset:', error);
-        return { success: false, message: `Gagal menghapus aset: ${error.message}` };
-    }
-});
-
-
-ipcMain.handle('save-script-content', async (event, { storyTitle, chapterName, scriptContent }) => {
-    const scriptPath = path.join(__dirname, 'aset', 'game', 'visual_novels', storyTitle, chapterName, 'script.json');
-    try {
-        const content = JSON.stringify(scriptContent, null, 2);
-        fs.writeFileSync(scriptPath, content, 'utf-8');
-        return { success: true, message: 'Skrip berhasil disimpan!' };
-    } catch (error) {
-        console.error(`Gagal menyimpan script.json untuk ${storyTitle}/${chapterName}:`, error);
-        return { success: false, message: error.message };
-    }
-});
-// ----------------------------------------------------- End Edit Novel -----------------------------------------------//
-
-// ---------------------------------------------------
-// yaaa bisa sebut aja engine ini Rin.js , wkwkwkwkkw
-// ---------------------------------------------------
-// ----------------------------------------------------- Engine Novel -----------------------------------------------//
-let currentVNScript = [];
-let currentVNIndex = 0;
-let currentVNState = {
-    backgroundStack: [{ type: null, src: null }],
-    bgmState: { src: null, volume: undefined, pan: undefined, delay: undefined },
-    lastSpeaker: null
-};
-let vnDialogueHistory = [];
-
-function handleJump(target) {
-    console.log(`[VN Engine] JUMP diproses. Target: '${target}'`);
-    let newIndex = -1;
-
-    // Helper untuk menemukan akhir dari sebuah blok label INDUK
-    const findEndOfParentBlock = (startIndex) => {
-        let parentName = null;
-        for (let i = startIndex; i >= 0; i--) {
-            if (currentVNScript[i].type === 'label' && !currentVNScript[i].name.includes('.')) {
-                parentName = currentVNScript[i].name;
-                break;
-            }
-        }
-        if (!parentName) return startIndex;
-
-        // akan berhenti jika menemukan baris yang BUKAN bagian dari konten label
-        const endOfBlockIndex = currentVNScript.findIndex((line, index) => {
-            if (index <= startIndex) return false; // Hanya cari setelah posisi saat ini
-
-            switch (line.type) {
-                case 'dialogue':
-                case 'choice':
-                case 'scene':
-                case 'jump': // Jump dianggap sebagai konten, bukan akhir blok
-                    return false; // Ini adalah konten, jadi lanjutkan pencarian
-                case 'label':
-                    // Jika ini adalah sub-label, ini adalah konten. Jika bukan, ini akhir dari blok.
-                    return !line.name.startsWith(parentName + '.');
-                case 'phase': // Phase baru menandakan akhir blok
-                    return true;
-                default:
-                    // Tipe lain yang tidak dikenali dianggap akhir blok
-                    return true;
-            }
-        });
-        return endOfBlockIndex !== -1 ? endOfBlockIndex : currentVNScript.length;
-    };
-
-    // Helper untuk menemukan akhir dari sebuah blok SUB-LABEL
-    const findEndOfSubLabelBlock = (startIndex) => {
-        for (let i = startIndex + 1; i < currentVNScript.length; i++) {
-            const line = currentVNScript[i];
-            if (line.type === 'jump' || (line.type === 'label' && !line.name.includes('.'))) {
-                return i; // Akhir dari blok adalah di baris jump/label ini
-            }
-        }
-        return currentVNScript.length;
-    };
-
-
-    // ================== PENANGANAN PERINTAH SPESIAL ==================
-    if (target === '##CONTINUE_PARENT##' || target === '##EXIT_SUB_LABEL##') {
-        console.log(`[VN Engine] ${target}: Keluar dari blok sub-label.`);
-        let endOfSubBlock = findEndOfSubLabelBlock(currentVNIndex);
-        // Lanjutkan dari baris SETELAH jump yang mengakhiri sub-label
-        newIndex = currentVNScript[endOfSubBlock]?.type === 'jump' ? endOfSubBlock + 1 : endOfSubBlock;
-
-    } else if (target === '##CONTINUE_PARENT_FLOW##') {
-        console.log(`[VN Engine] ##CONTINUE_PARENT_FLOW##: Mencari entri selanjutnya di label induk.`);
-        let endOfCurrentSubBlock = findEndOfSubLabelBlock(currentVNIndex);
-        let searchStartIndex = currentVNScript[endOfCurrentSubBlock]?.type === 'jump' ? endOfCurrentSubBlock + 1 : endOfCurrentSubBlock;
-        let parentBlockEnd = findEndOfParentBlock(currentVNIndex);
-
-        for (let i = searchStartIndex; i < parentBlockEnd; i++) {
-            const line = currentVNScript[i];
-            if (line.type === 'label' && line.name.includes('.')) {
-                let end = findEndOfSubLabelBlock(i);
-                i = currentVNScript[end]?.type === 'jump' ? end : end - 1;
-                continue;
-            }
-            if (line.type !== 'label' && line.type !== 'jump') {
-                newIndex = i;
-                break;
-            }
-        }
-        if (newIndex === -1) newIndex = parentBlockEnd;
-
-    } else if (target === '##FINISH_PARENT##' || target === '##EXIT_LABEL##') {
-        const endOfBlock = findEndOfParentBlock(currentVNIndex);
-
-        // Cari mundur dari batas blok untuk menemukan "exit jump" terakhir (jump ke fase atau ##)
-        // yang merupakan alur keluar normal dari label induk
-        let exitJumpIndex = -1;
-        for (let i = endOfBlock - 1; i > currentVNIndex; i--) {
-            const line = currentVNScript[i];
-            // Jangan mundur melewati sub-label lain
-            if (line.type === 'label') break;
-
-            if (line.type === 'jump') {
-                // Cek apakah ini exit jump (ke fase lain atau command ##)
-                if (line.target && (line.target.startsWith('fase:') || line.target.startsWith('##'))) {
-                    exitJumpIndex = i;
-                    break;
-                }
-            }
-        }
-
-        if (exitJumpIndex !== -1) {
-            // Ditemukan exit jump, eksekusi dari sana
-            newIndex = exitJumpIndex;
-            console.log(`[VN Engine] ${target}: Keluar dari blok. Ditemukan exit jump di index ${exitJumpIndex}, mengeksekusi...`);
-        } else {
-            // Tidak ada exit jump, lanjut ke setelah blok
-            newIndex = endOfBlock;
-            console.log(`[VN Engine] ${target}: Keluar dari blok. Melanjutkan dari index ${newIndex}`);
-        }
-
-    } else if (target === '##SKIP_ALL_LABEL##') {
-        console.log(`[VN Engine] ##SKIP_ALL_LABEL##: Mencari alur utama setelah SEMUA blok label.`);
-
-        // Cari batas fase berikutnya
-        const endOfPhaseIndex = currentVNScript.findIndex((line, index) => index > currentVNIndex && line.type === 'phase');
-        const searchLimit = (endOfPhaseIndex !== -1) ? endOfPhaseIndex : currentVNScript.length;
-
-        // Kumpulkan semua index label INDUK yang ada di fase ini (setelah posisi saat ini)
-        const allParentLabelIndexes = [];
-        for (let i = currentVNIndex + 1; i < searchLimit; i++) {
-            const line = currentVNScript[i];
-            // Label induk adalah label yang namanya tidak mengandung titik
-            if (line.type === 'label' && !line.name.includes('.')) {
-                allParentLabelIndexes.push(i);
-            }
-        }
-
-        console.log(`[VN Engine] Ditemukan ${allParentLabelIndexes.length} label induk di fase ini: indexes ${allParentLabelIndexes.join(', ')}`);
-
-        if (allParentLabelIndexes.length === 0) {
-            // Tidak ada label induk, langsung cari entri konten pertama setelah posisi saat ini
-            for (let i = currentVNIndex + 1; i < searchLimit; i++) {
-                const line = currentVNScript[i];
-                if (line.type !== 'jump' && line.type !== 'label') {
-                    newIndex = i;
-                    break;
-                }
-            }
-        } else {
-            // Tentukan batas akhir dari LABEL TERAKHIR
-            // Batas akhir adalah index dari label induk berikutnya, atau fase berikutnya
-            const lastLabelIndex = allParentLabelIndexes[allParentLabelIndexes.length - 1];
-
-            // Cari di mana konten label terakhir berakhir
-            // Konten berakhir saat kita menemukan label INDUK baru atau fase baru
-            // Atau jika ada entri setelah jump terakhir dari label tersebut
-            let contentAfterLastLabel = -1;
-            let lastJumpInLabel = -1;
-
-            for (let i = lastLabelIndex + 1; i < searchLimit; i++) {
-                const line = currentVNScript[i];
-
-                // Jika menemukan label induk baru, berarti konten label sebelumnya sudah berakhir
-                if (line.type === 'label' && !line.name.includes('.')) {
-                    break;
-                }
-
-                // Jika menemukan sub-label dari label terakhir, skip (masih bagian dari label)
-                if (line.type === 'label' && line.name.startsWith(currentVNScript[lastLabelIndex].name + '.')) {
-                    continue;
-                }
-
-                // Track exit jump dari label
-                if (line.type === 'jump') {
-                    // Cek apakah jump ini adalah "exit jump" dari label (##FINISH_PARENT##, ##EXIT_LABEL##, atau fase:)
-                    if (line.target && (line.target.startsWith('##') || line.target.startsWith('fase:'))) {
-                        lastJumpInLabel = i;
-                        console.log(`[VN Engine] Exit jump ditemukan di index ${i}: "${line.target}". STOP pencarian.`);
-                        // BREAK setelah menemukan exit jump PERTAMA
-                        // Karena konten setelah exit jump ini adalah konten DI LUAR label
-                        break;
-                    }
-                }
-            }
-
-            // Setelah melewati konten label terakhir, cari entri yang ada DI LUAR label
-            // Mulai dari posisi setelah jump terakhir dari label
-            const searchStart = lastJumpInLabel !== -1 ? lastJumpInLabel + 1 : lastLabelIndex + 1;
-
-            for (let i = searchStart; i < searchLimit; i++) {
-                const line = currentVNScript[i];
-
-                // Jika ini label induk baru, skip keseluruhan label tersebut
-                if (line.type === 'label' && !line.name.includes('.')) {
-                    // Cari akhir dari label ini
-                    let labelEnd = i + 1;
-                    for (let j = i + 1; j < searchLimit; j++) {
-                        if (currentVNScript[j].type === 'label' && !currentVNScript[j].name.includes('.')) {
-                            labelEnd = j;
-                            break;
-                        }
-                        if (currentVNScript[j].type === 'phase') {
-                            labelEnd = j;
-                            break;
-                        }
-                        if (currentVNScript[j].type === 'jump' &&
-                            (currentVNScript[j].target?.startsWith('##') || currentVNScript[j].target?.startsWith('fase:'))) {
-                            labelEnd = j + 1;
-                        }
-                    }
-                    i = labelEnd - 1; // -1 karena loop akan i++
-                    continue;
-                }
-
-                // Skip jump entries
-                if (line.type === 'jump') {
-                    continue;
-                }
-
-                // Sub-label juga dilewati
-                if (line.type === 'label') {
-                    continue;
-                }
-
-                // Ditemukan entri konten di luar label!
-                newIndex = i;
-                console.log(`[VN Engine] Ditemukan entri di luar label pada index ${i}: "${line.text || line.type}"`);
-                break;
-            }
-        }
-
-        if (newIndex === -1) {
-            console.log(`[VN Engine] Tidak ada entri di luar label. Lanjut ke fase berikutnya.`);
-            newIndex = searchLimit;
-        }
-
-    } else if (target && target.startsWith('fase:')) {
-        const phaseName = target.replace('fase:', '');
-        newIndex = currentVNScript.findIndex(d => d.type === 'phase' && d.name === phaseName);
-        console.log(`[VN Engine] Mencari fase '${phaseName}'... Ditemukan di index: ${newIndex}`);
-
-    } else if (target) { // Jump ke label biasa
-        newIndex = currentVNScript.findIndex(d => d.type === 'label' && d.name === target);
-        console.log(`[VN Engine] Mencari label '${target}'... Ditemukan di index: ${newIndex}`);
-    }
-
-    if (newIndex !== -1) {
-        currentVNIndex = newIndex;
-    } else {
-        console.log(`[VN Engine] Target jump '${target}' tidak ditemukan. Lanjut ke baris berikutnya.`);
-        currentVNIndex++;
-    }
-}
-
-function processAndSendVNUpdate() {
-    if (!mainWindow || mainWindow.isDestroyed()) return;
-
-    // Cek kondisi SEBELUM memproses baris.
-    // Jika kita sudah berada dalam fase ending DAN baris berikutnya adalah fase baru (atau akhir dari file),
-    // berarti cerita sudah benar-benar berakhir.
-    if (currentVNState.isInEndingPhase) {
-        const nextLine = currentVNScript[currentVNIndex];
-        if (!nextLine || nextLine.type === 'phase') {
-            console.log(`[VN Engine] Mencapai akhir dari FASE ENDING. Mengirim sinyal end-of-chapter.`);
-            mainWindow.webContents.send('vn-engine:end-of-chapter', {
-                hasNextChapter: false // Ending tidak memiliki chapter selanjutnya
-            });
-            return; // Hentikan semua proses lebih lanjut
-        }
-    }
-
-    if (currentVNIndex >= currentVNScript.length) {
-        console.log(`[VN Engine] Mencapai akhir skrip. Index: ${currentVNIndex}. Mengirim sinyal end-of-chapter.`);
-        mainWindow.webContents.send('vn-engine:end-of-chapter', {
-            hasNextChapter: getNextChapterSync() !== null
-        });
-        return;
-    }
-
-    const currentLine = currentVNScript[currentVNIndex];
-
-
-
-    if (currentLine.type === 'phase' || currentLine.type === 'label') {
-
-        if (currentLine.type === 'phase') {
-            if (currentLine.isEnding) {
-                currentVNState.isInEndingPhase = true;
-                console.log(`[VN Engine] Memasuki FASE ENDING: '${currentLine.name}'`);
-            } else {
-                currentVNState.isInEndingPhase = false;
-            }
-        }
-
-        if (currentLine.background || currentLine.video) {
-            let newBackgroundState = {};
-            if (currentLine.background) {
-                newBackgroundState = { type: 'image', src: currentLine.background };
-                newBackgroundState.mode = currentLine.backgroundMode || 'cover';
-            } else if (currentLine.video) {
-                newBackgroundState = { type: 'video', src: currentLine.video };
-            }
-            if (currentLine.type === 'phase') {
-                currentVNState.backgroundStack = [newBackgroundState];
-            } else {
-                const currentState = currentVNState.backgroundStack[currentVNState.backgroundStack.length - 1];
-                currentVNState.backgroundStack.push({ ...currentState, ...newBackgroundState });
-            }
-        }
-
-        if (currentLine.bgm) {
-            currentVNState.lastBgmState = {
-                src: currentLine.bgm, volume: currentLine.bgmVolume, pan: currentLine.bgmPan,
-                delay: currentLine.bgmDelay, loop: currentLine.bgmLoop, fade: currentLine.bgmFade
-            };
-        }
-
-        // Jika ini adalah label yang mengubah aset visual (background/video)
-        if (currentLine.type === 'label' && (currentLine.background || currentLine.video)) {
-            // Tentukan efeknya: gunakan yang ada di script, atau 'cut' (instan) jika tidak ada.
-            const effect = currentLine.transition || 'cut';
-
-            const payload = {
-                bgm: currentVNState.lastBgmState?.src,
-                background: currentVNState.backgroundStack[currentVNState.backgroundStack.length - 1]?.src,
-                video: currentVNState.backgroundStack[currentVNState.backgroundStack.length - 1]?.type === 'video' ? currentVNState.backgroundStack[currentVNState.backgroundStack.length - 1].src : null,
-                backgroundMode: currentVNState.backgroundStack[currentVNState.backgroundStack.length - 1]?.mode
-            };
-
-            console.log(`[VN Engine] Label dengan aset terdeteksi. Mengirim transisi '${effect}'...`);
-            mainWindow.webContents.send('vn-engine:execute-transition', {
-                effect: effect,
-                payload: payload
-            });
-            // HENTIKAN eksekusi di sini dan tunggu player merespons.
-            return;
-        }
-
-        currentVNIndex++;
-        processAndSendVNUpdate();
-        return;
-    }
-
-    if (currentLine.type === 'jump') {
-        handleJump(currentLine.target);
-        processAndSendVNUpdate();
-        return;
-    }
-
-    const payload = { ...currentLine };
-
-    // Cek apakah ada flag dari baris SEBELUMNYA
-    if (currentVNState.skipNextTransitionIn) {
-        console.log(`%c[VN Engine] Mendeteksi ini adalah transisi 'in' berantai. Menandai payload...`, 'color: #FFD700');
-        // Tandai payload ini agar player tahu
-        // untuk MELEWATI bagian "Fade To Color" dari animasinya.
-        payload.isChainedTransition = true;
-
-        // Reset flag SETELAH digunakan agar tidak terbawa ke payload berikutnya
-        delete currentVNState.skipNextTransitionIn;
-    }
-
-    if (!payload.bgm && currentVNState.lastBgmState) {
-        payload.bgm = currentVNState.lastBgmState.src;
-        if (payload.bgmVolume === undefined) payload.bgmVolume = currentVNState.lastBgmState.volume;
-        if (payload.bgmPan === undefined) payload.bgmPan = currentVNState.lastBgmState.pan;
-        if (payload.bgmDelay === undefined) payload.bgmDelay = currentVNState.lastBgmState.delay;
-        if (payload.bgmLoop === undefined) payload.bgmLoop = currentVNState.lastBgmState.loop;
-        if (payload.bgmFade === undefined) payload.bgmFade = currentVNState.lastBgmState.fade;
-    }
-
-    const currentBackgroundDefault = currentVNState.backgroundStack[currentVNState.backgroundStack.length - 1];
-    if (currentBackgroundDefault) {
-        if (currentBackgroundDefault.type === 'image' && !payload.background) {
-            payload.background = currentBackgroundDefault.src;
-            payload.backgroundMode = currentBackgroundDefault.mode;
-        } else if (currentBackgroundDefault.type === 'video' && !payload.video) {
-            payload.video = currentBackgroundDefault.src;
-        }
-    }
-
-    if (currentLine.speaker) currentVNState.lastSpeaker = currentLine.speaker;
-    else payload.speaker = currentVNState.lastSpeaker;
-
-    const shouldPersist = currentLine.type === 'dialogue' || (currentLine.type === 'scene' && currentLine.persistBackground !== false);
-    if (shouldPersist) {
-        let newState = {};
-        if (currentLine.background) {
-            // kita juga menyimpan 'mode' ke dalam state
-            newState = {
-                type: 'image',
-                src: currentLine.background,
-                mode: currentLine.backgroundMode || 'cover' // Ambil mode dari data, atau default ke 'cover'
-            };
-        } else if (currentLine.video) {
-            newState = { type: 'video', src: currentLine.video };
-        }
-
-        if (newState.type) {
-            currentVNState.backgroundStack[currentVNState.backgroundStack.length - 1] = newState;
-        }
-    }
-
-    // Cek jika baris SAAT INI adalah 'scene' yang punya transisi 'out'
-    if (currentLine.type === 'scene' && currentLine.transitionOut && currentLine.persistBackground === false) {
-
-        // "Intip" baris BERIKUTNYA
-        const nextLine = currentVNScript[currentVNIndex + 1];
-
-        // Cek apakah baris berikutnya ada, juga 'scene', dan punya transisi 'in' (bukan 'cut' atau 'none')
-        const hasNextTransition = nextLine && nextLine.type === 'scene' &&
-            nextLine.transition && nextLine.transition !== 'cut';
-
-        if (hasNextTransition) {
-            console.log(`%c[VN Engine] Look-ahead terpicu! ${currentLine.transitionOut} akan disambung ${nextLine.transition}`, 'color: #FFD700');
-            // Selalu atur flag dan kirim data, apapun nama transisinya
-            currentVNState.skipNextTransitionIn = true;
-            payload.nextTransition = nextLine.transition;
-        }
-    }
-
-    console.log(`\n--- [VN ENGINE TICK] ---`);
-    console.log(`> Index Diproses: ${currentVNIndex}`);
-    console.log(`> Payload Final Dikirim:`, payload);
-    console.log(`------------------------\n`);
-
-    mainWindow.webContents.send('vn-engine:update-display', payload);
-
-    if ((currentLine.type === 'dialogue' || currentLine.type === 'choice') && payload.text) {
-        vnDialogueHistory.push({ speaker: payload.speaker || "Narasi", text: payload.text });
-    }
-}
-
-// Helper sinkron untuk memeriksa chapter selanjutnya (dipakai di akhir chapter)
-function getNextChapterSync() {
-    if (!currentStoryTitle || !currentChapter) return null;
-    const chaptersResponse = getChapterListData(currentStoryTitle);
-    const mainChapters = chaptersResponse.mainChapters.sort((a, b) => {
-        const getNumber = (name) => {
-            if (name.toLowerCase().includes('prolog')) return 0;
-            const match = name.match(/\d+/);
-            return match ? parseInt(match[0], 10) : Infinity;
-        };
-        return getNumber(a) - getNumber(b);
-    });
-    const currentIndex = mainChapters.indexOf(currentChapter);
-    if (currentIndex > -1 && currentIndex < mainChapters.length - 1) {
-        return mainChapters[currentIndex + 1];
-    }
-    return null;
-}
-
-
-// 1. Renderer memberi tahu bahwa ia siap menerima data
-ipcMain.on('vn-engine:ready', () => {
-    console.log('[VN Engine] Renderer is ready. Sending first line.');
-
-    // Cek apakah sedang dalam mode preview label
-    if (isLabelPreviewMode) {
-        console.log('[VN Engine] Mode Preview Label aktif, menggunakan processPreviewLabelUpdate.');
-        processPreviewLabelUpdate();
-    } else {
-        processAndSendVNUpdate();
-    }
-});
-
-// --- SAVE & LOAD SYSTEM ---
-ipcMain.on('vn-engine:save-game', (event, { slotId, previewType, previewImage }) => {
-    if (!currentStoryTitle || !currentChapter) return;
-
-    const saveDir = path.join(__dirname, 'aset', 'game', 'visual_novels', currentStoryTitle, 'saves');
-    if (!fs.existsSync(saveDir)) {
-        fs.mkdirSync(saveDir, { recursive: true });
-    }
-
-    const savePath = path.join(saveDir, `save_slot_${slotId}.json`);
-    const saveData = {
-        storyTitle: currentStoryTitle,
-        chapter: currentChapter,
-        index: currentVNIndex,
-        history: vnDialogueHistory,
-        state: currentVNState,
-        timestamp: new Date().toISOString(),
-        previewType: previewType || 'image',
-        previewImage: previewImage || ''
-    };
-
-    try {
-        fs.writeFileSync(savePath, JSON.stringify(saveData, null, 2));
-        console.log(`[Main] Game saved to ${savePath}`);
-        // Kirim konfirmasi balik ke renderer jika perlu
-        event.sender.send('vn-engine:save-success', slotId);
-    } catch (err) {
-        console.error('[Main] Failed to save game:', err);
-    }
-});
-
-ipcMain.on('vn-engine:load-game', (event, { slotId }) => {
-    if (!currentStoryTitle) return;
-
-    const savePath = path.join(__dirname, 'aset', 'game', 'visual_novels', currentStoryTitle, 'saves', `save_slot_${slotId}.json`);
-
-    if (fs.existsSync(savePath)) {
-        try {
-            const saveData = JSON.parse(fs.readFileSync(savePath, 'utf-8'));
-
-            // Restore state
-            currentStoryTitle = saveData.storyTitle;
-            currentChapter = saveData.chapter;
-            currentVNIndex = saveData.index;
-            vnDialogueHistory = saveData.history || [];
-            currentVNState = saveData.state || {};
-
-            console.log(`[Main] Loading game: ${currentStoryTitle} - ${currentChapter} at index ${currentVNIndex}`);
-
-            // Reload script and HTML
-            const chapterPath = path.join(__dirname, 'aset', 'game', 'visual_novels', currentStoryTitle, currentChapter);
-            const scriptPath = path.join(chapterPath, 'script.json');
-            const scriptContent = fs.readFileSync(scriptPath, 'utf-8');
-            currentVNScript = JSON.parse(scriptContent);
-
-            mainWindow.loadFile(path.join(chapterPath, 'index.html'));
-
-        } catch (err) {
-            console.error('[Main] Failed to load game:', err);
-        }
-    } else {
-        console.log('[Main] No save file found.');
-    }
-});
-
-ipcMain.handle('vn-engine:get-save-slots', (event, storyTitle) => {
-    const targetTitle = storyTitle || currentStoryTitle;
-    if (!targetTitle) return [];
-
-    const saveDir = path.join(__dirname, 'aset', 'game', 'visual_novels', targetTitle, 'saves');
-    if (!fs.existsSync(saveDir)) return [];
-
-    const slots = [];
-    const files = fs.readdirSync(saveDir).filter(f => f.startsWith('save_slot_') && f.endsWith('.json'));
-
-    for (const file of files) {
-        try {
-            const content = fs.readFileSync(path.join(saveDir, file), 'utf-8');
-            const data = JSON.parse(content);
-            const slotId = parseInt(file.replace('save_slot_', '').replace('.json', ''));
-
-            let previewImage = null;
-            let previewType = 'image'; // Default type
-
-            if (data.state && data.state.backgroundStack && data.state.backgroundStack.length > 0) {
-                const lastBg = data.state.backgroundStack[data.state.backgroundStack.length - 1];
-                if (lastBg && lastBg.src) {
-                    previewImage = lastBg.src;
-                    // Deteksi tipe jika tersedia di state, atau tebak dari ekstensi
-                    if (lastBg.type) {
-                        previewType = lastBg.type;
-                    } else {
-                        const lowerSrc = lastBg.src.toLowerCase();
-                        if (lowerSrc.endsWith('.mp4') || lowerSrc.endsWith('.webm')) {
-                            previewType = 'video';
-                        }
-                    }
-                }
-            }
-
-            slots.push({
-                slotId: slotId,
-                timestamp: data.timestamp,
-                chapter: data.chapter,
-                previewImage: previewImage,
-                previewType: previewType,
-                storyTitle: data.storyTitle
-            });
-        } catch (e) {
-            console.error('Error reading save slot', file, e);
-        }
-    }
-    return slots.sort((a, b) => a.slotId - b.slotId);
-});
-
-ipcMain.on('vn-engine:load-game-from-hub', (event, { storyTitle, slotId }) => {
-    const savePath = path.join(__dirname, 'aset', 'game', 'visual_novels', storyTitle, 'saves', `save_slot_${slotId}.json`);
-    if (fs.existsSync(savePath)) {
-        try {
-            const saveData = JSON.parse(fs.readFileSync(savePath, 'utf-8'));
-
-            currentStoryTitle = saveData.storyTitle;
-            currentChapter = saveData.chapter;
-            currentVNIndex = saveData.index;
-            vnDialogueHistory = saveData.history || [];
-            currentVNState = saveData.state || {};
-
-            console.log(`[Main] Loading game from hub: ${currentStoryTitle} - ${currentChapter}`);
-
-            const chapterPath = path.join(__dirname, 'aset', 'game', 'visual_novels', currentStoryTitle, currentChapter);
-            const scriptPath = path.join(chapterPath, 'script.json');
-            const scriptContent = fs.readFileSync(scriptPath, 'utf-8');
-            currentVNScript = JSON.parse(scriptContent);
-
-            mainWindow.loadFile(path.join(chapterPath, 'index.html'));
-
-        } catch (err) {
-            console.error('[Main] Failed to load game from hub:', err);
-        }
-    }
-});
-
-// 2. Renderer meminta baris/dialog selanjutnya (setelah user klik)
-ipcMain.on('vn-engine:request-next-line', () => {
-    // Jika dalam mode preview label, gunakan handler khusus
-    if (isLabelPreviewMode) {
-        if (currentVNState.pendingJump) {
-            const target = currentVNState.pendingJump;
-            delete currentVNState.pendingJump;
-            // Di mode preview, jump sederhana: cari target di skrip preview
-            const targetIndex = currentVNScript.findIndex(d => d.type === 'label' && d.name === target);
-            if (targetIndex !== -1) {
-                currentVNIndex = targetIndex;
-            } else {
-                currentVNIndex++;
-            }
-        } else {
-            currentVNIndex++;
-        }
-        processPreviewLabelUpdate();
-        return;
-    }
-
-    if (currentVNState.pendingJump) {
-        const target = currentVNState.pendingJump;
-        delete currentVNState.pendingJump;
-        // Panggil fungsi terpusat yang baru
-        handleJump(target);
-    } else {
-        currentVNIndex++;
-    }
-    processAndSendVNUpdate();
-});
-
-// 3. Renderer mengirim pilihan yang dibuat user
-ipcMain.on('vn-engine:choice-made', (event, choice) => {
-    // Jika dalam mode preview label, gunakan handler khusus
-    if (isLabelPreviewMode) {
-        const originalChoiceLine = currentVNScript[currentVNIndex];
-
-        // Guard: pastikan originalChoiceLine ada
-        if (!originalChoiceLine) {
-            console.error('[Preview Label] originalChoiceLine tidak ditemukan!');
-            currentVNIndex++;
-            processPreviewLabelUpdate();
-            return;
-        }
-
-        if (choice.setVariable) {
-            currentVNState[choice.setVariable.name] = choice.setVariable.value;
-        }
-
-        // Handle autoDialogue di mode preview
-        if (originalChoiceLine.autoDialogue && choice.text) {
-            const autoDialoguePayload = {
-                type: 'dialogue',
-                text: choice.text,
-                bgm: currentVNState.lastBgmState?.src,
-                bgmVolume: currentVNState.lastBgmState?.volume,
-                background: currentVNState.backgroundStack[currentVNState.backgroundStack.length - 1]?.src,
-                backgroundMode: currentVNState.backgroundStack[currentVNState.backgroundStack.length - 1]?.mode,
-                sprite: originalChoiceLine.sprite,
-                sprite2: originalChoiceLine.sprite2,
-                spriteCenter: originalChoiceLine.spriteCenter,
-                charSprites: originalChoiceLine.charSprites,
-                isPreview: true,
-                isLabelPreview: true
-            };
-
-            if (originalChoiceLine.autoDialogue === 'character' && currentVNState.lastSpeaker) {
-                autoDialoguePayload.speaker = currentVNState.lastSpeaker;
-            }
-
-            if (autoDialoguePayload.speaker) {
-                vnDialogueHistory.push({ speaker: autoDialoguePayload.speaker, text: autoDialoguePayload.text });
-            }
-
-            previewWindow.webContents.send('vn-engine:update-display', autoDialoguePayload);
-            currentVNState.pendingJump = choice.jump;
-            return;
-        }
-
-        // Handle jump dari choice di mode preview
-        if (choice.jump) {
-            const targetIndex = currentVNScript.findIndex(d => d.type === 'label' && d.name === choice.jump);
-            if (targetIndex !== -1) {
-                currentVNIndex = targetIndex;
-            } else {
-                console.log('[Preview Label] Jump target tidak ada di skrip preview, lanjut ke entri berikutnya');
-                currentVNIndex++;
-            }
-        } else {
-            currentVNIndex++;
-        }
-
-        processPreviewLabelUpdate();
-        return;
-    }
-
-    // === Handler normal untuk game biasa ===
-    const originalChoiceLine = currentVNScript[currentVNIndex];
-
-    if (choice.setVariable) {
-        currentVNState[choice.setVariable.name] = choice.setVariable.value;
-    }
-
-    if (originalChoiceLine.autoDialogue && choice.text) {
-        const autoDialoguePayload = {
-            type: 'dialogue',
-            text: choice.text,
-            bgm: currentVNState.lastBgmState?.src, // Ambil BGM dari state terakhir
-            bgmVolume: currentVNState.lastBgmState?.volume, // Ambil Volume dari state terakhir
-
-            background: currentVNState.backgroundStack[currentVNState.backgroundStack.length - 1]?.src, // Ambil dari stack
-            backgroundMode: currentVNState.backgroundStack[currentVNState.backgroundStack.length - 1]?.mode, // Ambil mode juga
-
-            // kode sementara yang ada buat dev biar tetep bisa (sprite, sprite2, spriteCenter) di build sebelumnya ===
-            sprite: originalChoiceLine.sprite, // Sprite dari baris choice asli
-            sprite2: originalChoiceLine.sprite2, // Sprite 2 dari baris choice asli
-            spriteCenter: originalChoiceLine.spriteCenter, // Sprite Tengah dari baris choice asli
-            spriteAnim: originalChoiceLine.spriteAnim,
-            sprite2Anim: originalChoiceLine.sprite2Anim,
-            spriteCenterAnim: originalChoiceLine.spriteCenterAnim,
-            spriteScale: originalChoiceLine.spriteScale,
-            sprite2Scale: originalChoiceLine.sprite2Scale,
-            spriteCenterScale: originalChoiceLine.spriteCenterScale,
-
-            // === MULTI-SPRITE SYSTEM (charSprites array) ===
-            // Jika choice asli memiliki charSprites, teruskan
-            charSprites: originalChoiceLine.charSprites
-        };
-
-        if (originalChoiceLine.autoDialogue === 'character' && currentVNState.lastSpeaker) {
-            autoDialoguePayload.speaker = currentVNState.lastSpeaker;
-        }
-
-        if (autoDialoguePayload.speaker) {
-            vnDialogueHistory.push({ speaker: autoDialoguePayload.speaker, text: autoDialoguePayload.text });
-        }
-
-        mainWindow.webContents.send('vn-engine:update-display', autoDialoguePayload);
-
-        currentVNState.pendingJump = choice.jump;
-        return;
-    }
-    if (choice.jump) {
-        // Jika jump adalah perintah khusus, serahkan ke handleJump
-        if (choice.jump.startsWith('##')) {
-            handleJump(choice.jump);
-        } else {
-            // Jika bukan, cari sebagai label atau fase biasa
-            let targetIndex = currentVNScript.findIndex(d => d.type === 'label' && d.name === choice.jump);
-            if (targetIndex === -1) {
-                targetIndex = currentVNScript.findIndex(d => d.type === 'phase' && d.name === choice.jump);
-            }
-
-            if (targetIndex !== -1) {
-                currentVNIndex = targetIndex;
-            } else {
-                console.error(`[VN Engine] Target jump dari pilihan (label atau fase) '${choice.jump}' tidak ditemukan.`);
-                currentVNIndex++;
-            }
-        }
-    } else {
-        currentVNIndex++;
-    }
-    processAndSendVNUpdate();
-});
-
-// 4. Renderer meminta riwayat dialog
-ipcMain.handle('vn-engine:get-history', async () => {
-    return vnDialogueHistory;
-});
-
-// 5. Renderer meminta untuk mengulang chapter
-ipcMain.on('vn-engine:replay-chapter', () => {
-    console.log('[VN Engine] Menerima permintaan untuk mengulang chapter. Mereset state...');
-    // Reset semua variabel state ke kondisi awal
-    currentVNIndex = 0;
-    currentVNState = {
-        backgroundStack: [{ type: null, src: null }],
-        bgmState: { src: null, volume: undefined },
-        lastSpeaker: null
-    };
-    vnDialogueHistory = [];
-
-    // Mulai lagi dari baris pertama
-    processAndSendVNUpdate();
-});
-// ----------------------------------------------------- End Engine Novel -----------------------------------------------//
-
-
 // ---------------------------------------
 // End Visual Novel
 // ---------------------------------------
@@ -7468,8 +6751,8 @@ ipcMain.on('set-rpc-enabled', (event, enabled) => {
     }
 
     console.log(`[RPC] Mengubah fitur dari ${isRpcEnabled} ke ${enabled}`);
+    
     userSettings.rpcEnabled = enabled;
-
     scheduleSaveUserSettings();
 
     if (enabled) {
@@ -7480,13 +6763,23 @@ ipcMain.on('set-rpc-enabled', (event, enabled) => {
         // Nonaktifkan RPC - destroyRPC akan set isRpcEnabled = false
         destroyRPC(true);
     }
-
+    
     console.log(`[RPC] Fitur sekarang: ${isRpcEnabled}`);
 });
 
 app.on('before-quit', () => {
     console.log('[App] Aplikasi akan keluar, membersihkan resource...');
-    
+
+    // Flush posisi/ukuran overlay terbaru ke disk sebelum window dihancurkan.
+    // Tangkap bounds dari window yang masih hidup, lalu tulis sinkron (lewati debounce)
+    // agar geser/resize tepat sebelum quit tidak hilang.
+    try {
+        updateGifOverlaysInMemory({ preserveWhenNoWindows: true });
+        flushUserSettingsToDisk();
+    } catch (e) {
+        console.error('[App] Gagal flush user settings saat before-quit:', e);
+    }
+
     if (snowWindow) {
         snowWindow.destroy();
     }
@@ -7500,6 +6793,7 @@ app.on('before-quit', () => {
     // Bersihkan Discord RPC - destroyRPC akan handle semua cleanup
     destroyRPC(true);
 });
+
 // Tambahan: Pastikan RPC dibersihkan saat semua window ditutup
 app.on('window-all-closed', () => {
     console.log('[App] Semua window ditutup, membersihkan Discord RPC...');
@@ -7516,7 +6810,6 @@ app.on('window-all-closed', () => {
     isRpcConnecting = false;
     
     // Bersihkan RPC instance
-
     if (rpc) {
         try {
             rpc.removeAllListeners();

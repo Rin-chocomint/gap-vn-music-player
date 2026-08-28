@@ -1,0 +1,111 @@
+/* =============================================
+ * VN Player — Dialogue Styles
+ * Kotak dialog, nama karakter, efek ketik
+ * ============================================= */
+
+#dialogue-box {
+    width: var(--vn-dialogue-width);
+    background: var(--vn-dialogue-bg);
+    color: var(--vn-dialogue-color);
+    /* D8 sumbu CSS: `--vn-dialogue-size` TERDEFINISI di variables.css & di-override
+       keempat tema, tapi NOL var() membacanya — persis kelas A4. Ditemukan oleh
+       pemindaian konsumsi, bukan mata; kurasi tangan Gelombang 3 melewatkannya
+       sehingga slider "Ukuran Teks" selama ini mati. Diwire di sini. */
+    font-size: var(--vn-dialogue-size);
+    border: var(--vn-dialogue-border);
+    border-radius: var(--vn-dialogue-radius);
+    padding: var(--vn-dialogue-padding);
+    margin-bottom: var(--vn-dialogue-margin-bottom);
+    text-align: left;
+    opacity: 0;
+    /* audit A4: konsumsi --vn-fade-duration (dulu yatim; nilai default 0.5s sama
+       persis dgn hardcode lama → nol perubahan visual, kini bisa di-override tema). */
+    transition: opacity var(--vn-fade-duration, 0.5s) ease-in-out;
+    /* position wajib ada agar z-index berlaku — elemen static (default)
+       DIABAIKAN sepenuhnya oleh z-index dan selalu digambar di bawah
+       elemen positioned mana pun (mis. overlay efek position:fixed),
+       berapa pun angka z-index-nya. */
+    position: relative;
+    z-index: var(--vn-dialogue-z);
+}
+
+#dialogue-box.visible {
+    opacity: 1;
+}
+
+#character-name {
+    font-weight: var(--vn-name-weight);
+    color: var(--vn-name-color);
+    margin-bottom: var(--vn-name-margin);
+}
+
+/* Kursor ketik animasi.
+ * Selektornya diterjemahkan dari `#dialogue-text` ke PERAN (Tahap 4): kreator
+ * yang menulis kotak dialognya sendiri jarang memakai id yang sama, dan aturan
+ * ini dulu diam-diam tak berlaku untuk mereka. Paparan diukur sebelum diubah —
+ * 3 dari 18 `player.html` menyebut elemen teks, dan ketiganya sudah membawa
+ * `data-player-role="text"`, jadi terjemahan ini netral. */
+[data-player-role="text"].typing::after {
+    content: var(--vn-typing-cursor);
+    animation: blink 1s steps(5, start) infinite;
+}
+
+@keyframes blink {
+    to { visibility: hidden; }
+}
+
+/* =============================================
+ * INDIKATOR LANJUT (page advance indicator)
+ *
+ * TEMPATNYA: sudut KANAN-BAWAH kotak dialog — bukan menempel di ujung kalimat.
+ * Ia penanda keadaan milik KOTAK ("kotak ini menunggumu"), bukan bagian dari
+ * kalimatnya; menempelkannya di belakang teks membuatnya ikut berpindah tiap
+ * baris berganti panjang, dan pemain kehilangan satu titik tetap untuk dilihat.
+ * Itu juga yang dilakukan VN pada umumnya.
+ *
+ * Karena itu ::after-nya milik `dialogue`, sedangkan keadaan yang menentukannya
+ * (`.typing`, kosong/tidak) hidup di `text` — `:has()` yang menjembatani.
+ * Kursor ketik tetap di `text` dan memang harus: ia MEMANG bagian dari kalimat
+ * yang sedang tumbuh.
+ *
+ * Tiga gerbang, masing-masing menutup satu kesalahan tampil:
+ *   • :not(.typing)  — jangan mendahului; baris belum selesai diketik.
+ *   • :not(:empty)   — entri tanpa teks (scene, command) tak punya apa pun untuk
+ *                      dilanjutkan; indikator di kotak kosong membingungkan.
+ *   • gerbang choices — saat pilihan tampil, yang ditunggu adalah PILIHAN, bukan
+ *                      klik lanjut. Ini satu-satunya alasan aturan ini butuh
+ *                      ancestor `[data-player-role="stage"]`.
+ *
+ * NOL JavaScript. `.typing` sudah ditambah `typewriter.js` saat mulai dan dibuang
+ * `finishTyping()` — termasuk saat pemain men-skip. Jadi engine tak perlu tahu
+ * apa pun tentang indikator ini; browser yang menyimpulkannya dari keadaan.
+ *
+ * UNTUK PRESET: geser lewat `--vn-continue-right`/`--vn-continue-bottom` tanpa
+ * menulis selektor apa pun. Untuk pindah ke elemen LAIN (tepi layar, rel kanan),
+ * kosongkan `--vn-continue-indicator` lalu tulis ::after-mu sendiri — pseudo-
+ * element tak bisa dipindahkan lewat variabel.
+ * ============================================= */
+[data-player-role="stage"]:not(:has([data-player-role="choices"].visible))
+[data-player-role="dialogue"]:has([data-player-role="text"]:not(.typing):not(:empty))::after {
+    content: var(--vn-continue-indicator);
+    color: var(--vn-continue-color);
+    opacity: var(--vn-continue-opacity);
+    /* Menumpang `position: relative` yang sudah dipasang #dialogue-box di atas
+       (dipasang demi z-index) — jadi sudutnya adalah sudut KOTAK, bukan sudut
+       layar. `position: absolute` sekaligus mem-blockify ::after, sehingga
+       transform di keyframes berlaku tanpa perlu display: inline-block. */
+    position: absolute;
+    right: var(--vn-continue-right);
+    bottom: var(--vn-continue-bottom);
+    /* Tanda status, bukan target klik: klik di mana pun sudah memajukan cerita,
+       dan pseudo-element yang menangkap pointer hanya menciptakan titik mati. */
+    pointer-events: none;
+    animation: var(--vn-continue-anim);
+}
+
+/* Dorongan kecil ke BAWAH, bukan ke kanan: di sudut kanan-bawah, gerak menyamping
+   akan menabrak tepi kotak; gerak turun-naik justru menunjuk arah "lanjut". */
+@keyframes vnContinuePulse {
+    0%, 100% { opacity: var(--vn-continue-opacity); transform: translateY(0); }
+    50%      { opacity: 1; transform: translateY(0.22em); }
+}

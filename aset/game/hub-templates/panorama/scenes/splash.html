@@ -1,0 +1,14 @@
+<!-- ===== Scene: {{SCENE_NAME}} (splash) =====
+     Layar pembuka. Blok judul naik ke tengah-kanan; pita menu belum ada.
+     Auto-lanjut sesuai data-duration (ms) atau klik untuk skip. -->
+    <section class="hub-scene hub-scene-boot pn-splash" data-scene-id="{{SCENE_ID}}" data-scene-type="splash" data-scene-name="{{SCENE_NAME}}" data-duration="3000">
+      <img class="pn-art" data-node="artwork" data-bind-asset alt="">
+      <div class="pn-shade"></div>
+      <section class="pn-title-block" data-node="content">
+        <small class="pn-kicker">Visual Novel</small>
+        <h1 class="pn-title" data-node="title" data-bind="title">Visual Novel</h1>
+        <div class="pn-hairline"></div>
+        <p class="pn-tagline" data-node="tagline" data-bind="storyDesc"></p>
+      </section>
+      <p class="pn-skip" data-node="skip-hint">Klik untuk lanjut &rarr;</p>
+    </section>

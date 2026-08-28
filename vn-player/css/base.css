@@ -1,0 +1,242 @@
+/* =============================================
+ * VN Player — Base Styles
+ * Reset, font-face, game container, background layers
+ * ============================================= */
+
+/* Font Lexend */
+@font-face {
+    font-family: 'Lexend';
+    font-style: normal;
+    font-weight: 300;
+    src: url('../../fonts/lexend-v26-latin-300.woff2') format('woff2');
+}
+
+@font-face {
+    font-family: 'Lexend';
+    font-style: normal;
+    font-weight: 400;
+    src: url('../../fonts/lexend-v26-latin-regular.woff2') format('woff2');
+}
+
+@font-face {
+    font-family: 'Lexend';
+    font-style: normal;
+    font-weight: 700;
+    src: url('../../fonts/lexend-v26-latin-700.woff2') format('woff2');
+}
+
+/* Reset */
+body {
+    background-color: var(--vn-bg-color);
+    margin: 0;
+    padding: 0;
+    font-family: var(--vn-font-family);
+    overflow: hidden;
+}
+
+/* Animasi pembuka scene */
+@keyframes fadeInScene {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Game Container */
+#game-container {
+    position: relative;
+    width: var(--vn-container-width);
+    height: var(--vn-container-height);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    cursor: pointer;
+    opacity: 0;
+    animation: fadeInScene 0.4s ease-in forwards;
+    animation-delay: 0.1s;
+}
+
+/* Background Layers */
+#background,
+#background-next {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+#background {
+    z-index: -2;
+}
+
+#background-next {
+    z-index: -1;
+    opacity: 0;
+    transition: opacity var(--vn-bg-transition);
+}
+
+#background-next.visible {
+    opacity: 1;
+}
+
+/* Video Background */
+#background-video {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: -2;
+    opacity: 0;
+    transition: opacity var(--vn-bg-transition);
+}
+
+/* Text Screen Overlay (narasi layar penuh) */
+#text-screen-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: black;
+    z-index: 50;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    font-size: 2.5em;
+    text-align: center;
+    padding: 20px;
+    white-space: pre-wrap;
+}
+
+/* =============================================
+ * RANGKAIAN KONTROL DALAM-GAME — sengaja ber-specificity NOL.
+ *
+ * Blok di bawah memakai `:where(#id)` alih-alih `#id`. Alasannya bukan gaya:
+ * selektor id berbobot 1-0-0, sedangkan lapisan kreator menulis dengan PERAN
+ * (`[data-player-role="btn-auto"]`, 0-1-0). Selisih itu mustahil ditutup tanpa
+ * `!important` — artinya "susun ulang penempatan kontrol", salah satu sumbu
+ * yang justru ditawarkan ke preset, sebenarnya TIDAK MUNGKIN dilakukan.
+ * Terukur: preset yang memindahkan tombol ke baris bawah tak menggeser satu
+ * piksel pun, tanpa galat apa pun.
+ *
+ * `:where()` menurunkan bobotnya ke 0-0-0 sehingga ia jadi apa yang memang
+ * dimaksudkan sejak awal — NILAI BAWAAN yang boleh ditimpa. Nol perubahan di
+ * berkas novel mana pun: idnya tetap sama, hanya bobot aturannya yang turun.
+ *
+ * Ini TIDAK diberlakukan menyeluruh ke seluruh base.css. Yang diturunkan hanya
+ * elemen yang memang dirancang untuk ditata ulang kreator; menurunkan semuanya
+ * sekaligus akan mengubah pemenang di tempat-tempat yang tak pernah diukur.
+ * ============================================= */
+
+/* Tombol kembali ke hub novel */
+:where(#back-to-hub-button) {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 100;
+    width: var(--vn-control-size);
+    height: var(--vn-control-size);
+    background-color: var(--vn-control-bg);
+    color: var(--vn-control-color);
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.8rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    line-height: 0;
+}
+
+:where(#back-to-hub-button):hover {
+    transform: scale(1.1) rotate(-30deg);
+    background-color: rgba(30, 30, 30, 0.9);
+}
+
+/* Kontrol kanan atas (Auto + History) */
+:where(#top-right-controls) {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+:where(#auto-mode-button) {
+    padding: 10px 15px;
+    background-color: var(--vn-control-bg);
+    color: var(--vn-control-color);
+    border-radius: var(--vn-control-radius);
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: bold;
+    transition: all 0.2s ease;
+    animation: pulse 2s infinite alternate;
+}
+
+:where(#auto-mode-button):hover {
+    transform: scale(1.1);
+    background-color: rgba(30, 30, 30, 0.9);
+}
+
+:where(#auto-mode-button).active {
+    background-color: var(--vn-auto-active-bg);
+    color: var(--vn-auto-active-color);
+    animation: none;
+}
+
+:where(#auto-mode-button).active:hover {
+    background-color: #ffe55c;
+    transform: scale(1.1);
+}
+
+:where(#history-button) {
+    width: var(--vn-control-size);
+    height: var(--vn-control-size);
+    color: var(--vn-control-color);
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+/* Rollback — mundur satu baris (◀). Disabled saat riwayat kosong /
+   terpotong batas choice-custom (engine mengirim canRollback per payload). */
+:where(#rollback-button) {
+    width: var(--vn-control-size);
+    height: var(--vn-control-size);
+    color: var(--vn-control-color);
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+#rollback-button:hover {
+    transform: scale(1.1);
+    background-color: rgba(30, 30, 30, 0.9);
+}
+
+#rollback-button.disabled {
+    opacity: 0.3;
+    cursor: default;
+    pointer-events: none;
+}
+
+#history-button:hover {
+    transform: scale(1.1);
+    background-color: rgba(30, 30, 30, 0.9);
+}

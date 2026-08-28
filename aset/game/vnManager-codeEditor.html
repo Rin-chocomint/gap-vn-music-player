@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <title>Hub Code Editor — Advanced</title>
+    <link rel="stylesheet" href="vnStyles/player/global.css">
+    <link rel="stylesheet" href="vnStyles/editor/editor.css">
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            background: #0d0d12;
+            overflow: hidden;
+        }
+
+        #hub-code-editor-root.ce-root {
+            height: 100vh;
+            min-height: 0;
+            border-radius: 0;
+            border: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="hub-code-editor-root" class="ce-root">
+        <!-- File Tabs -->
+        <div class="ce-tab-bar">
+            <button class="ce-file-tab active" data-file="html">
+                <span class="ce-tab-icon">&#60;/&#62;</span> hub.html
+            </button>
+            <button class="ce-file-tab" data-file="css">
+                <span class="ce-tab-icon">#</span> hub.css
+            </button>
+            <button class="ce-file-tab" data-file="js">
+                <span class="ce-tab-icon">{ }</span> hub.js
+            </button>
+            <button class="ce-file-tab ce-file-tab-full" data-file="full"
+                title="Lihat hub.html utuh hasil komposit (read-only)">
+                <span class="ce-tab-icon">&#9638;</span> Full
+            </button>
+
+            <div class="ce-tab-actions">
+                <span id="ce-status" class="ce-status-text"></span>
+                <button id="ce-save-btn" class="ce-action-btn ce-save" title="Simpan Perubahan">&#128190; Simpan</button>
+                <button id="ce-reload-btn" class="ce-action-btn ce-reload"
+                    title="Muat Ulang dari Disk">&#128260; Muat Ulang</button>
+            </div>
+        </div>
+
+        <!-- HTML Editor Pane -->
+        <div id="ce-pane-html" class="ce-pane" style="display: flex;">
+            <div class="ce-editor-wrapper">
+                <div class="ce-line-numbers" aria-hidden="true">1
+                </div>
+                <textarea class="ce-textarea" spellcheck="false"
+                    placeholder="<!-- Tulis HTML kustom hub kamu di sini -->"
+                    autocomplete="off" autocorrect="off"
+                    autocapitalize="off"></textarea>
+                <pre class="ce-highlight" aria-hidden="true"><code></code></pre>
+            </div>
+        </div>
+
+        <!-- CSS Editor Pane -->
+        <div id="ce-pane-css" class="ce-pane" style="display: none;">
+            <div class="ce-editor-wrapper">
+                <div class="ce-line-numbers" aria-hidden="true">1
+                </div>
+                <textarea class="ce-textarea" spellcheck="false"
+                    placeholder="/* Tulis CSS kustom hub kamu di sini */"
+                    autocomplete="off" autocorrect="off"
+                    autocapitalize="off"></textarea>
+                <pre class="ce-highlight" aria-hidden="true"><code></code></pre>
+            </div>
+        </div>
+
+        <!-- JS Editor Pane (global hub.js) -->
+        <div id="ce-pane-js" class="ce-pane" style="display: none;">
+            <div class="ce-editor-wrapper">
+                <div class="ce-line-numbers" aria-hidden="true">1
+                </div>
+                <textarea class="ce-textarea" spellcheck="false"
+                    placeholder="// JS kustom hub (global) — jalan setelah runtime bawaan"
+                    autocomplete="off" autocorrect="off"
+                    autocapitalize="off"></textarea>
+                <pre class="ce-highlight" aria-hidden="true"><code></code></pre>
+            </div>
+        </div>
+
+        <!-- Full Composited Pane (hub.html utuh, read-only) -->
+        <div id="ce-pane-full" class="ce-pane" style="display: none;">
+            <div class="ce-full-banner">
+                <span>👁 Read-only — komposit <b>hub.html</b> dari semua scene. Edit lewat tab
+                    <b>Scene</b> / <b>hub.css</b> / <b>hub.js</b>. Teks bisa diseleksi &amp; disalin.</span>
+                <button id="ce-full-copy" class="ce-action-btn" type="button" title="Salin seluruh kode ke clipboard">📋 Salin</button>
+            </div>
+            <div class="ce-editor-wrapper">
+                <div class="ce-line-numbers" aria-hidden="true">1
+                </div>
+                <textarea class="ce-textarea" spellcheck="false" readonly
+                    placeholder="(komposit hub.html — read-only; edit lewat tab Scene / hub.css / hub.js)"
+                    autocomplete="off" autocorrect="off"
+                    autocapitalize="off"></textarea>
+                <pre class="ce-highlight" aria-hidden="true"><code></code></pre>
+            </div>
+        </div>
+
+        <!-- Info bar -->
+        <div class="ce-info-bar">
+            <span class="ce-info-hint">Tab = 2 spaces &nbsp;│&nbsp; File ini
+                dipakai engine sebagai halaman Hub utama novel kamu.</span>
+        </div>
+    </div>
+
+    <div id="notification-toast"></div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+    </script>
+    <script src="vnModules/shared/utils.js"></script>
+    <!-- Mesin editor (highlight + logika ketikan) dipisah supaya panel VN Player
+         di vnManager.html memakai yang SAMA. Wajib dimuat sebelum hubCodeEditor.js. -->
+    <script src="vnModules/editor/codeEditorCore.js"></script>
+    <script src="vnModules/editor/hubCodeEditor.js"></script>
+    <script src="vnModules/editor/hubCodeEditorWindow.js"></script>
+</body>
+
+</html>

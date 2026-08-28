@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="id">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Custom Player</title>
+    <!--
+      ====================================================================
+      CUSTOM PLAYER (engine sendiri) — starter
+      ====================================================================
+      File ini jadi player chapter kamu sendiri. Engine global DILEWATI:
+      kamu membaca script.json sendiri (VNPlayer.getScript()) dan mengatur
+      tampilan + mekanismenya bebas. Engine menyuntikkan objek global
+      `VNPlayer` (lihat vn-player/js/vn-player-api.js) sebagai jembatan ke:
+        - VNPlayer.getScript()             -> array entri dari script.json
+        - VNPlayer.resolveAsset(rel)       -> file:// URL aset di folder chapter
+        - VNPlayer.resolveNovelAsset(rel)  -> file:// URL aset di folder novel
+        - VNPlayer.getEffectiveProfile()   -> profile player dari editor (global+override chapter)
+        - VNPlayer.getNovelMeta()          -> metadata novel (judul, cover, dst.)
+        - VNPlayer.getChapterList()        -> daftar chapter novel ini
+        - VNPlayer.playChapter(nama)       -> lompat ke chapter lain
+        - VNPlayer.replayChapter()         -> ulang chapter ini dari awal
+        - VNPlayer.returnToHub()           -> kembali ke Hub novel
+        - VNPlayer.showSettings()          -> buka Settings
+        - VNPlayer.saveGame/loadGame       -> simpan/muat (state bebas milikmu)
+        - VNPlayer.scene.show('nama')      -> tampilkan <section data-player-scene="nama">
+        - VNPlayer.scene.hide()            -> sembunyikan semua scene
+        - VNPlayer.scene.list()            -> daftar nama scene yang ada di file ini
+      Edit sebebasnya lewat VS Code. Hapus file ini untuk kembali ke player
+      global bawaan.
+    -->
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            font-family: 'Segoe UI', sans-serif; background: #000; color: #fff;
+            overflow: hidden; user-select: none; cursor: pointer;
+        }
+        #bg {
+            position: fixed; inset: 0; z-index: 0;
+            background-size: cover; background-position: center;
+            background-color: #0b0b12; transition: background-image 0.25s ease;
+        }
+        #shade { position: fixed; inset: 0; z-index: 1; background: linear-gradient(to bottom, transparent 55%, rgba(0,0,0,0.6)); }
+        #back-btn {
+            position: fixed; top: 16px; left: 16px; z-index: 5;
+            padding: 8px 16px; background: rgba(0,0,0,0.45); color: #fff;
+            border: 1px solid rgba(255,255,255,0.25); border-radius: 8px;
+            cursor: pointer; backdrop-filter: blur(4px);
+        }
+        #back-btn:hover { background: rgba(243,85,122,0.6); border-color: #f3557a; }
+        #dialogue-box {
+            position: fixed; left: 0; right: 0; bottom: 0; z-index: 3;
+            margin: 0 auto 24px; max-width: 1000px; padding: 20px 28px;
+            background: rgba(10,10,16,0.82); border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 12px; backdrop-filter: blur(6px); display: none;
+        }
+        #speaker { color: #05d9e8; font-weight: 700; margin-bottom: 8px; font-size: 1.05rem; }
+        #text { font-size: 1.15rem; line-height: 1.7; white-space: pre-wrap; }
+        #click-hint { position: fixed; bottom: 6px; right: 18px; z-index: 4; opacity: 0.4; font-size: 0.8rem; }
+        #choices {
+            position: fixed; inset: 0; z-index: 6;
+            display: none; flex-direction: column; gap: 12px;
+            align-items: center; justify-content: center; padding: 40px;
+        }
+        #choices.show { display: flex; }
+        .choice-btn {
+            min-width: 320px; max-width: 80vw; padding: 14px 22px;
+            background: rgba(20,20,28,0.9); color: #fff; cursor: pointer;
+            border: 1px solid rgba(255,255,255,0.18); border-radius: 10px;
+            font-size: 1.05rem; transition: all 0.15s ease;
+        }
+        .choice-btn:hover { background: rgba(243,85,122,0.25); border-color: #f3557a; transform: translateY(-1px); }
+
+        /* ---- Scene (data-player-scene) ----
+           `position/inset/opacity/pointer-events` di sini adalah PENJAGA PRA-GAMBAR:
+           scene di <body> tergambar sebelum bridge VNPlayer sempat disuntik, jadi
+           tanpa baris itu layar 'end' tampil menumpuk di atas cerita sejak awal.
+           Sisanya (transisi & scene aktif) tetap datang dari VNPlayer.scene. */
+        [data-player-scene]:not([data-scene-mode="base"]) {
+            position: absolute; inset: 0; opacity: 0; pointer-events: none;
+            display: flex; flex-direction: column; gap: 18px;
+            align-items: center; justify-content: center;
+            background: rgba(6, 6, 10, 0.92); text-align: center; padding: 40px;
+        }
+        [data-player-scene] h2 { font-size: 2rem; letter-spacing: 0.04em; }
+        [data-player-scene] p { opacity: 0.75; }
+    </style>
+</head>
+
+<body>
+    <div id="bg"></div>
+    <div id="shade"></div>
+    <button id="back-btn" type="button">← Hub</button>
+    <div id="dialogue-box" data-player-role="dialogue">
+        <div id="speaker"></div>
+        <div id="text"></div>
+    </div>
+    <div id="click-hint">klik untuk lanjut</div>
+    <div id="choices"></div>
+
+    <!-- ============================================================
+         SCENE — tiap <section data-player-scene="..."> adalah satu scene.
+         Tampilkan dengan VNPlayer.scene.show('<nama>'), sembunyikan dengan
+         VNPlayer.scene.hide(). Editor membaca atribut ini dan menampilkannya
+         sebagai daftar scene di tab Code — jadi scene yang kamu tulis di sini
+         langsung bisa dinavigasi dari editor.
+
+         Tambahkan scene barumu di sini, mis. ending alternatif:
+           <section data-player-scene="ending-sejati"><h2>Ending Sejati</h2></section>
+         lalu panggil VNPlayer.scene.show('ending-sejati') dari logikamu.
+         ============================================================ -->
+    <section data-player-scene="end">
+        <h2>— Tamat —</h2>
+        <p>Terima kasih sudah membaca.</p>
+        <button class="choice-btn" type="button" id="end-back-btn">Kembali ke Hub</button>
+    </section>
+
+    <script>
+        (function () {
+            // Tunggu bridge VNPlayer ter-inject, lalu tunggu context siap.
+            function whenVNPlayer(cb) {
+                if (window.VNPlayer) return cb();
+                window.addEventListener('vnplayer:api-ready', cb, { once: true });
+            }
+            whenVNPlayer(function () { VNPlayer.onReady(start); });
+
+            var script = [], idx = 0, labels = {};
+            var bgEl, textEl, speakerEl, choicesEl, boxEl;
+
+            function start() {
+                bgEl = document.getElementById('bg');
+                textEl = document.getElementById('text');
+                speakerEl = document.getElementById('speaker');
+                choicesEl = document.getElementById('choices');
+                boxEl = document.getElementById('dialogue-box');
+
+                var backBtn = document.getElementById('back-btn');
+                backBtn.addEventListener('click', function (ev) { ev.stopPropagation(); VNPlayer.returnToHub(); });
+                var endBackBtn = document.getElementById('end-back-btn');
+                if (endBackBtn) endBackBtn.addEventListener('click', function (ev) { ev.stopPropagation(); VNPlayer.returnToHub(); });
+
+                script = VNPlayer.getScript() || [];
+                script.forEach(function (e, i) { if (e && e.type === 'label' && e.name) labels[e.name] = i; });
+
+                document.body.addEventListener('click', onAdvance);
+                idx = 0;
+                render();
+            }
+
+            function setBackground(src) {
+                if (!src) return;
+                bgEl.style.backgroundImage = "url('" + VNPlayer.resolveAsset(src) + "')";
+            }
+
+            function render() {
+                var guard = 0;
+                while (idx < script.length) {
+                    if (++guard > 10000) break; // jaga-jaga loop jump rusak
+                    var e = script[idx];
+                    if (!e) { idx++; continue; }
+                    if (e.type === 'label' || e.type === 'phase') { idx++; continue; }
+                    if (e.type === 'jump') { idx = (e.target in labels) ? labels[e.target] : script.length; continue; }
+                    if (e.type === 'scene') { setBackground(e.background); idx++; continue; }
+                    if (e.type === 'dialogue') { if (e.background) setBackground(e.background); showDialogue(e.speaker, e.text); return; }
+                    if (e.type === 'choice') { if (e.background) setBackground(e.background); showChoice(e); return; }
+                    idx++; // tipe lain (set_var, custom, dll.) — lewati di starter ini
+                }
+                showEnd();
+            }
+
+            function showDialogue(speaker, text) {
+                choicesEl.className = '';
+                choicesEl.innerHTML = '';
+                boxEl.style.display = 'block';
+                speakerEl.textContent = speaker || '';
+                speakerEl.style.display = speaker ? 'block' : 'none';
+                textEl.textContent = text || '';
+            }
+
+            function showChoice(e) {
+                speakerEl.textContent = e.speaker || '';
+                speakerEl.style.display = e.speaker ? 'block' : 'none';
+                textEl.textContent = e.text || '';
+                boxEl.style.display = (e.speaker || e.text) ? 'block' : 'none';
+                choicesEl.innerHTML = '';
+                (e.choices || []).forEach(function (opt) {
+                    var b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'choice-btn';
+                    b.textContent = opt.text || '...';
+                    b.addEventListener('click', function (ev) {
+                        ev.stopPropagation();
+                        choicesEl.className = '';
+                        choicesEl.innerHTML = '';
+                        idx = (opt.jump && (opt.jump in labels)) ? labels[opt.jump] : idx + 1;
+                        render();
+                    });
+                    choicesEl.appendChild(b);
+                });
+                choicesEl.className = 'show';
+            }
+
+            function onAdvance() {
+                if (choicesEl.children.length > 0) return; // sedang memilih
+                var e = script[idx];
+                if (e && e.type === 'dialogue') { idx++; render(); }
+            }
+
+            // Akhir cerita = tampilkan SCENE 'end' (bukan menulis teks ke kotak dialog).
+            // Ini mengikuti prosedur scene baru: layar akhir adalah section
+            // ber-data-player-scene, jadi ia terbaca navigator scene di editor dan
+            // bisa diganti/ditambah (mis. beberapa ending) tanpa mengubah alur render.
+            function showEnd() {
+                boxEl.style.display = 'none';
+                choicesEl.className = '';
+                choicesEl.innerHTML = '';
+                document.body.removeEventListener('click', onAdvance);
+                VNPlayer.scene.show('end');
+                // Contoh ending bercabang:
+                //   VNPlayer.scene.show(vars.route === 'true' ? 'ending-sejati' : 'end');
+            }
+        })();
+    </script>
+</body>
+
+</html>

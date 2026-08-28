@@ -1,0 +1,30 @@
+{
+  "hubType": "default",
+  "hubModeConfirmed": true,
+  "bootSequence": [],
+  "warningScreen": {
+    "enabled": false,
+    "text": "",
+    "style": "default"
+  },
+  "menu": {
+    "bgm": "",
+    "layout": "",
+    "items": [],
+    "background": {
+      "type": "",
+      "src": ""
+    }
+  },
+  "chapterConfig": {},
+  "credits": {
+    "lines": []
+  },
+  "playerProfile": {
+    "spriteSlots": 5,
+    "restrictions": {
+      "autoMode": true,
+      "skipMode": true
+    }
+  }
+}

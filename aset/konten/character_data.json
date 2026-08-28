@@ -1,13 +1,7 @@
 {
-    "novelTitle": {
-        "mainKanji": "judul kanji",
-        "main": "judul panjang novel",
-        "subtitle": "sub judul novel",
-        "pressStart": "Press Enter"
-    },
     "profile": {
-        "name": "nama karakter",
-        "description": "deskripsi karakter",
+        "name": "nickname....",
+        "description": "deskripsi, atau title, kalimat...",
         "level": "Level: 30"
     },
     "rotatingTexts": [

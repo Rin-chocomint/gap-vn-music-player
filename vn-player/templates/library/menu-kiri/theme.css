@@ -1,0 +1,289 @@
+/* =============================================================
+ * MENU KIRI - kontrol pindah sisi, kotak jadi bilah tembus pandang.
+ *
+ * Preset ini MENYUSUN ULANG layar cerita tanpa memiliki satu peran pun:
+ * markup-nya tetap milik engine, jadi novelmu terus ikut update. Yang berubah
+ * hanya CSS di berkas ini.
+ *
+ * Empat perubahan susunan:
+ *   1. Kotak teks jadi bilah rata penuh yang TEMBUS PANDANG (61% pekat), jadi
+ *      gambar di baliknya masih terbaca. Keterbacaan teks dijamin garis-luar.
+ *   2. Nama pembicara pindah ke KIRI kalimat dalam satu baris, bukan di atasnya.
+ *   3. Kerumunan tombol pojok kanan-atas turun jadi KOLOM di tepi kiri bawah,
+ *      berlabel teks, bertanda wajik.
+ *   4. Tanda lanjut naik ke sudut kanan-ATAS bilah (di bilah setinggi ini,
+ *      sudut kanan-bawah terlalu jauh dari mata yang sedang membaca).
+ *
+ * PENTING soal aturan 4: engine menulis `bottom` untuk tanda lanjut dengan
+ * bobot selektor yang jauh lebih tinggi daripada aturan biasa di berkas ini
+ * (rantai :has/:not-nya berbobot 0-7-0). Karena itu ia dimatikan lewat
+ * VARIABEL (`--vn-continue-bottom: auto`), bukan ditimpa lewat selektor -
+ * lalu `top` ditulis di sini, properti yang memang tak pernah disentuh engine.
+ *
+ * Semua selektor memakai `data-player-role` - bukan id. Itu kontraknya
+ * (Tahap 4): kotak dialog buatanmu sendiri tetap kena aturan ini asal ia
+ * membawa perannya.
+ * ============================================================= */
+
+:root {
+    /* --- Palet --- */
+    --mk-ink: #fbfaf8;
+    --mk-outline: rgba(0, 0, 0, 0.95);
+    --mk-bar: rgba(9, 10, 14, 0.61);
+    --mk-menu: rgba(16, 16, 21, 0.84);
+    --mk-mark: #e2e5e3;
+
+    /* Lebar kolom menu. Dipakai TIGA kali di bawah (kolom kontrol, tombol hub,
+       dan padding kiri bilah) - ubah di sini saja supaya ketiganya tetap sejajar. */
+    --mk-col: max(11%, 132px);
+    --mk-row: 51px;
+
+    /* --- Bilah teks (aturan 1) --- */
+    --vn-dialogue-width: 100%;
+    --vn-dialogue-radius: 0px;
+    --vn-dialogue-bg: var(--mk-bar);
+    --vn-dialogue-color: var(--mk-ink);
+    --vn-dialogue-border: none;
+    --vn-dialogue-margin-bottom: 0;
+    --vn-dialogue-padding: 20px 6% 22px calc(var(--mk-col) + 22px);
+
+    --vn-name-color: var(--mk-ink);
+    --vn-name-weight: 700;
+    --vn-name-margin: 0;
+
+    /* --- Tanda lanjut (aturan 4) --- */
+    --vn-continue-indicator: "\25C6";
+    --vn-continue-color: var(--mk-ink);
+    --vn-continue-opacity: 0.9;
+    --vn-continue-right: 2.4%;
+    --vn-continue-bottom: auto;        /* WAJIB - lihat catatan di kepala berkas */
+
+    --vn-typing-cursor: "\2595";
+}
+
+/* WAJIB untuk apa pun yang diberi lebar + padding di sini. Engine TIDAK
+   menyetel `border-box` di mana pun, jadi `width: 100%` berarti 100% UNTUK ISI
+   SAJA dan padding ditambahkan DI LUARNYA - bilah selebar layar jadi 1491px di
+   layar 1280px, tergeser ke kiri oleh `align-items: center`, dan sisi kanannya
+   terpotong. Tak ada galat apa pun, hanya salah gambar. */
+[data-player-role="dialogue"],
+[data-player-role="stage"] > div:has(> [data-player-role="btn-auto"]),
+[data-player-role="btn-hub"] {
+    box-sizing: border-box;
+}
+
+/* --- 1. Bilah rata penuh, bertepi atas tegas --- */
+[data-player-role="dialogue"] {
+    min-height: max(29.7vh, 154px);
+    border-top: 2px solid rgba(17, 18, 23, 0.92);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.16),
+        0 -6px 18px rgba(0, 0, 0, 0.1);
+    /* `overflow: visible` menjaga tanda lanjut yang duduk di tepi atas tetap
+       utuh bila suatu saat digeser keluar bilah. */
+    overflow: visible;
+
+    /* --- 2. Nama sebaris dengan kalimat --- */
+    display: flex;
+    align-items: flex-start;
+    gap: 18px;
+}
+
+[data-player-role="speaker"] {
+    flex: 0 0 14%;
+    min-width: 135px;
+    font-style: italic;
+    font-size: clamp(1rem, 1.72vw, 1.7rem);
+    line-height: 1.5;
+    text-shadow:
+        2px 2px 0 var(--mk-outline),
+        -1px -1px 0 var(--mk-outline),
+        1px -1px 0 var(--mk-outline),
+        -1px 1px 0 var(--mk-outline);
+}
+
+/* Baris narasi tanpa pembicara tak boleh menyisakan kolom kosong selebar 14%
+   yang mendorong kalimat ke kanan. `:empty` yang menjawabnya - nol JavaScript. */
+[data-player-role="speaker"]:empty { display: none; }
+
+[data-player-role="text"] {
+    flex: 1;
+    font-style: italic;
+    font-weight: 700;
+    font-size: clamp(1.02rem, 1.85vw, 1.82rem);
+    line-height: 1.5;
+    text-shadow:
+        2px 2px 0 var(--mk-outline),
+        -1px -1px 0 var(--mk-outline),
+        1px -1px 0 var(--mk-outline),
+        -1px 1px 0 var(--mk-outline),
+        0 3px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* Aturan 4: `top` tak pernah ditulis engine, jadi 0-1-0 di sini sudah cukup. */
+[data-player-role="dialogue"]::after {
+    top: 12px;
+    font-size: 1.5rem;
+    line-height: 0.8;
+    text-shadow:
+        2px 2px 0 var(--mk-outline),
+        -1px -1px 0 var(--mk-outline);
+}
+
+/* --- 3. Kerumunan pojok jadi kolom kiri ---
+ *
+ * Wadah tombolnya TAK punya peran sendiri (hanya anak-anaknya yang punya), jadi
+ * ia dijangkau lewat isinya: "div di dalam panggung yang memuat tombol auto".
+ * Itu tetap diturunkan dari peran - bukan dari id - sehingga aturan ini tak
+ * bergantung pada nama yang boleh saja diubah player lain. */
+[data-player-role="stage"] > div:has(> [data-player-role="btn-auto"]) {
+    position: fixed;
+    top: auto;
+    right: auto;
+    bottom: var(--mk-row);          /* tombol hub duduk di bawahnya */
+    left: 0;
+    z-index: 101;
+    display: flex;
+    width: var(--mk-col);
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: 8px 7px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    background: var(--mk-menu);
+}
+
+/* Tombol kembali ke hub TIDAK bisa dipindahkan ke dalam wadah di atas - CSS tak
+   memindahkan induk. Ia dijadikan BARIS PALING BAWAH kolom yang sama: lebar dan
+   latar yang sama, ditempel di dasar layar, dan wadah di atas diberi
+   `bottom: var(--mk-row)` supaya keduanya terbaca sebagai satu kolom. */
+[data-player-role="btn-hub"] {
+    top: auto;
+    right: auto;
+    bottom: 0;
+    left: 0;
+    width: var(--mk-col);
+    height: var(--mk-row);
+    border-radius: 0;
+    padding: 0 7px;
+}
+
+/* Semua baris kolom berbagi satu bentuk. Isi asli tombol (ikon/emoji) dikecilkan
+   sampai nol lalu label ditulis di ::after - cara ini juga tahan terhadap i18n
+   yang menulis ulang teks tombol: yang ditimpa ukurannya, bukan isinya. */
+[data-player-role="btn-hub"],
+[data-player-role="btn-rollback"],
+[data-player-role="btn-auto"],
+[data-player-role="btn-history"] {
+    display: flex;
+    width: auto;
+    height: var(--mk-row);
+    align-items: center;
+    justify-content: flex-start;
+    gap: 15px;
+    padding-left: 8px;
+    border-radius: 0;
+    background: transparent;
+    color: var(--mk-ink);
+    cursor: pointer;
+    font-size: 0;
+    animation: none;                /* cabut denyut bawaan tombol AUTO */
+    transition: color 140ms ease, transform 140ms ease;
+}
+
+[data-player-role="btn-hub"]::before,
+[data-player-role="btn-rollback"]::before,
+[data-player-role="btn-auto"]::before,
+[data-player-role="btn-history"]::before {
+    content: "\25C6";
+    display: grid;
+    width: 21px;
+    height: 21px;
+    flex: 0 0 21px;
+    place-items: center;
+    color: var(--mk-mark);
+    font-size: 1rem;
+    font-style: normal;
+    text-shadow: 1px 1px 0 #747777, -1px -1px 0 #ffffff;
+}
+
+[data-player-role="btn-hub"]::after,
+[data-player-role="btn-rollback"]::after,
+[data-player-role="btn-auto"]::after,
+[data-player-role="btn-history"]::after {
+    font-size: clamp(0.86rem, 1.45vw, 1.4rem);
+    font-style: italic;
+    font-weight: 700;
+    line-height: 1;
+    text-shadow:
+        2px 2px 0 var(--mk-outline),
+        -1px -1px 0 var(--mk-outline);
+}
+
+[data-player-role="btn-rollback"]::after { content: "Mundur"; }
+[data-player-role="btn-auto"]::after     { content: "Auto"; }
+[data-player-role="btn-history"]::after  { content: "Riwayat"; }
+[data-player-role="btn-hub"]::after      { content: "Menu"; }
+
+/* Latar sel Menu dikembalikan SESUDAH aturan bersama di atas. Blok bersama itu
+   menulis `background: transparent` untuk keempat tombol; kalau latar kolom
+   ditulis lebih dulu, aturan bersama yang berbobot sama tapi datang belakangan
+   akan menghapusnya - dan sel Menu jadi satu-satunya baris tanpa latar,
+   memutus kolom secara visual. */
+[data-player-role="btn-hub"] { background: var(--mk-menu); }
+
+[data-player-role="btn-hub"]:hover,
+[data-player-role="btn-rollback"]:hover,
+[data-player-role="btn-auto"]:hover,
+[data-player-role="btn-history"]:hover {
+    background: transparent;
+    color: #ffffff;
+    transform: translateX(3px);     /* ganti scale/rotate bawaan */
+}
+
+[data-player-role="btn-auto"].active::before { color: #ffd76a; }
+[data-player-role="btn-auto"].active { background: transparent; color: #ffe9b0; }
+
+/* Engine menandai tombol mundur `.disabled` saat tak ada riwayat. Menghormati
+   penanda itu lebih baik daripada menyembunyikannya: tinggi kolom tak berubah,
+   jadi mata pemain tak perlu mencari ulang barisnya. */
+[data-player-role="btn-rollback"].disabled {
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+/* CATATAN JUJUR: Simpan/Muat/Pengaturan TIDAK ikut kolom ini. Di markup engine
+   ketiganya tinggal DI DALAM overlay riwayat yang `display: none`, dan anak dari
+   elemen yang disembunyikan tak bisa ditampilkan lewat CSS mana pun. Jalurnya
+   tetap: Riwayat -> Save/Load/Setting. Menaikkan ketiganya ke kolom menuntut
+   kepemilikan markup, bukan sekadar tema - itu paket "Lengkap", bukan preset
+   susunan seperti berkas ini. */
+
+/* --- Pilihan: senada bilah, bergaris-luar --- */
+:root {
+    --vn-choice-bg: rgba(9, 10, 14, 0.78);
+    --vn-choice-color: var(--mk-ink);
+    --vn-choice-border: 1px solid rgba(255, 255, 255, 0.6);
+    --vn-choice-radius: 2px;
+    --vn-choice-hover-bg: rgba(251, 250, 248, 0.92);
+    --vn-choice-hover-color: #131318;
+}
+
+/* --- Kosakata yang lahir dari CSS (D8) ---
+ * Kolom menu memakan tepi kiri layar, jadi tokoh di 25% bawaan akan tertutup
+ * sebagian. Dua posisi di bawah menggesernya, dan langsung muncul di dropdown
+ * "Posisi Sprite" editor tanpa didaftarkan ke mana pun. */
+:root {
+    --vn-pos-luar-menu: 34%;
+    --vn-pos-tepi-kanan: 82%;
+}
+
+@keyframes menuKiriMasuk {
+    from { opacity: 0; transform: translateX(-2%); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* Awalan `anim-in-` = hanya diputar saat sprite benar-benar baru muncul. */
+.anim-in-geser-masuk {
+    animation: menuKiriMasuk 0.45s ease-out forwards;
+}

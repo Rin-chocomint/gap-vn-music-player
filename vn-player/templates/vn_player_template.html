@@ -1,0 +1,2395 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{NOVEL_TITLE} | {CHAPTER_NAME}</title>
+    <style>
+        body {
+            background-color: black;
+            margin: 0;
+            padding: 0;
+            font-family: 'Lexend', sans-serif;
+            overflow: hidden;
+        }
+
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 300;
+            src: url('../../../../fonts/lexend-v26-latin-300.woff2') format('woff2');
+        }
+
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 400;
+            src: url('../../../../fonts/lexend-v26-latin-regular.woff2') format('woff2');
+        }
+
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 700;
+            src: url('../../../../fonts/lexend-v26-latin-700.woff2') format('woff2');
+        }
+
+        @keyframes fadeInScene {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        #transition-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 50;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #transition-overlay.black {
+            background-color: black;
+        }
+
+        #transition-overlay.white {
+            background-color: white;
+        }
+
+        #transition-overlay.active {
+            opacity: 1;
+        }
+
+        #top-right-controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        #auto-mode-button {
+            padding: 10px 15px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: bold;
+            transition: all 0.2s ease;
+            animation: pulse 2s infinite alternate;
+        }
+
+        #auto-mode-button:hover {
+            transform: scale(1.1);
+            background-color: rgba(30, 30, 30, 0.9);
+        }
+
+        #auto-mode-button.active {
+            background-color: #FFD700;
+            color: black;
+            animation: none;
+        }
+
+        #auto-mode-button.active:hover {
+            background-color: #ffe55c;
+            transform: scale(1.1);
+        }
+
+        #history-button {
+            width: 44px;
+            height: 44px;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        #history-button:hover {
+            transform: scale(1.1);
+            background-color: rgba(30, 30, 30, 0.9);
+        }
+
+        #backlog-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            z-index: 200;
+            color: white;
+            padding: 50px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #backlog-content {
+            width: 80%;
+            max-width: 800px;
+            height: 80%;
+            overflow-y: auto;
+            padding-right: 20px;
+            border-bottom: 1px solid #555;
+            margin-bottom: 20px;
+        }
+
+        #backlog-content p {
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+
+        #backlog-content strong {
+            color: #FFD700;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .backlog-controls {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .menu-button {
+            padding: 10px 30px;
+            font-size: 1rem;
+            border: 1px solid white;
+            background-color: transparent;
+            color: white;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: all 0.2s ease;
+        }
+
+        .menu-button:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+            transform: scale(1.05);
+        }
+
+        #background-video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: -2;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+        }
+
+        #text-screen-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: black;
+            z-index: 50;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 2.5em;
+            text-align: center;
+            padding: 20px;
+            white-space: pre-wrap;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+            cursor: pointer;
+            opacity: 0;
+            animation: fadeInScene 0.4s ease-in forwards;
+            animation-delay: 0.1s;
+        }
+
+        #back-to-hub-button {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            width: 44px;
+            height: 44px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.8rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            line-height: 0;
+        }
+
+        #back-to-hub-button:hover {
+            transform: scale(1.1) rotate(-30deg);
+            background-color: rgba(30, 30, 30, 0.9);
+        }
+
+        /* Aturan umum untuk kedua lapisan background */
+        #background,
+        #background-next {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+
+        #background {
+            z-index: -2;
+        }
+
+        #background-next {
+            z-index: -1;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+        }
+
+        #background-next.visible {
+            opacity: 1;
+        }
+
+        @keyframes slideFromBottom {
+            0% {
+                opacity: 0;
+                transform: translateY(8%);
+            }
+
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* TERAPKAN SEMUA ATURAN CSS INI */
+        @keyframes slideFromLeft {
+            0% {
+                opacity: 0;
+                transform: translateX(-15%);
+            }
+
+            100% {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes slideFromRight {
+            0% {
+                opacity: 0;
+                transform: translateX(15%);
+            }
+
+            100% {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes simpleFadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        .anim-loop-shake {
+            animation: shakeSprite 0.5s linear infinite;
+        }
+
+        .anim-loop-pulse {
+            animation: pulseSprite 1.5s ease-in-out infinite;
+        }
+
+        /* Animasi Sekali Eksekusi (One-Shot) */
+        .anim-oneshot-shake {
+            animation: shakeSprite 0.5s linear;
+        }
+
+        .anim-oneshot-jump {
+            animation: jumpSprite 0.5s ease-in-out;
+        }
+
+        @keyframes pulseGlow {
+
+            0%,
+            100% {
+                filter: brightness(1);
+                opacity: 1;
+            }
+
+            50% {
+                filter: brightness(1.15) drop-shadow(0 0 5px rgba(255, 255, 255, 0.5));
+                opacity: 1;
+            }
+        }
+
+        @keyframes gentleFloat {
+
+            0%,
+            100% {
+                transform: translateY(0);
+                opacity: 1;
+            }
+
+            50% {
+                transform: translateY(-8px);
+                opacity: 1;
+            }
+        }
+
+        @keyframes shakeSprite {
+
+            0%,
+            100% {
+                transform: translateX(0);
+                opacity: 1;
+            }
+
+            10%,
+            30%,
+            50%,
+            70%,
+            90% {
+                transform: translateX(-5px);
+                opacity: 1;
+            }
+
+            20%,
+            40%,
+            60%,
+            80% {
+                transform: translateX(5px);
+                opacity: 1;
+            }
+        }
+
+        @keyframes jumpSprite {
+
+            0%,
+            100% {
+                transform: translateY(0);
+                opacity: 1;
+            }
+
+            50% {
+                transform: translateY(-20px);
+                opacity: 1;
+            }
+        }
+
+        @keyframes pulseSprite {
+
+            0%,
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.05);
+                opacity: 1;
+            }
+        }
+
+        /* === CHARACTER SPRITES LAYER (Unified Container) === */
+        #char-sprites-layer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .char-sprite-slot {
+            position: absolute;
+            bottom: 0;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            pointer-events: none;
+        }
+
+        /* === SPRITE POSITIONING MODES === */
+
+        /* MODE AUTO: Flexbox auto-spacing */
+        #char-sprites-layer.mode-auto {
+            display: flex;
+            justify-content: space-evenly;
+            align-items: flex-end;
+            padding: 0 3%;
+        }
+
+        #char-sprites-layer.mode-auto .char-sprite-slot {
+            position: relative !important;
+            /* Override absolute */
+            flex: 0 1 auto;
+            bottom: auto !important;
+            /* Reset semua positioning dari mode custom */
+            left: auto !important;
+            right: auto !important;
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+            transform: none;
+            /* Reset transform - akan diset ulang oleh JS untuk scale */
+        }
+
+        /* Dalam mode auto, slot preset berfungsi sebagai order hint */
+        #char-sprites-layer.mode-auto .char-sprite-slot[data-slot="left"],
+        #char-sprites-layer.mode-auto #char-sprite-slot-left {
+            order: 1;
+        }
+
+        #char-sprites-layer.mode-auto .char-sprite-slot[data-slot="center"],
+        #char-sprites-layer.mode-auto #char-sprite-slot-center {
+            order: 2;
+        }
+
+        #char-sprites-layer.mode-auto .char-sprite-slot[data-slot="right"],
+        #char-sprites-layer.mode-auto #char-sprite-slot-right {
+            order: 3;
+        }
+
+        #char-sprites-layer.mode-auto .char-sprite-slot[data-slot="custom"] {
+            order: 4;
+            /* Custom sprites muncul setelah preset */
+        }
+
+        /* MODE CUSTOM: Absolute positioning (default behavior) */
+        #char-sprites-layer.mode-custom {
+            /* Default mode - mempertahankan positioning absolut */
+            display: block;
+        }
+
+        #char-sprites-layer.mode-custom .char-sprite-slot {
+            position: absolute;
+            bottom: 0;
+        }
+
+        /* Legacy support: sprite containers dengan nama lama */
+        .sprite-container {
+            position: absolute;
+            bottom: 0;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            pointer-events: none;
+        }
+
+        /* Posisi preset untuk char-sprite slots */
+        .char-sprite-slot[data-slot="left"],
+        #char-sprite-slot-left {
+            left: 0;
+            justify-content: flex-start;
+            padding-left: 50px;
+        }
+
+        .char-sprite-slot[data-slot="right"],
+        #char-sprite-slot-right {
+            right: 0;
+            justify-content: flex-end;
+            padding-right: 50px;
+        }
+
+        .char-sprite-slot[data-slot="center"],
+        #char-sprite-slot-center {
+            left: 50%;
+            transform: translateX(-55%);
+            justify-content: center;
+        }
+
+        /* Legacy ID mappings untuk backward compatibility */
+        #sprite-container-left {
+            left: 0;
+            justify-content: flex-start;
+            padding-left: 50px;
+        }
+
+        #sprite-container-right {
+            right: 0;
+            justify-content: flex-end;
+            padding-right: 50px;
+        }
+
+        #sprite-container-center {
+            left: 50%;
+            transform: translateX(-55%);
+            justify-content: center;
+        }
+
+        /* Custom positioning untuk dynamic sprites */
+        .char-sprite-slot[data-slot="custom"] {
+            /* Position will be set dynamically via inline style by processCharSprites() */
+            left: var(--sprite-x, 50%);
+            transform: translateX(-50%);
+        }
+
+        /* === CHARACTER SPRITE IMAGES === */
+        /* Menggunakan viewport-relative sizing untuk responsif */
+        :root {
+            --sprite-base-height: 75vh;
+            /* Base height: 75% of viewport height */
+            --sprite-max-height: 600px;
+            /* Max height agar tidak terlalu besar */
+        }
+
+        .char-sprite-img,
+        #char-sprite-1,
+        #char-sprite-2,
+        #char-sprite-center,
+        /* Legacy support */
+        #character-sprite,
+        #character-sprite-2,
+        #character-sprite-center {
+            height: var(--sprite-base-height);
+            max-height: var(--sprite-max-height);
+            max-width: 45vw;
+            width: auto;
+            object-fit: contain;
+            opacity: 0;
+            transition: opacity 0.4s ease, height 0.3s ease;
+        }
+
+        /* Media queries untuk menyesuaikan ukuran sprite berdasarkan viewport */
+        @media screen and (max-height: 800px) {
+            :root {
+                --sprite-base-height: 70vh;
+                --sprite-max-height: 520px;
+            }
+        }
+
+        @media screen and (max-height: 650px) {
+            :root {
+                --sprite-base-height: 65vh;
+                --sprite-max-height: 420px;
+            }
+        }
+
+        @media screen and (max-height: 500px) {
+            :root {
+                --sprite-base-height: 60vh;
+                --sprite-max-height: 300px;
+            }
+        }
+
+        /* Untuk window sangat kecil (agar tetap terlihat layak) */
+        @media screen and (max-height: 400px) {
+            :root {
+                --sprite-base-height: 55vh;
+                --sprite-max-height: 220px;
+            }
+        }
+
+        .char-sprite-img.hide,
+        #char-sprite-1.hide,
+        #char-sprite-2.hide,
+        #char-sprite-center.hide,
+        /* Legacy support */
+        #character-sprite.hide,
+        #character-sprite-2.hide,
+        #character-sprite-center.hide {
+            opacity: 0;
+        }
+
+
+        /* --- Debug HUD (Preview Mode) - Minimalist Entry Debugger --- */
+        #debug-hud {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            width: 320px;
+            background: rgba(20, 20, 20, 0.9);
+            border: 1px solid #444;
+            border-radius: 4px;
+            color: #ccc;
+            font-family: 'Consolas', monospace;
+            font-size: 12px;
+            z-index: 999999;
+            display: none;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        #debug-hud .debug-header {
+            background: #252525;
+            padding: 10px 12px;
+            border-bottom: 1px solid #444;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        #debug-hud .debug-header-title {
+            font-size: 13px;
+            font-weight: bold;
+            color: #aaa;
+            flex: 1;
+        }
+
+        #debug-hud .debug-header-badge {
+            font-size: 10px;
+            padding: 3px 6px;
+            border-radius: 2px;
+            background: #333;
+            color: #666;
+        }
+
+        #debug-hud .debug-header-badge.has-event {
+            background: #555;
+            color: #fff;
+        }
+
+        /* Section Container */
+        .debug-section {
+            padding: 10px 12px;
+            border-bottom: 1px solid #333;
+        }
+
+        .debug-section:last-child {
+            border-bottom: none;
+        }
+
+        .debug-section-header {
+            margin-bottom: 8px;
+            color: #666;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        /* Entry Context Specifics */
+        .debug-entry-type {
+            display: inline-block;
+            padding: 3px 8px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-bottom: 6px;
+            color: #888;
+        }
+
+        .debug-entry-type.type-dialogue {
+            color: #7ac;
+        }
+
+        .debug-entry-type.type-choice {
+            color: #a7a;
+        }
+
+        .debug-entry-type.type-scene {
+            color: #7a7;
+        }
+
+        .debug-speaker {
+            color: #cc9;
+            font-weight: bold;
+            font-size: 13px;
+            margin-bottom: 4px;
+        }
+
+        .debug-text-preview {
+            color: #888;
+            font-size: 11px;
+            max-height: 36px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.4;
+        }
+
+        .debug-sprites-row {
+            display: flex;
+            gap: 6px;
+            margin-top: 4px;
+        }
+
+        .debug-sprite-indicator {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 10px;
+            color: #555;
+        }
+
+        .debug-sprite-indicator.active {
+            color: #999;
+        }
+
+        .debug-sprite-indicator .sprite-dot {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: #333;
+        }
+
+        .debug-sprite-indicator.active .sprite-dot {
+            background: #888;
+        }
+
+        /* Special Event Section */
+        .debug-section.special-event.hidden {
+            display: none;
+        }
+
+        .debug-event-type {
+            display: inline-block;
+            padding: 3px 8px;
+            font-size: 11px;
+            font-weight: bold;
+            color: #a7a;
+            margin-bottom: 8px;
+        }
+
+        .debug-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 3px;
+        }
+
+        #dbg-duration-bar-container {
+            flex-grow: 1;
+            height: 3px;
+            background: #333;
+            margin: 0 6px;
+        }
+
+        #dbg-duration-bar {
+            height: 100%;
+            width: 0%;
+            background: #777;
+            transition: width 0.1s linear;
+        }
+
+        .debug-label {
+            color: #666;
+            font-size: 11px;
+            min-width: 55px;
+        }
+
+        .debug-value {
+            color: #aaa;
+            font-size: 11px;
+            text-align: right;
+        }
+
+        .debug-tag {
+            display: inline-block;
+            padding: 2px 5px;
+            font-size: 9px;
+        }
+
+        .tag-active {
+            color: #8a8;
+        }
+
+        .tag-inactive {
+            color: #555;
+        }
+
+        .char-sprite-img.visible,
+        #char-sprite-1.visible,
+        #char-sprite-2.visible,
+        #char-sprite-center.visible,
+        /* Legacy support */
+        #character-sprite.visible,
+        #character-sprite-2.visible,
+        #character-sprite-center.visible {
+            opacity: 1;
+        }
+
+        .anim-in-slide-from-bottom {
+            animation: slideFromBottom 0.6s ease-out forwards;
+        }
+
+        .anim-in-slide-from-left {
+            animation: slideFromLeft 0.6s ease-out forwards;
+        }
+
+        .anim-in-slide-from-right {
+            animation: slideFromRight 0.6s ease-out forwards;
+        }
+
+        .anim-in-fade {
+            animation: simpleFadeIn 0.05s forwards;
+        }
+
+        /* Animasi Keluar */
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+            }
+
+            to {
+                opacity: 0;
+            }
+        }
+
+        @keyframes slideToBottom {
+            from {
+                opacity: 1;
+                transform: translateY(0);
+            }
+
+            to {
+                opacity: 0;
+                transform: translateY(8%);
+            }
+        }
+
+        @keyframes slideToLeft {
+            from {
+                opacity: 1;
+                transform: translateX(0);
+            }
+
+            to {
+                opacity: 0;
+                transform: translateX(-15%);
+            }
+        }
+
+        @keyframes slideToRight {
+            from {
+                opacity: 1;
+                transform: translateX(0);
+            }
+
+            to {
+                opacity: 0;
+                transform: translateX(15%);
+            }
+        }
+
+        .anim-out-fade {
+            animation: fadeOut 0.5s ease-in forwards;
+        }
+
+        .anim-out-slide-to-bottom {
+            animation: slideToBottom 0.5s ease-in forwards;
+        }
+
+        .anim-out-slide-to-left {
+            animation: slideToLeft 0.5s ease-in forwards;
+        }
+
+        .anim-out-slide-to-right {
+            animation: slideToRight 0.5s ease-in forwards;
+        }
+
+        .anim-loop-pulse-glow {
+            animation: pulseGlow 2s infinite alternate;
+        }
+
+        .anim-loop-gentle-float {
+            animation: gentleFloat 3s ease-in-out infinite;
+        }
+
+        #dialogue-box {
+            /* Theme-aware: --vn-* di-set oleh theme.css (via .theme-<x>) / customCSS.
+               Fallback = tampilan default template bila tanpa tema. */
+            width: var(--vn-dialogue-width, 80%);
+            background: var(--vn-dialogue-bg, rgba(0, 0, 0, 0.7));
+            color: var(--vn-dialogue-color, #fff);
+            border: var(--vn-dialogue-border, 2px solid #fff);
+            border-radius: var(--vn-dialogue-radius, 10px);
+            padding: var(--vn-dialogue-padding, 10px 20px);
+            margin-bottom: var(--vn-dialogue-margin-bottom, 10px);
+            font-family: var(--vn-font-family, inherit);
+            font-size: var(--vn-dialogue-size, 1em);
+            text-align: left;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+            z-index: 5;
+        }
+
+        #dialogue-box.visible {
+            opacity: 1;
+        }
+
+        #character-name {
+            font-weight: var(--vn-name-weight, bold);
+            color: var(--vn-name-color, #FFD700);
+            margin-bottom: 5px;
+        }
+
+        #make-choice-container {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            gap: 8px;
+            width: 85%;
+            max-width: 1200px;
+            margin-bottom: 0;
+            margin-top: 0;
+            z-index: 10;
+            overflow: hidden;
+            max-height: 0;
+            opacity: 0;
+            transition: max-height 0.4s ease-out, opacity 0.3s ease-in, margin-top 0.4s ease-out, margin-bottom 0.4s ease-out, padding 0.4s ease-out;
+            pointer-events: none;
+        }
+
+        #make-choice-container.visible {
+            opacity: 1;
+            max-height: 300px;
+            pointer-events: auto;
+            padding: 15px 10px;
+        }
+
+        .choice {
+            padding: var(--vn-choice-padding, 15px 25px);
+            background-color: var(--vn-choice-bg, rgba(0, 0, 0, 0.8));
+            color: var(--vn-choice-color, white);
+            border: var(--vn-choice-border, 2px solid white);
+            border-radius: var(--vn-choice-radius, 10px);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: var(--vn-choice-font-size, 1.1em);
+            width: 100%;
+            text-align: center;
+            margin: 2px;
+        }
+
+        .choice:hover {
+            background-color: var(--vn-choice-hover-bg, white);
+            color: var(--vn-choice-hover-color, black);
+            transform: scale(1.03);
+            transform-origin: center;
+        }
+
+        #dialogue-text.typing::after {
+            content: '...';
+            animation: blink 1s steps(5, start) infinite;
+        }
+
+        @keyframes blink {
+            to {
+                visibility: hidden;
+            }
+        }
+
+        @keyframes shake {
+
+            10%,
+            90% {
+                transform: translate3d(-1px, 0, 0);
+            }
+
+            20%,
+            80% {
+                transform: translate3d(2px, 0, 0);
+            }
+
+            30%,
+            50%,
+            70% {
+                transform: translate3d(-4px, 0, 0);
+            }
+
+            40%,
+            60% {
+                transform: translate3d(4px, 0, 0);
+            }
+        }
+
+        #chapter-end-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            color: white;
+            z-index: 250;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.8s ease-in-out;
+        }
+
+        #chapter-end-screen.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #chapter-end-screen.visible h2,
+        #chapter-end-screen.visible button {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        #chapter-end-screen h2,
+        #chapter-end-screen button {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+        }
+
+        #chapter-end-screen.visible h2 {
+            transition-delay: 0.5s;
+        }
+
+        #chapter-end-screen.visible #next-chapter-btn {
+            transition-delay: 0.8s;
+        }
+
+        #chapter-end-screen.visible #replay-chapter-btn {
+            transition-delay: 1.0s;
+        }
+
+        #chapter-end-screen.visible #back-to-hub-btn {
+            transition-delay: 1.2s;
+        }
+
+        #chapter-end-screen h2 {
+            font-size: 2.5rem;
+            margin-bottom: 30px;
+        }
+
+        #chapter-end-screen button {
+            padding: 15px 25px;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            border: 2px solid white;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 1.1em;
+            width: 300px;
+            margin-top: 15px;
+        }
+
+        #chapter-end-screen button:hover {
+            background-color: white;
+            color: black;
+            transform: scale(1.03);
+        }
+
+        /* === SETTINGS MODAL STYLES (Ultra Deep Black Theme) === */
+        #settings-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(5, 6, 8, 0.95);
+            /* --bg-main with opacity */
+            z-index: 350;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #f5f7fa;
+            /* --text-primary */
+            font-family: 'Lexend', sans-serif;
+            backdrop-filter: blur(5px);
+        }
+
+        .settings-container {
+            background: #0d0e12;
+            /* --bg-secondary */
+            border-radius: 16px;
+            padding: 35px 45px;
+            min-width: 420px;
+            max-width: 500px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            /* --border-color */
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+        }
+
+        .settings-title {
+            font-size: 1.6rem;
+            margin-bottom: 30px;
+            text-align: center;
+            color: #f5f7fa;
+            /* --text-primary */
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .settings-group {
+            margin-bottom: 25px;
+        }
+
+        .settings-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            color: #a4abb6;
+            /* --text-secondary */
+            font-weight: 500;
+        }
+
+        .settings-label .volume-value {
+            background: #16181d;
+            /* --bg-tertiary */
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            min-width: 45px;
+            text-align: center;
+            color: #f5f7fa;
+            /* --text-primary */
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .settings-slider {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #16181d;
+            /* --bg-tertiary */
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+            cursor: pointer;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .settings-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #fff;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+            transition: transform 0.15s ease, box-shadow 0.2s;
+            border: 2px solid #0d0e12;
+            /* Border match bg to make it pop */
+        }
+
+        .settings-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        /* --- Individual Slider Colors (Flat/Formal) --- */
+
+        /* BGM: Cyan / Biru (#05d9e8) */
+        .settings-slider.bgm-slider::-webkit-slider-thumb {
+            background: #05d9e8;
+            box-shadow: none;
+        }
+
+        .settings-slider.bgm-slider {
+            background: rgba(5, 217, 232, 0.1);
+        }
+
+        /* Voice: Pink (#ff2a6d) */
+        .settings-slider.voice-slider::-webkit-slider-thumb {
+            background: #ff2a6d;
+            box-shadow: none;
+        }
+
+        .settings-slider.voice-slider {
+            background: rgba(255, 42, 109, 0.1);
+        }
+
+        /* SFX: Orange (#ff9f1c) */
+        .settings-slider.sfx-slider::-webkit-slider-thumb {
+            background: #ff9f1c;
+            box-shadow: none;
+        }
+
+        .settings-slider.sfx-slider {
+            background: rgba(255, 159, 28, 0.1);
+        }
+
+
+        .settings-divider {
+            height: 1px;
+            background: rgba(255, 255, 255, 0.05);
+            margin: 25px 0;
+        }
+
+        .settings-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .settings-btn {
+            padding: 12px 30px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+
+        .settings-btn.save-btn {
+            background: #ff6b6b;
+            /* Flat Accent Color */
+            color: white;
+            box-shadow: none;
+        }
+
+        .settings-btn.save-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .settings-btn.close-btn {
+            background: rgba(255, 255, 255, 0.07);
+            /* --button-hover */
+            color: #a4abb6;
+            /* --text-secondary */
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .settings-btn.close-btn:hover {
+            background: rgba(255, 255, 255, 0.12);
+            color: #f5f7fa;
+        }
+
+        /* Toggle Switch untuk Settings */
+        .settings-toggle-wrapper {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+        }
+
+        .settings-toggle-label {
+            font-size: 0.95rem;
+            color: #a4abb6;
+            /* --text-secondary */
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 46px;
+            height: 24px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #16181d;
+            /* --bg-tertiary */
+            transition: 0.3s;
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background-color: #5f6368;
+            /* --text-muted */
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        .toggle-switch input:checked+.toggle-slider {
+            background-color: rgba(255, 107, 107, 0.2);
+            border-color: #ff6b6b;
+        }
+
+        .toggle-switch input:checked+.toggle-slider:before {
+            transform: translateX(22px);
+            background-color: #ff6b6b;
+            /* --accent-color */
+            box-shadow: none;
+        }
+
+        .settings-section-title {
+            font-size: 0.75rem;
+            color: #5f6368;
+            /* --text-muted */
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 12px;
+            margin-top: 5px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="game-container" data-player-role="stage">
+        <div id="transition-overlay" data-player-role="transition"></div>
+        <div id="back-to-hub-button" data-player-role="btn-hub" title="Kembali ke Menu Novel">
+            <span>&#8617;</span>
+        </div>
+        <div id="top-right-controls">
+            <div id="auto-mode-button" data-player-role="btn-auto">AUTO</div>
+            <div id="history-button" data-player-role="btn-history">📜</div>
+        </div>
+        <div id="backlog-overlay" data-player-role="backlog" style="display: none;">
+            <div id="backlog-content" data-player-role="backlog-content"></div>
+            <div class="backlog-controls">
+                <button id="save-button" data-player-role="btn-save" class="menu-button">Save</button>
+                <button id="load-button" data-player-role="btn-load" class="menu-button">Load</button>
+                <button id="close-backlog-button" data-player-role="backlog-close" class="menu-button">Tutup</button>
+                <button id="setting-button" data-player-role="btn-settings" class="menu-button">Setting</button>
+            </div>
+        </div>
+
+        <div id="save-load-modal" data-player-role="saveload"
+            style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 300; flex-direction: column; align-items: center; justify-content: center; color: white;">
+            <h2 id="save-load-title" data-player-role="saveload-title" style="margin-bottom: 20px;">Select Slot</h2>
+            <div id="slots-container" data-player-role="saveload-slots"
+                style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; max-width: 900px; width: 90%;">
+                <!-- Slots will be injected here -->
+            </div>
+            <button id="close-save-load-modal" data-player-role="saveload-close" class="menu-button" style="margin-top: 30px;">Cancel</button>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal" data-player-role="settings">
+            <div class="settings-container">
+                <h2 class="settings-title">⚙️ Pengaturan</h2>
+
+                <div class="settings-section-title">🔊 Audio</div>
+
+                <div class="settings-group">
+                    <div class="settings-label">
+                        <span>Volume BGM</span>
+                        <span class="volume-value" id="bgm-volume-display" data-player-role="bgm-display">80%</span>
+                    </div>
+                    <input type="range" id="setting-bgm-volume" data-player-role="set-bgm" class="settings-slider bgm-slider" min="0" max="100"
+                        value="80">
+                </div>
+
+                <div class="settings-group">
+                    <div class="settings-label">
+                        <span>Volume Voice</span>
+                        <span class="volume-value" id="voice-volume-display" data-player-role="voice-display">80%</span>
+                    </div>
+                    <input type="range" id="setting-voice-volume" data-player-role="set-voice" class="settings-slider voice-slider" min="0" max="100"
+                        value="80">
+                </div>
+
+                <div class="settings-group">
+                    <div class="settings-label">
+                        <span>Volume SFX</span>
+                        <span class="volume-value" id="sfx-volume-display" data-player-role="sfx-display">80%</span>
+                    </div>
+                    <input type="range" id="setting-sfx-volume" data-player-role="set-sfx" class="settings-slider sfx-slider" min="0" max="100"
+                        value="80">
+                </div>
+
+                <div class="settings-divider"></div>
+
+                <div class="settings-section-title">🖥️ Tampilan</div>
+
+                <div class="settings-group">
+                    <div class="settings-toggle-wrapper">
+                        <span class="settings-toggle-label">Mode Fullscreen</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="setting-fullscreen-toggle" data-player-role="set-fullscreen">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="settings-divider"></div>
+
+                <div class="settings-buttons">
+                    <button id="close-settings-modal" data-player-role="settings-close" class="settings-btn close-btn">Tutup</button>
+                    <button id="save-settings-btn" data-player-role="settings-save" class="settings-btn save-btn">Simpan</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="background" data-player-role="background"></div>
+        <div id="background-next" data-player-role="background-next"></div>
+        <video id="background-video" data-player-role="background-video" loop playsinline></video>
+        <div id="text-screen-overlay" data-player-role="text-screen">
+            <p></p>
+        </div>
+
+        <!-- === CHARACTER SPRITES LAYER (Unified Multi-Sprite Container) === -->
+        <div id="char-sprites-layer" data-player-role="sprite-layer">
+            <!-- Legacy sprite slots (untuk backward compatibility) -->
+            <div id="char-sprite-slot-left" class="char-sprite-slot sprite-container" data-slot="left">
+                <img id="char-sprite-2" class="char-sprite-img" alt="Character Left" />
+            </div>
+            <div id="char-sprite-slot-right" class="char-sprite-slot sprite-container" data-slot="right">
+                <img id="char-sprite-1" class="char-sprite-img" alt="Character Right" />
+            </div>
+            <div id="char-sprite-slot-center" class="char-sprite-slot sprite-container" data-slot="center">
+                <img id="char-sprite-center" class="char-sprite-img" alt="Character Center" />
+            </div>
+            <!-- Dynamic sprites will be appended here by JavaScript -->
+        </div>
+
+        <!-- Legacy sprite containers (hidden, for backward compatibility in old chapters) -->
+        <div id="sprite-container-left" class="sprite-container" style="display:none;">
+            <img id="character-sprite-2" alt="Character 2" />
+        </div>
+        <div id="sprite-container-right" class="sprite-container" style="display:none;">
+            <img id="character-sprite" alt="Character 1" />
+        </div>
+        <div id="sprite-container-center" class="sprite-container" style="display:none;">
+            <img id="character-sprite-center" alt="Character Center" />
+        </div>
+        <div id="dialogue-box" data-player-role="dialogue">
+            <p id="character-name" data-player-role="speaker"></p>
+            <p id="dialogue-text" data-player-role="text"></p>
+        </div>
+        <div id="make-choice-container" data-player-role="choices"></div>
+        <audio id="bgm-audio" data-player-role="bgm" loop></audio>
+        <audio id="sfx-audio" data-player-role="sfx"></audio>
+        <audio id="voice-audio" data-player-role="voice"></audio>
+        <!-- SCENE 'end' — layar akhir chapter. Atribut data-player-scene menjadikannya
+             scene bernama: bisa ditampilkan VNPlayer.scene.show('end') dan terbaca
+             navigator scene di tab Code editor. -->
+        <div id="chapter-end-screen" data-player-scene="end">
+            <h2>Chapter Selesai</h2>
+            <button id="next-chapter-btn">Chapter Selanjutnya</button>
+            <button id="replay-chapter-btn">Ulangi Chapter</button>
+            <button id="back-to-hub-btn">Kembali ke Menu</button>
+        </div>
+
+        <!-- ============================================================
+             SCENE TAMBAHAN — tulis milikmu di sini (mis. beberapa ending).
+             Tiap section ber-data-player-scene otomatis muncul di navigator
+             scene editor. Tampilkan dari logikamu:
+                 VNPlayer.scene.show('ending-sejati');
+             Hapus komentar untuk memakai:
+
+        <section data-player-scene="ending-sejati">
+            <h2>Ending Sejati</h2>
+            <button onclick="VNPlayer.returnToHub()">Kembali ke Menu</button>
+        </section>
+             ============================================================ -->
+    </div>
+    <!-- Debug HUD Overlay - Universal Entry Debugger -->
+    <div id="debug-hud">
+        <!-- Header -->
+        <div class="debug-header">
+            <span class="debug-header-title">Preview Inspector</span>
+            <span class="debug-header-badge" id="dbg-event-badge">NO EVENT</span>
+        </div>
+
+        <!-- Section: Entry Context -->
+        <div class="debug-section entry-context">
+            <div class="debug-section-header">Entry Context</div>
+            <div class="debug-entry-type type-dialogue" id="dbg-entry-type">
+                <span>💬</span> DIALOGUE
+            </div>
+            <div class="debug-speaker" id="dbg-speaker">-</div>
+            <div class="debug-text-preview" id="dbg-text-preview">Tidak ada teks dialog...</div>
+            <div class="debug-sprites-row">
+                <div class="debug-sprite-indicator" id="dbg-sprite-left">
+                    <span class="sprite-dot"></span>Kiri
+                </div>
+                <div class="debug-sprite-indicator" id="dbg-sprite-center">
+                    <span class="sprite-dot"></span>Tengah
+                </div>
+                <div class="debug-sprite-indicator" id="dbg-sprite-right">
+                    <span class="sprite-dot"></span>Kanan
+                </div>
+            </div>
+        </div>
+
+        <!-- Section: Special Event (Hidden by default) -->
+        <div class="debug-section special-event hidden" id="dbg-special-event-section">
+            <div class="debug-section-header">Special Event</div>
+            <div class="debug-event-type" id="dbg-event-type">
+                <span></span> <span id="dbg-type">-</span>
+            </div>
+            <div class="debug-row">
+                <span class="debug-label">Duration</span>
+                <div id="dbg-duration-bar-container">
+                    <div id="dbg-duration-bar"></div>
+                </div>
+                <span class="debug-value" id="dbg-duration">0 ms</span>
+            </div>
+            <div class="debug-row">
+                <span class="debug-label">Intensity</span>
+                <span class="debug-value" id="dbg-intensity">1.0</span>
+            </div>
+            <div class="debug-row">
+                <span class="debug-label">Blocking</span>
+                <span class="debug-value">
+                    <span id="dbg-wait" class="debug-tag tag-inactive">OFF</span>
+                </span>
+            </div>
+            <div class="debug-row">
+                <span class="debug-label">SFX</span>
+                <span class="debug-value" id="dbg-sfx" style="font-size: 10px; color: #888;">None</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================================================================
+         ENGINE PLAYER (Custom Player, code-first) — v0.0.0.9
+         ==================================================================
+         File ini = player.html milik chapter-mu sendiri. Engine GLOBAL di-bypass:
+         player ini membaca `script.json` chapter SENDIRI lewat objek global
+         `VNPlayer` (lihat vn-player/js/vn-player-api.js) lalu menjalankan flow-nya
+         sendiri — dialog, scene, sprite, pilihan, transisi, save/load, settings.
+
+         Ini versi "Engine Penuh": contoh lengkap & berfungsi yang meniru perilaku
+         engine bawaan, tapi seluruh mekanismenya ADA DI SINI dan bebas kamu edit
+         lewat VS Code. Untuk kerangka kosong, pakai template "Starter Minimal".
+
+         API jembatan VNPlayer yang dipakai di bawah:
+           VNPlayer.onReady(cb)            context chapter siap
+           VNPlayer.getScript()           array entri dari script.json
+           VNPlayer.resolveAsset(rel)     file:// URL aset folder chapter
+           VNPlayer.resolveNovelAsset(rel)file:// URL aset folder novel
+           VNPlayer.getSavedState()       state save yang dimuat (null jika baru)
+           VNPlayer.saveGame(slot, data)  simpan state bebas milik player ini
+           VNPlayer.getSaveSlots()        daftar slot save
+           VNPlayer.loadGame(slot)        muat slot (engine reload player + savedState)
+           VNPlayer.returnToHub()         kembali ke Hub novel
+           VNPlayer.showSettings()        buka Settings global engine
+           VNPlayer.getNovelMeta()        metadata novel (untuk Discord RPC, dll.)
+           VNPlayer.updateRPC(activity)   update Discord Rich Presence
+
+         SKEMA ENTRI script.json yang dimengerti engine ini:
+           phase   { name, background?, backgroundMode?, bgm?, isEnding? }
+           label   { name, transition?, background?, backgroundMode?, bgm? }
+           dialogue{ speaker?, text, background?, video?, sprite?/sprite2?/spriteCenter?,
+                     bgm?, sfx?, voice?, transition?, specialEvent? }
+           choice  { speaker?, text?, choices:[{ text, jump?, condition?, setVariable? }] }
+           scene   { sceneType:'image'|'video'|'text_screen', background?/video?/text?,
+                     backgroundMode?, transition?, transitionOut?, persistBackground?, duration? }
+           jump    { target: 'fase:NamaFase' | 'NamaLabel' }
+           set_var { name, op:'='|'+='|'-='|'*='|'/='|'%='|'min'|'max'|'random', value }
+           (field) condition: { var, op:'=='|'!='|'>'|'>='|'<'|'<='|'in'|'!in'|'between', value }
+                              atau array kondisi (AND), atau kombinator
+                              { all:[...] } / { any:[...] } / { not:{...} }.
+                              value boleh merujuk variabel lain: "$nama" / { var:'nama' }.
+    -->
+    <script>
+    (function () {
+        'use strict';
+
+        // ---- Tunggu bridge VNPlayer + context chapter siap ----
+        // Catatan: panggilan whenReady(boot) sengaja ditaruh di AKHIR IIFE, setelah
+        // semua fungsi & state terdefinisi, agar boot aman dijalankan kapan pun
+        // onReady terpicu (termasuk bila context sudah siap lebih dulu).
+        function whenReady(cb) {
+            if (window.VNPlayer) { VNPlayer.onReady(cb); return; }
+            window.addEventListener('vnplayer:api-ready', function () { VNPlayer.onReady(cb); }, { once: true });
+        }
+
+        // ==================================================================
+        // STATE & REFERENSI DOM
+        // ==================================================================
+        var $ = function (id) { return document.getElementById(id); };
+
+        var el = {};                 // diisi di boot()
+        var script = [];             // array entri script.json
+        var idx = 0;                 // index entri aktif
+        var vars = {};               // variabel cerita (set_var / condition)
+        var bgStack = [{ type: null, src: null, mode: 'cover' }]; // tumpukan background aktif
+        var lastBgm = null;          // { src } BGM terakhir (persisten antar entri)
+        var lastSpeaker = null;      // speaker terakhir (untuk baris tanpa speaker)
+        var history = [];            // backlog: { speaker, text }
+        var isInEndingPhase = false; // true setelah masuk phase ber-isEnding
+
+        var mode = 'idle';           // 'dialogue' | 'choice' | 'scene' | 'end' | 'idle'
+        var isTyping = false;
+        var typeTimer = null;
+        var fullText = '';
+        var pendingExit = null;      // { effect } transisi keluar scene saat advance
+        var debugOn = false;
+
+        var isAuto = false;
+        var autoTimer = null;
+
+        // Pengaturan tersimpan (localStorage) — volume per kanal + kecepatan teks.
+        var settings = loadSettings();
+
+        // ==================================================================
+        // BOOT
+        // ==================================================================
+        function boot() {
+            el = {
+                game: $('game-container'),
+                overlay: $('transition-overlay'),
+                bg: $('background'),
+                bgNext: $('background-next'),
+                bgVideo: $('background-video'),
+                textScreen: $('text-screen-overlay'),
+                dialogueBox: $('dialogue-box'),
+                name: $('character-name'),
+                text: $('dialogue-text'),
+                choices: $('make-choice-container'),
+                spritesLayer: $('char-sprites-layer'),
+                spriteRight: $('char-sprite-1'),
+                spriteLeft: $('char-sprite-2'),
+                spriteCenter: $('char-sprite-center'),
+                bgmAudio: $('bgm-audio'),
+                sfxAudio: $('sfx-audio'),
+                voiceAudio: $('voice-audio'),
+                endScreen: $('chapter-end-screen'),
+                hubIcon: $('back-to-hub-button'),
+                autoBtn: $('auto-mode-button'),
+                historyBtn: $('history-button'),
+                backlog: $('backlog-overlay'),
+                backlogContent: $('backlog-content'),
+                debugHud: $('debug-hud')
+            };
+
+            script = VNPlayer.getScript() || [];
+            wireInput();
+            applySettings();
+
+            // Terapkan profil efektif (tema/gaya dialog/customCSS + cascade theme.css) dari
+            // tab Gaya editor VN Player sebagai BASELINE — supaya player custom ini menghormati
+            // setting kreator. Bebas kamu override/hapus di CSS/kode player ini.
+            if (VNPlayer.applyEffectiveProfile) VNPlayer.applyEffectiveProfile();
+
+            // Discord RPC opsional (aman bila gagal).
+            VNPlayer.getNovelMeta && VNPlayer.getNovelMeta().then(function (meta) {
+                try {
+                    VNPlayer.updateRPC({
+                        details: (meta && meta.title) || 'Visual Novel',
+                        state: 'Membaca: ' + VNPlayer.getChapter(),
+                        largeImageKey: 'logo'
+                    });
+                } catch (e) { /* RPC opsional */ }
+            }).catch(function () {});
+
+            // Lanjut dari save bila ada, selain itu mulai dari awal.
+            var saved = VNPlayer.getSavedState && VNPlayer.getSavedState();
+            if (saved && typeof saved.idx === 'number') {
+                restoreState(saved);
+                rerenderCurrent();
+            } else {
+                idx = 0;
+                play();
+            }
+        }
+
+        // ==================================================================
+        // LOOP UTAMA — meniru processAndSendVNUpdate engine (subset code-first)
+        // Memproses entri non-visual (phase/label/jump/set_var/condition) sampai
+        // bertemu entri visual (dialogue/choice/scene), merendernya, lalu menunggu.
+        // ==================================================================
+        function play() {
+            var guard = 0;
+            while (true) {
+                if (++guard > 10000) { console.error('[Player] Loop guard tripped — kemungkinan jump cycle.'); showEnd(); return; }
+
+                // Akhir fase ending → tamat.
+                if (isInEndingPhase) {
+                    var nx = script[idx];
+                    if (!nx || nx.type === 'phase') { showEnd(); return; }
+                }
+                if (idx < 0 || idx >= script.length) { showEnd(); return; }
+
+                var e = script[idx];
+                if (!e || typeof e !== 'object') { idx++; continue; }
+
+                // Kondisi blok — lewati entri bila tidak terpenuhi.
+                if (e.condition && !evalCondition(e.condition, vars)) { idx++; continue; }
+
+                // Variabel.
+                if (e.type === 'set_var') { applySetVar(vars, e.name, e.op, e.value); idx++; continue; }
+
+                // Phase: reset background stack + bgm + status ending.
+                if (e.type === 'phase') {
+                    isInEndingPhase = !!e.isEnding;
+                    clearAllSprites();
+                    if (e.background) bgStack = [{ type: 'image', src: e.background, mode: e.backgroundMode || 'cover' }];
+                    else if (e.video) bgStack = [{ type: 'video', src: e.video }];
+                    if (e.bgm) lastBgm = { src: e.bgm };
+                    idx++; continue;
+                }
+
+                // Label: dorong background/bgm; bila punya aset+transisi → animasikan lalu lanjut.
+                if (e.type === 'label') {
+                    if (e.background) bgStack.push({ type: 'image', src: e.background, mode: e.backgroundMode || 'cover' });
+                    else if (e.video) bgStack.push({ type: 'video', src: e.video });
+                    if (e.bgm) lastBgm = { src: e.bgm };
+
+                    if ((e.background || e.video) && e.transition && e.transition !== 'cut') {
+                        runTransition(e.transition, function () {
+                            applyBackgroundFromStack(true); // swap saat layar tertutup
+                            if (e.bgm) playBgm(e.bgm);
+                        }, function () { idx++; play(); });
+                        return;
+                    }
+                    idx++; continue;
+                }
+
+                // Jump.
+                if (e.type === 'jump') { idx = resolveTarget(e.target); continue; }
+
+                // ---- Entri visual: dialogue / choice / scene ----
+                var p = buildPayload(e);
+
+                if (p.type === 'choice') {
+                    p.choices = (p.choices || []).filter(function (o) { return evalCondition(o.condition, vars); });
+                    if (p.choices.length === 0) { idx++; continue; } // semua opsi terfilter → lewati
+                }
+
+                renderEntry(p);
+                return; // berhenti — tunggu klik / pilihan / durasi
+            }
+        }
+
+        // Bangun payload entri visual: inject background & bgm dari state, fallback speaker.
+        function buildPayload(entry) {
+            var p = {};
+            for (var k in entry) if (Object.prototype.hasOwnProperty.call(entry, k)) p[k] = entry[k];
+
+            if (!p.bgm && lastBgm) p.bgm = lastBgm.src;
+
+            var top = bgStack[bgStack.length - 1];
+            if (top) {
+                if (top.type === 'image' && !p.background) { p.background = top.src; p.backgroundMode = p.backgroundMode || top.mode; }
+                else if (top.type === 'video' && !p.video) p.video = top.src;
+            }
+
+            if (p.speaker) lastSpeaker = p.speaker; else p.speaker = lastSpeaker;
+
+            // Persist background entri ke stack untuk entri berikutnya.
+            var persist = p.type === 'dialogue' || (p.type === 'scene' && p.persistBackground !== false);
+            if (persist) {
+                if (entry.background) bgStack[bgStack.length - 1] = { type: 'image', src: entry.background, mode: entry.backgroundMode || 'cover' };
+                else if (entry.video) bgStack[bgStack.length - 1] = { type: 'video', src: entry.video };
+            }
+            return p;
+        }
+
+        // Resolve target jump: 'fase:Nama' → phase; selain itu → label dengan nama itu.
+        function resolveTarget(target) {
+            if (!target) return idx + 1;
+            var t = String(target);
+            if (t.indexOf('fase:') === 0) {
+                var fn = t.slice(5);
+                var pi = script.findIndex(function (e) { return e.type === 'phase' && e.name === fn; });
+                return pi >= 0 ? pi : script.length;
+            }
+            var li = script.findIndex(function (e) { return e.type === 'label' && e.name === t; });
+            return li >= 0 ? li : script.length;
+        }
+
+        // ==================================================================
+        // RENDER ENTRI VISUAL
+        // ==================================================================
+        function renderEntry(p, covered) {
+            currentPayload = p;
+            updateDebugHUD(p);
+            clearTimeout(autoTimer);
+            el.endScreen.classList.remove('visible');
+            el.choices.classList.remove('visible');
+            el.textScreen.style.display = 'none';
+            pendingExit = null;
+
+            // Transisi entri-level (mis. scene fade_black): tutup → render → buka.
+            if (!covered && p.transition && p.transition !== 'cut') {
+                runTransition(p.transition, function () { renderEntry(p, true); }, function () {});
+                return;
+            }
+
+            // Background / video.
+            if (p.background) showImage(p.background, !covered, p.backgroundMode);
+            else if (p.video && p.type !== 'scene') showVideo(p.video, true);
+
+            processSprites(p);
+            playBgm(p.bgm);
+            playOneShot(el.sfxAudio, p.sfx, settings.sfx);
+            playOneShot(el.voiceAudio, p.voice, settings.voice);
+            if (p.specialEvent) executeSpecialEvent(p.specialEvent);
+
+            if (p.type === 'dialogue' || p.type === 'choice') {
+                el.dialogueBox.classList.add('visible');
+                el.name.textContent = p.speaker || '';
+                typeWriter(p.text || '');
+                if ((p.type === 'dialogue' || p.type === 'choice') && p.text) history.push({ speaker: p.speaker || 'Narasi', text: p.text });
+            } else {
+                el.dialogueBox.classList.remove('visible');
+            }
+
+            if (p.type === 'choice') { mode = 'choice'; showChoices(p.choices || []); return; }
+
+            if (p.type === 'scene') {
+                mode = 'scene';
+                if (p.sceneType === 'video') showVideo(p.video, p.videoMuted == null ? true : p.videoMuted);
+                else if (p.sceneType === 'text_screen') showTextScreen(p.text, p.duration);
+                if (p.transitionOut && p.persistBackground !== true) pendingExit = { effect: p.transitionOut };
+                if (isAuto && p.duration && p.sceneType !== 'text_screen') scheduleAuto(parseInt(p.duration, 10));
+                return;
+            }
+
+            mode = 'dialogue';
+            // Auto mode dialog dijadwalkan setelah teks selesai diketik (lihat finishTyping).
+        }
+
+        var currentPayload = {};
+        function rerenderCurrent() {
+            // Render ulang entri aktif tanpa memprosesnya sebagai langkah baru (untuk load).
+            var e = script[idx];
+            if (!e) { showEnd(); return; }
+            if (e.type === 'dialogue' || e.type === 'choice' || e.type === 'scene') renderEntry(buildPayload(e), true);
+            else play();
+        }
+
+        // ==================================================================
+        // ADVANCE (maju ke entri berikutnya)
+        // ==================================================================
+        function advance() {
+            clearTimeout(autoTimer);
+            if (mode === 'choice') return; // wajib memilih
+            if (mode === 'end') return;
+
+            if (pendingExit) {
+                var fx = pendingExit; pendingExit = null;
+                runTransition(fx.effect, function () { idx++; }, function () { play(); });
+                return;
+            }
+            idx++;
+            play();
+        }
+
+        // ==================================================================
+        // BACKGROUND, VIDEO, SPRITES, TRANSISI
+        // ==================================================================
+        function applyBackgroundFromStack(instant) {
+            var top = bgStack[bgStack.length - 1];
+            if (!top || !top.src) return;
+            if (top.type === 'video') showVideo(top.src, true);
+            else showImage(top.src, !instant, top.mode);
+        }
+
+        function showImage(src, withFade, mode2) {
+            el.bgVideo.style.opacity = '0';
+            var resolved = VNPlayer.resolveAsset(src);
+            var url = "url('" + resolved + "')";
+            var size = (mode2 === 'contain') ? 'contain' : 'cover';
+            // backgroundImage dinormalkan browser jadi url("..."), jadi bandingkan via substring.
+            if (el.bg.style.backgroundImage.indexOf(resolved) !== -1) return;
+            if (withFade) {
+                el.bgNext.style.backgroundSize = size;
+                el.bgNext.style.backgroundImage = url;
+                el.bgNext.classList.add('visible');
+                setTimeout(function () {
+                    el.bg.style.backgroundSize = size;
+                    el.bg.style.backgroundImage = url;
+                    el.bgNext.classList.remove('visible');
+                }, 500);
+            } else {
+                el.bg.style.backgroundSize = size;
+                el.bg.style.backgroundImage = url;
+            }
+        }
+
+        function showVideo(src, muted) {
+            if (!src) return;
+            el.bgVideo.src = VNPlayer.resolveAsset(src);
+            el.bgVideo.muted = !!muted;
+            el.bgVideo.style.opacity = '1';
+            el.bgVideo.play().catch(function () {});
+        }
+
+        // Transisi fade hitam/putih: tutup layar (500ms) → mid() saat tertutup →
+        // buka layar (500ms) → done(). 'cut'/kosong = instan tanpa animasi.
+        function runTransition(effect, mid, done) {
+            if (!effect || effect === 'cut') { mid && mid(); done && done(); return; }
+            var color = (effect === 'fade_white') ? 'white' : 'black';
+            var ov = el.overlay;
+            ov.classList.remove('white', 'black');
+            ov.classList.add(color);
+            ov.style.transition = 'opacity 500ms ease';
+            // paksa reflow agar transisi opacity terpicu
+            void ov.offsetWidth;
+            ov.classList.add('active');
+            setTimeout(function () {
+                mid && mid();
+                ov.classList.remove('active');
+                setTimeout(function () {
+                    ov.classList.remove('white', 'black');
+                    done && done();
+                }, 500);
+            }, 500);
+        }
+
+        // Sprite: 3 slot legacy (sprite=kanan, sprite2=kiri, spriteCenter=tengah) +
+        // animasi masuk opsional (spriteAnim / sprite2Anim / spriteCenterAnim, mis.
+        // 'fade', 'slide-from-bottom'). charSprites[] opsional untuk sprite dinamis.
+        function processSprites(p) {
+            setSlot(el.spriteRight, p.sprite, p.spriteAnim);
+            setSlot(el.spriteLeft, p.sprite2, p.sprite2Anim);
+            setSlot(el.spriteCenter, p.spriteCenter, p.spriteCenterAnim);
+
+            // Sprite dinamis hanya dibangun ulang bila entri menyertakan charSprites.
+            if (p.charSprites === undefined) return;
+            Array.prototype.slice.call(el.spritesLayer.querySelectorAll('.dynamic-sprite')).forEach(function (n) { n.remove(); });
+            (p.charSprites || []).forEach(function (s) {
+                if (!s || !s.src) return;
+                var slot = document.createElement('div');
+                slot.className = 'char-sprite-slot dynamic-sprite';
+                slot.setAttribute('data-slot', 'custom');
+                if (s.x != null) { slot.style.left = s.x + '%'; slot.style.transform = 'translateX(-50%)'; }
+                var img = document.createElement('img');
+                img.className = 'char-sprite-img';
+                img.src = VNPlayer.resolveAsset(s.src);
+                if (s.scale) img.style.transform = 'scale(' + s.scale + ')';
+                slot.appendChild(img);
+                el.spritesLayer.appendChild(slot);
+                requestAnimationFrame(function () { img.classList.add('visible'); if (s.anim) img.classList.add('anim-in-' + s.anim); });
+            });
+        }
+        function setSlot(img, src, anim) {
+            if (src === undefined) return;        // field tak disebut → pertahankan sprite slot (VN default)
+            img.className = 'char-sprite-img';
+            if (!src) { img.classList.remove('visible'); img.removeAttribute('src'); return; } // '' / null → sembunyikan
+            img.src = VNPlayer.resolveAsset(src);
+            requestAnimationFrame(function () {
+                img.classList.add('visible');
+                if (anim) img.classList.add('anim-in-' + anim);
+            });
+        }
+        function clearAllSprites() {
+            [el.spriteRight, el.spriteLeft, el.spriteCenter].forEach(function (img) {
+                img.className = 'char-sprite-img'; img.classList.remove('visible'); img.removeAttribute('src');
+            });
+            Array.prototype.slice.call(el.spritesLayer.querySelectorAll('.dynamic-sprite')).forEach(function (n) { n.remove(); });
+        }
+
+        // ==================================================================
+        // TYPEWRITER, DIALOG, PILIHAN
+        // ==================================================================
+        function typeWriter(textValue) {
+            clearTimeout(typeTimer);
+            fullText = textValue || '';
+            el.text.textContent = '';
+            isTyping = true;
+            var i = 0;
+            (function tick() {
+                if (i < fullText.length) {
+                    el.text.textContent += fullText.charAt(i++);
+                    typeTimer = setTimeout(tick, settings.textSpeed);
+                } else {
+                    isTyping = false;
+                    onTypingDone();
+                }
+            })();
+        }
+        function finishTyping() {
+            clearTimeout(typeTimer);
+            el.text.textContent = fullText;
+            isTyping = false;
+            onTypingDone();
+        }
+        function onTypingDone() {
+            // Jadwalkan auto-advance untuk dialog (bukan choice) saat Auto Mode aktif.
+            if (isAuto && mode === 'dialogue') scheduleAuto(settings.autoDelay);
+        }
+
+        function showChoices(choices) {
+            el.choices.innerHTML = '';
+            choices.forEach(function (opt) {
+                var b = document.createElement('button');
+                b.className = 'choice';
+                b.textContent = opt.text || '...';
+                b.addEventListener('click', function (ev) {
+                    ev.stopPropagation();
+                    if (opt.setVariable) applySetVar(vars, opt.setVariable.name, opt.setVariable.op, opt.setVariable.value);
+                    el.choices.classList.remove('visible');
+                    el.choices.innerHTML = '';
+                    mode = 'idle';
+                    idx = opt.jump ? resolveTarget(opt.jump) : idx + 1;
+                    play();
+                });
+                el.choices.appendChild(b);
+            });
+            requestAnimationFrame(function () { el.choices.classList.add('visible'); });
+        }
+
+        function showTextScreen(text, duration) {
+            el.textScreen.querySelector('p').textContent = text || '';
+            el.textScreen.style.display = 'flex';
+            if (isAuto && duration) scheduleAuto(parseInt(duration, 10));
+        }
+
+        // ==================================================================
+        // AUDIO (sederhana — volume per kanal; pan bisa kamu tambah via Web Audio)
+        // ==================================================================
+        function playBgm(src) {
+            if (!src) return;
+            var url = VNPlayer.resolveAsset(src);
+            if (el.bgmAudio.getAttribute('data-src') === url) { el.bgmAudio.volume = settings.bgm; return; }
+            el.bgmAudio.setAttribute('data-src', url);
+            el.bgmAudio.src = url;
+            el.bgmAudio.volume = settings.bgm;
+            el.bgmAudio.play().catch(function () {});
+        }
+        function playOneShot(audio, src, vol) {
+            if (!src) return;
+            audio.src = VNPlayer.resolveAsset(src);
+            audio.volume = vol;
+            audio.currentTime = 0;
+            audio.play().catch(function () {});
+        }
+
+        // ==================================================================
+        // SPECIAL EVENTS (extensible). Bawaan: shake & flash. Tambah tipe lain
+        // di switch ini — Debug HUD menampilkan type/duration/intensity/wait/sfx.
+        // ==================================================================
+        function executeSpecialEvent(ev) {
+            if (!ev || !ev.type) return;
+            if (ev.sfx) playOneShot(el.sfxAudio, ev.sfx, settings.sfx);
+            var dur = parseInt(ev.duration, 10) || 500;
+            switch (ev.type) {
+                case 'shake':
+                    el.game.classList.remove('anim-oneshot-shake');
+                    void el.game.offsetWidth;
+                    el.game.classList.add('anim-oneshot-shake');
+                    setTimeout(function () { el.game.classList.remove('anim-oneshot-shake'); }, dur);
+                    break;
+                case 'flash':
+                    var color = ev.color || 'white';
+                    runTransition(color === 'black' ? 'fade_black' : 'fade_white', function () {}, function () {});
+                    break;
+                default:
+                    console.log('[Player] Special event belum ditangani:', ev.type, '(tambahkan di executeSpecialEvent)');
+            }
+        }
+
+        // ==================================================================
+        // AKHIR CHAPTER
+        // ==================================================================
+        function showEnd() {
+            mode = 'end';
+            // Publikasikan snapshot variabel ke engine (story-vars.json) agar hub
+            // bisa membaca state cerita via VNHub.getStoryVars() — paritas dengan
+            // player global yang melakukannya otomatis.
+            if (VNPlayer.persistStoryVars) { try { VNPlayer.persistStoryVars(vars); } catch (e) { /* ignore */ } }
+            el.dialogueBox.classList.remove('visible');
+            el.choices.classList.remove('visible');
+            updateDebugHUD({ type: 'scene', speaker: '', text: '— Tamat —' });
+            VNPlayer.getChapterList && VNPlayer.getChapterList().then(function (list) {
+                var all = (list.mainChapters || []).concat(list.sideStories || []);
+                var here = all.indexOf(VNPlayer.getChapter());
+                var nextCh = (here >= 0 && here + 1 < all.length) ? all[here + 1] : null;
+                var nextBtn = $('next-chapter-btn');
+                if (nextBtn) {
+                    nextBtn.style.display = nextCh ? 'block' : 'none';
+                    nextBtn.onclick = function () { if (nextCh) VNPlayer.playChapter(nextCh); };
+                }
+            }).catch(function () {});
+            var replay = $('replay-chapter-btn'); if (replay) replay.onclick = function () { VNPlayer.replayChapter(); };
+            var hub = $('back-to-hub-btn'); if (hub) hub.onclick = function () { VNPlayer.returnToHub(); };
+            el.endScreen.classList.add('visible');
+        }
+
+        // ==================================================================
+        // SAVE / LOAD (state bebas milik player ini)
+        // ==================================================================
+        function snapshot() {
+            return { v: 1, idx: idx, vars: vars, bgStack: bgStack, lastBgm: lastBgm, lastSpeaker: lastSpeaker, history: history, isInEndingPhase: isInEndingPhase };
+        }
+        function restoreState(s) {
+            idx = s.idx || 0;
+            vars = s.vars || {};
+            bgStack = (Array.isArray(s.bgStack) && s.bgStack.length) ? s.bgStack : [{ type: null, src: null, mode: 'cover' }];
+            lastBgm = s.lastBgm || null;
+            lastSpeaker = s.lastSpeaker || null;
+            history = Array.isArray(s.history) ? s.history : [];
+            isInEndingPhase = !!s.isInEndingPhase;
+            if (lastBgm) playBgm(lastBgm.src);
+            applyBackgroundFromStack(true);
+        }
+
+        function openSlots(saveMode) {
+            var modal = $('save-load-modal');
+            var title = $('save-load-title');
+            var box = $('slots-container');
+            title.textContent = saveMode ? 'Simpan ke Slot' : 'Muat dari Slot';
+            box.textContent = '';
+            var loading = document.createElement('p');
+            loading.style.opacity = '.6';
+            loading.textContent = 'Memuat slot...';
+            box.appendChild(loading);
+            modal.style.display = 'flex';
+
+            VNPlayer.getSaveSlots().then(function (slots) {
+                box.textContent = '';
+                var n = 6;
+                for (var i = 1; i <= n; i++) {
+                    var info = (slots || []).filter(function (s) { return s.slotId === i; })[0];
+                    var empty = !info || info.isEmpty;
+                    var card = document.createElement('div');
+                    card.style.cssText = 'background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:18px;cursor:pointer;min-height:90px;';
+                    var slotTitle = document.createElement('div');
+                    slotTitle.style.cssText = 'font-weight:600;margin-bottom:6px;';
+                    slotTitle.textContent = 'Slot ' + i;
+                    var slotInfo = document.createElement('div');
+                    slotInfo.style.cssText = 'font-size:.85rem;color:#aaa;';
+                    slotInfo.textContent = empty ? 'Kosong' : ((info.chapter || '') + ' — ' + (info.date || ''));
+                    card.appendChild(slotTitle);
+                    card.appendChild(slotInfo);
+                    (function (slotId, isEmpty) {
+                        card.addEventListener('click', function () {
+                            if (saveMode) {
+                                VNPlayer.saveGame(slotId, snapshot());
+                                modal.style.display = 'none';
+                                toast('Disimpan ke Slot ' + slotId);
+                            } else if (!isEmpty) {
+                                VNPlayer.loadGame(slotId);
+                            }
+                        });
+                    })(i, empty);
+                    box.appendChild(card);
+                }
+            }).catch(function () {
+                box.textContent = '';
+                var error = document.createElement('p');
+                error.style.color = '#f3557a';
+                error.textContent = 'Gagal memuat slot.';
+                box.appendChild(error);
+            });
+        }
+
+        // ==================================================================
+        // SETTINGS (lokal: volume + kecepatan teks; + tombol Settings global)
+        // ==================================================================
+        function loadSettings() {
+            var d = { bgm: 0.8, voice: 0.8, sfx: 0.8, textSpeed: 45, autoDelay: 2000 };
+            try { return Object.assign(d, JSON.parse(localStorage.getItem('vnPlayerSettings') || '{}')); }
+            catch (e) { return d; }
+        }
+        function saveSettings() { try { localStorage.setItem('vnPlayerSettings', JSON.stringify(settings)); } catch (e) {} }
+        function applySettings() {
+            el.bgmAudio.volume = settings.bgm;
+            var b = $('setting-bgm-volume'), v = $('setting-voice-volume'), s = $('setting-sfx-volume');
+            if (b) { b.value = Math.round(settings.bgm * 100); $('bgm-volume-display').textContent = b.value + '%'; }
+            if (v) { v.value = Math.round(settings.voice * 100); $('voice-volume-display').textContent = v.value + '%'; }
+            if (s) { s.value = Math.round(settings.sfx * 100); $('sfx-volume-display').textContent = s.value + '%'; }
+        }
+
+        // ==================================================================
+        // BACKLOG / HISTORY
+        // ==================================================================
+        function openBacklog() {
+            el.backlogContent.textContent = '';
+            history.forEach(function (h) {
+                var p = document.createElement('p');
+                var speaker = document.createElement('strong');
+                speaker.textContent = h.speaker == null ? '' : String(h.speaker);
+                p.appendChild(speaker);
+                p.appendChild(document.createTextNode(h.text == null ? '' : String(h.text)));
+                el.backlogContent.appendChild(p);
+            });
+            el.backlog.scrollTop = 0;
+            el.backlog.style.display = 'flex';
+            el.backlogContent.scrollTop = el.backlogContent.scrollHeight;
+        }
+
+        // ==================================================================
+        // DEBUG HUD — inspektur entri. Toggle dengan tombol F9 (atau `).
+        // ==================================================================
+        function updateDebugHUD(data) {
+            var hud = el.debugHud;
+            if (!hud) return;
+            hud.style.display = debugOn ? 'block' : 'none';
+            if (!debugOn) return;
+
+            var type = data.type || 'dialogue';
+            var typeEl = $('dbg-entry-type');
+            if (typeEl) {
+                typeEl.className = 'debug-entry-type type-' + type;
+                var icons = { dialogue: '💬', choice: '🔀', scene: '🖼️' };
+                var labels = { dialogue: 'DIALOGUE', choice: 'CHOICE', scene: 'SCENE' };
+                typeEl.innerHTML = '<span>' + (icons[type] || '💬') + '</span> ' + (labels[type] || 'DIALOGUE');
+            }
+            var sp = $('dbg-speaker'); if (sp) sp.textContent = data.speaker || '(Narrator)';
+            var tp = $('dbg-text-preview'); if (tp) tp.textContent = (data.text && data.text.length) ? data.text : 'Tidak ada teks dialog...';
+            var L = $('dbg-sprite-left'), C = $('dbg-sprite-center'), R = $('dbg-sprite-right');
+            if (L) L.classList.toggle('active', !!data.sprite2);
+            if (C) C.classList.toggle('active', !!data.spriteCenter);
+            if (R) R.classList.toggle('active', !!data.sprite);
+
+            var hasEvent = data.specialEvent && data.specialEvent.type;
+            var badge = $('dbg-event-badge');
+            if (badge) { badge.classList.toggle('has-event', !!hasEvent); badge.textContent = hasEvent ? 'HAS EVENT' : 'NO EVENT'; }
+            var section = $('dbg-special-event-section');
+            if (section) {
+                if (hasEvent) {
+                    section.classList.remove('hidden');
+                    var se = data.specialEvent;
+                    $('dbg-type').textContent = String(se.type).toUpperCase().replace(/_/g, ' ');
+                    $('dbg-duration').textContent = (se.duration || 0) + ' ms';
+                    $('dbg-intensity').textContent = parseFloat(se.intensity || 1).toFixed(1);
+                    $('dbg-sfx').textContent = se.sfx ? String(se.sfx).split('/').pop() : 'None';
+                    var w = $('dbg-wait'); if (w) { w.className = se.wait ? 'debug-tag tag-active' : 'debug-tag tag-inactive'; w.textContent = se.wait ? 'ON' : 'OFF'; }
+                } else { section.classList.add('hidden'); }
+            }
+        }
+
+        // ==================================================================
+        // INPUT & WIRING
+        // ==================================================================
+        function wireInput() {
+            el.game.addEventListener('click', function () {
+                if (el.backlog.style.display === 'flex') return;
+                if ($('save-load-modal').style.display === 'flex') return;
+                if ($('settings-modal').style.display === 'flex') return;
+                if (isTyping) { finishTyping(); return; }
+                if (mode === 'dialogue' || mode === 'scene') advance();
+            });
+
+            el.hubIcon && el.hubIcon.addEventListener('click', function (e) { e.stopPropagation(); VNPlayer.returnToHub(); });
+            el.autoBtn && el.autoBtn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                isAuto = !isAuto;
+                el.autoBtn.classList.toggle('active', isAuto);
+                if (isAuto && mode === 'dialogue' && !isTyping) scheduleAuto(settings.autoDelay);
+                else clearTimeout(autoTimer);
+            });
+            el.historyBtn && el.historyBtn.addEventListener('click', function (e) { e.stopPropagation(); openBacklog(); });
+
+            wireClick('close-backlog-button', function () { el.backlog.style.display = 'none'; });
+            wireClick('save-button', function () { openSlots(true); });
+            wireClick('load-button', function () { openSlots(false); });
+            wireClick('setting-button', function () { el.backlog.style.display = 'none'; $('settings-modal').style.display = 'flex'; });
+            wireClick('close-save-load-modal', function () { $('save-load-modal').style.display = 'none'; });
+
+            wireClick('close-settings-modal', function () { $('settings-modal').style.display = 'none'; });
+            wireClick('save-settings-btn', function () {
+                var b = $('setting-bgm-volume'), v = $('setting-voice-volume'), s = $('setting-sfx-volume');
+                if (b) settings.bgm = b.value / 100;
+                if (v) settings.voice = v.value / 100;
+                if (s) settings.sfx = s.value / 100;
+                saveSettings(); applySettings();
+                $('settings-modal').style.display = 'none';
+                toast('Pengaturan disimpan');
+            });
+            wireSlider('setting-bgm-volume', 'bgm-volume-display', function (val) { el.bgmAudio.volume = val / 100; });
+            wireSlider('setting-voice-volume', 'voice-volume-display');
+            wireSlider('setting-sfx-volume', 'sfx-volume-display');
+            var fs = $('setting-fullscreen-toggle');
+            if (fs) fs.addEventListener('change', function () {
+                if (fs.checked) { (document.documentElement.requestFullscreen || function () {}).call(document.documentElement); }
+                else if (document.exitFullscreen) document.exitFullscreen().catch(function () {});
+            });
+
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'F9' || e.key === '`') { debugOn = !debugOn; updateDebugHUD(currentPayload); }
+                else if (e.key === 'Enter' || e.key === ' ') { if (mode === 'dialogue' || mode === 'scene') { if (isTyping) finishTyping(); else advance(); } }
+                else if (e.key === 'Escape') { el.backlog.style.display = 'none'; $('save-load-modal').style.display = 'none'; $('settings-modal').style.display = 'none'; }
+            });
+        }
+
+        // ==================================================================
+        // UTIL
+        // ==================================================================
+        function scheduleAuto(ms) {
+            clearTimeout(autoTimer);
+            autoTimer = setTimeout(function () { if (isAuto) advance(); }, Math.max(300, ms || 2000));
+        }
+        function wireClick(id, fn) { var n = $(id); if (n) n.addEventListener('click', function (e) { e.stopPropagation(); fn(); }); }
+        function wireSlider(id, displayId, onInput) {
+            var n = $(id), d = $(displayId);
+            if (!n) return;
+            n.addEventListener('input', function () { if (d) d.textContent = n.value + '%'; if (onInput) onInput(n.value); });
+        }
+        function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+        function toast(msg) { console.log('[Player]', msg); }
+
+        // ==================================================================
+        // VARIABEL — condition & set_var (paritas dengan engine bawaan)
+        // Delegasi ke evaluator resmi VNPlayer API bila tersedia — paritas PENUH
+        // engine global: kombinator all/any/not, operator between, operand
+        // var-vs-var ("$nama" / {var:'nama'}), op set_var mod/min/max/random.
+        // Implementasi lokal di bawah hanya fallback untuk bridge versi lama.
+        // ==================================================================
+        function evalCondition(cond, v) {
+            if (window.VNPlayer && VNPlayer.evaluateCondition) return VNPlayer.evaluateCondition(cond, v);
+            if (!cond || typeof cond !== 'object') return true;
+            if (Array.isArray(cond)) return cond.every(function (c) { return evalCondition(c, v); });
+            var name = cond.var, op = cond.op, value = cond.value;
+            if (!name || !op) return true;
+            var cur = v[name] !== undefined ? v[name] : 0;
+            switch (op) {
+                case '==': case '=': return String(cur) === String(value);
+                case '!=': return String(cur) !== String(value);
+                case '>': return Number(cur) > Number(value);
+                case '>=': return Number(cur) >= Number(value);
+                case '<': return Number(cur) < Number(value);
+                case '<=': return Number(cur) <= Number(value);
+                case 'in': return Array.isArray(value) && value.indexOf(cur) !== -1;
+                case '!in': return Array.isArray(value) && value.indexOf(cur) === -1;
+                default: return true;
+            }
+        }
+        function applySetVar(v, name, op, value) {
+            if (window.VNPlayer && VNPlayer.applySetVar) { VNPlayer.applySetVar(v, name, op, value); return; }
+            if (!name) return;
+            var cur = v[name]; if (cur === undefined) cur = 0;
+            var a = Number(cur), b = Number(value);
+            switch (op || '=') {
+                case '=': case 'set': v[name] = value; break;
+                case '+=': case 'add': v[name] = a + b; break;
+                case '-=': case 'sub': v[name] = a - b; break;
+                case '*=': case 'mul': v[name] = a * b; break;
+                case '/=': case 'div': v[name] = b !== 0 ? a / b : a; break;
+                default: v[name] = value;
+            }
+        }
+
+        // Mulai: daftarkan boot ke bridge VNPlayer (dijalankan saat context chapter siap).
+        whenReady(boot);
+    })();
+    </script>
+</body>
+
+</html>

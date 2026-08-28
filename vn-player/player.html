@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>VN Player</title>
+
+    <!-- CSS Modular — urutan cascade penting! -->
+    <link rel="stylesheet" href="css/variables.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/dialogue.css" />
+    <link rel="stylesheet" href="css/sprites.css" />
+    <link rel="stylesheet" href="css/transitions.css" />
+    <link rel="stylesheet" href="css/choices.css" />
+    <link rel="stylesheet" href="css/ui-panels.css" />
+    <link rel="stylesheet" href="css/scenes.css" />
+    <link rel="stylesheet" href="css/debug-hud.css" />
+    <!-- Varian gaya dialog -->
+    <link rel="stylesheet" href="css/dialogue-variants.css" />
+    <!-- Theme bawaan (bisa di-override oleh novel/chapter theme) -->
+    <link rel="stylesheet" href="themes/default/theme.css" />
+</head>
+
+<body>
+    <!-- ============================================================
+         LAYAR CERITA — blok layar bertipe DASAR.
+         Sama-sama blok ber-`data-player-scene` seperti layar lain, tapi dengan
+         `data-scene-mode="base"`: ia LATAR TEMPAT cerita berjalan, bukan overlay.
+         Bedanya nyata, bukan sekadar label:
+           • aturan tampilan overlay TIDAK diterapkan padanya (posisi, ukuran
+             panggung, animasi masuk, dan permukaan klik di bawah tetap milik CSS
+             #game-container);
+           • menyalakan layar overlay TIDAK memadamkannya — itulah yang membuat
+             layar akhir bawaan bisa tembus pandang & mengaburkan frame terakhir.
+         Tanpa `data-scene-mode`, sebuah blok = OVERLAY (perilaku baku).
+         ============================================================ -->
+    <!-- Elemen membawa `data-player-role` (dibaca ENGINE) DAN `id` (dipakai CSS +
+         cadangan resolusi). Dua atribut, dua pekerjaan berbeda — lihat state.js
+         ROLE_SPEC & docs/rancangan-kontrak-peran-ui-player.md. -->
+    <section id="game-container" data-player-scene="story" data-scene-mode="base" data-player-role="stage">
+        <div id="vn-toast-container" data-player-role="toast"></div>
+        <div id="transition-overlay" data-player-role="transition"></div>
+        <div id="back-to-hub-button" data-player-role="btn-hub" data-i18n-title="backToHubTitle" title="Kembali ke Menu Novel">
+            <span>&#8617;</span>
+        </div>
+        <div id="top-right-controls">
+            <div id="rollback-button" data-player-role="btn-rollback" class="disabled" data-i18n-title="rollbackTitle" title="Mundur satu baris (atau scroll ke atas)">◀</div>
+            <div id="auto-mode-button" data-player-role="btn-auto" data-i18n="auto">AUTO</div>
+            <div id="history-button" data-player-role="btn-history">📜</div>
+        </div>
+        <div id="backlog-overlay" data-player-role="backlog" style="display: none;">
+            <div id="backlog-content" data-player-role="backlog-content"></div>
+            <div class="backlog-controls">
+                <button id="save-button" data-player-role="btn-save" class="menu-button" data-i18n="save">Save</button>
+                <button id="load-button" data-player-role="btn-load" class="menu-button" data-i18n="load">Load</button>
+                <button id="close-backlog-button" data-player-role="backlog-close" class="menu-button" data-i18n="close">Tutup</button>
+                <button id="setting-button" data-player-role="btn-settings" class="menu-button" data-i18n="setting">Setting</button>
+            </div>
+        </div>
+
+        <!-- Save/Load Modal -->
+        <div id="save-load-modal" data-player-role="saveload"
+            style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 300; flex-direction: column; align-items: center; justify-content: center; color: white;">
+            <h2 id="save-load-title" data-player-role="saveload-title" data-i18n="selectSlot" style="margin-bottom: 20px;">Select Slot</h2>
+            <div id="slots-container" data-player-role="saveload-slots"
+                style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; max-width: 900px; width: 90%;">
+            </div>
+            <button id="close-save-load-modal" data-player-role="saveload-close" class="menu-button" data-i18n="cancel" style="margin-top: 30px;">Cancel</button>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal" data-player-role="settings">
+            <div class="settings-container">
+                <h2 class="settings-title" data-i18n="settingsTitle">⚙️ Pengaturan</h2>
+
+                <div class="settings-section-title" data-i18n="sectionAudio">🔊 Audio</div>
+
+                <div class="settings-group">
+                    <div class="settings-label">
+                        <span data-i18n="volumeBgm">Volume BGM</span>
+                        <span class="volume-value" id="bgm-volume-display" data-player-role="bgm-display">80%</span>
+                    </div>
+                    <input type="range" id="setting-bgm-volume" data-player-role="set-bgm" class="settings-slider bgm-slider" min="0" max="100"
+                        value="80">
+                </div>
+
+                <div class="settings-group">
+                    <div class="settings-label">
+                        <span data-i18n="volumeVoice">Volume Voice</span>
+                        <span class="volume-value" id="voice-volume-display" data-player-role="voice-display">80%</span>
+                    </div>
+                    <input type="range" id="setting-voice-volume" data-player-role="set-voice" class="settings-slider voice-slider" min="0" max="100"
+                        value="80">
+                </div>
+
+                <div class="settings-group">
+                    <div class="settings-label">
+                        <span data-i18n="volumeSfx">Volume SFX</span>
+                        <span class="volume-value" id="sfx-volume-display" data-player-role="sfx-display">80%</span>
+                    </div>
+                    <input type="range" id="setting-sfx-volume" data-player-role="set-sfx" class="settings-slider sfx-slider" min="0" max="100"
+                        value="80">
+                </div>
+
+                <div class="settings-divider"></div>
+
+                <div class="settings-section-title" data-i18n="sectionDisplay">🖥️ Tampilan</div>
+
+                <div class="settings-group">
+                    <div class="settings-toggle-wrapper">
+                        <span class="settings-toggle-label" data-i18n="fullscreen">Mode Fullscreen</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="setting-fullscreen-toggle" data-player-role="set-fullscreen">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="settings-divider"></div>
+
+                <div class="settings-section-title" data-i18n="sectionText">📝 Teks</div>
+
+                <div class="settings-group">
+                    <div class="settings-label">
+                        <span data-i18n="textSpeed">Kecepatan Teks</span>
+                        <span class="volume-value" id="text-speed-display" data-player-role="text-speed-display">45ms</span>
+                    </div>
+                    <input type="range" id="setting-text-speed" data-player-role="set-text-speed" class="settings-slider" min="10" max="100" value="45">
+                </div>
+
+                <div class="settings-group">
+                    <div class="settings-label">
+                        <span data-i18n="autoDelay">Jeda Auto Mode</span>
+                        <span class="volume-value" id="auto-delay-display" data-player-role="auto-delay-display">2.0s</span>
+                    </div>
+                    <input type="range" id="setting-auto-delay" data-player-role="set-auto-delay" class="settings-slider" min="500" max="5000" step="100" value="2000">
+                </div>
+
+                <div class="settings-divider"></div>
+
+                <div class="settings-buttons">
+                    <button id="close-settings-modal" data-player-role="settings-close" class="settings-btn close-btn" data-i18n="close">Tutup</button>
+                    <button id="save-settings-btn" data-player-role="settings-save" class="settings-btn save-btn" data-i18n="saveBtn">Simpan</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Background Layers -->
+        <div id="background" data-player-role="background"></div>
+        <div id="background-next" data-player-role="background-next"></div>
+        <video id="background-video" data-player-role="background-video" loop playsinline></video>
+        <div id="text-screen-overlay" data-player-role="text-screen">
+            <p></p>
+        </div>
+
+        <!-- Character Sprites Layer (Slots dinamis akan dimuat oleh JS) -->
+        <div id="char-sprites-layer" data-player-role="sprite-layer">
+        </div>
+
+        <!-- Legacy sprite containers (backward compat) -->
+        <div id="sprite-container-left" class="sprite-container" style="display:none;">
+            <img id="character-sprite-2" alt="Character 2" />
+        </div>
+        <div id="sprite-container-right" class="sprite-container" style="display:none;">
+            <img id="character-sprite" alt="Character 1" />
+        </div>
+        <div id="sprite-container-center" class="sprite-container" style="display:none;">
+            <img id="character-sprite-center" alt="Character Center" />
+        </div>
+
+        <!-- Dialogue -->
+        <div id="dialogue-box" data-player-role="dialogue">
+            <p id="character-name" data-player-role="speaker"></p>
+            <p id="dialogue-text" data-player-role="text"></p>
+        </div>
+        <div id="make-choice-container" data-player-role="choices"></div>
+
+        <!-- Audio -->
+        <audio id="bgm-audio" data-player-role="bgm" loop></audio>
+        <audio id="sfx-audio" data-player-role="sfx"></audio>
+        <audio id="voice-audio" data-player-role="voice"></audio>
+
+        <!-- ============================================================
+             SCENE 'end' — layar akhir chapter MILIK PLAYER INI.
+             Ini bukan markup istimewa milik engine: ia scene biasa, sama
+             seperti scene mana pun yang kamu tulis sendiri. Engine hanya tahu
+             satu hal — saat chapter usai ia memanggil scene bernama "end".
+             Player yang tidak punya scene ini tidak menampilkan layar akhir;
+             player yang punya versinya sendiri (lihat templat di
+             vn-player/templates/) memakai punyanya, bukan yang ini.
+
+             Tombol dikenali lewat `data-scene-action`, BUKAN id. Konvensi itu
+             berlaku di scene mana pun — tulis tombol dengan atribut ini di
+             ending buatanmu sendiri dan engine ikut mengaitkannya:
+                 next   → chapter berikutnya (disembunyikan otomatis bila tak ada)
+                 replay → ulangi chapter ini
+                 hub    → kembali ke menu novel
+             ============================================================ -->
+        <section data-player-scene="end" class="vn-end-screen">
+            <h2 data-i18n="chapterDone">Chapter Selesai</h2>
+            <button type="button" data-scene-action="next" data-i18n="nextChapter">Chapter Selanjutnya</button>
+            <button type="button" data-scene-action="replay" data-i18n="replayChapter">Ulangi Chapter</button>
+            <button type="button" data-scene-action="hub" data-i18n="backToMenu">Kembali ke Menu</button>
+        </section>
+
+        <!-- =========================================================
+             LAYAR BAWAAN TAMBAHAN — kartu judul & galeri.
+             Dulu keduanya hanya datang lewat template "Judul & Galeri", jadi
+             memilihnya berarti menebak dari preview yang tampak sama persis
+             dengan Default. Sekarang keduanya BAWAAN: naskahmu yang menentukan
+             dipakai atau tidak (`kartu_judul` / `buka_galeri`), dan yang tak
+             dipakai tak berbiaya apa pun — ia overlay tersembunyi.
+
+             Shim membaca berkas ini saat runtime, jadi novel yang SUDAH ada pun
+             langsung mendapatkannya tanpa menerapkan ulang template apa pun.
+             Menulis scene bernama sama di player.html-mu sendiri tetap MENANG —
+             dedup-per-nama di shim yang mengurusnya.
+             ========================================================= -->
+        <section data-player-scene="judul" class="vn-scene scene-judul">
+            <div class="judul-latar"></div>
+            <div class="judul-isi">
+                <h1 class="judul-teks" data-judul-teks>Judul Chapter</h1>
+                <p class="judul-sub" data-judul-sub></p>
+            </div>
+        </section>
+
+        <section data-player-scene="galeri" class="vn-scene scene-galeri">
+            <h2 class="galeri-judul" data-i18n="gallery">Galeri</h2>
+            <div class="galeri-grid" data-galeri-grid></div>
+            <button type="button" data-scene-action="hub" data-galeri-tutup
+                    class="galeri-tutup" data-i18n="close">Kembali</button>
+        </section>
+    </section>
+
+    <!-- Debug HUD -->
+    <div id="debug-hud">
+        <div class="debug-header">
+            <span class="debug-header-title">Preview Inspector</span>
+            <span class="debug-header-badge" id="dbg-event-badge">NO EVENT</span>
+        </div>
+
+        <div class="debug-section entry-context">
+            <div class="debug-section-header">Entry Context</div>
+            <div class="debug-entry-type type-dialogue" id="dbg-entry-type">
+                <span>💬</span> DIALOGUE
+            </div>
+            <div class="debug-speaker" id="dbg-speaker">-</div>
+            <div class="debug-text-preview" id="dbg-text-preview">Tidak ada teks dialog...</div>
+            <div class="debug-sprites-row">
+                <div class="debug-sprite-indicator" id="dbg-sprite-left">
+                    <span class="sprite-dot"></span>Kiri
+                </div>
+                <div class="debug-sprite-indicator" id="dbg-sprite-center">
+                    <span class="sprite-dot"></span>Tengah
+                </div>
+                <div class="debug-sprite-indicator" id="dbg-sprite-right">
+                    <span class="sprite-dot"></span>Kanan
+                </div>
+            </div>
+        </div>
+
+        <div class="debug-section special-event hidden" id="dbg-special-event-section">
+            <div class="debug-section-header">Special Event</div>
+            <div class="debug-event-type" id="dbg-event-type">
+                <span></span> <span id="dbg-type">-</span>
+            </div>
+            <div class="debug-row">
+                <span class="debug-label">Duration</span>
+                <div id="dbg-duration-bar-container">
+                    <div id="dbg-duration-bar"></div>
+                </div>
+                <span class="debug-value" id="dbg-duration">0 ms</span>
+            </div>
+            <div class="debug-row">
+                <span class="debug-label">Intensity</span>
+                <span class="debug-value" id="dbg-intensity">1.0</span>
+            </div>
+            <div class="debug-row">
+                <span class="debug-label">Blocking</span>
+                <span class="debug-value">
+                    <span id="dbg-wait" class="debug-tag tag-inactive">OFF</span>
+                </span>
+            </div>
+            <div class="debug-row">
+                <span class="debug-label">SFX</span>
+                <span class="debug-value" id="dbg-sfx" style="font-size: 10px; color: #888;">None</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- JS Modules — urutan load penting! -->
+    <!-- 1. Core: Bus, Registry, State -->
+    <script src="js/engine-bus.js"></script>
+    <script src="js/registry.js"></script>
+    <script src="js/i18n.js"></script>
+    <script src="js/state.js"></script>
+
+    <!-- Command bawaan Story->Hub (set_hub_flag) -->
+    <script src="js/hub-bridge-commands.js"></script>
+    <!-- Command untuk layar bawaan tambahan (kartu judul & galeri). Sesudah
+         vn-player-api.js karena handler-nya memakai VNPlayer.scene. -->
+    <script src="js/screen-commands.js"></script>
+
+    <!-- 2. Helpers: Audio, Sprites, Typewriter -->
+    <script src="js/audio-manager.js"></script>
+    <script src="js/sprite-manager.js"></script>
+    <script src="js/typewriter.js"></script>
+
+    <!-- 3. Controllers: Display, Input, Debug HUD, Effects, UI Panels -->
+    <script src="js/display-controller.js"></script>
+    <script src="js/input-controller.js"></script>
+    <script src="js/debug-hud.js"></script>
+    <script src="js/effects.js"></script>
+    <script src="js/ui-panels.js"></script>
+
+    <!-- 4. Built-in Transitions (self-register ke VNRegistry) -->
+    <script src="js/transitions.js"></script>
+
+    <!-- 4b. VNPlayer bridge — di engine global HANYA untuk API scene (VNPlayer.scene.*)
+         yang dipakai extension via hook player:end-screen. Handler set-player-context-nya
+         tak pernah menyala di sini (engine global memakai set-chapter-context); scene.*
+         murni DOM. Custom player mendapat bridge ini lewat injeksi terpisah (core.js). -->
+    <script src="js/vn-player-api.js"></script>
+
+    <!-- 5. Extension Loader (CSS cascade + JS extensions) -->
+    <script src="js/extension-loader.js"></script>
+
+    <!-- 6. Bootstrap (harus terakhir) -->
+    <script src="js/init.js"></script>
+</body>
+
+</html>

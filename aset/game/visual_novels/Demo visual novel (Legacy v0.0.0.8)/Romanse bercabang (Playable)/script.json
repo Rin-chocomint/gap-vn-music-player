@@ -1,0 +1,219 @@
+[
+  {
+    "type": "phase",
+    "name": "Pertemuan",
+    "bgmVolume": 1,
+    "bgmDelay": 0,
+    "bgmPan": 0
+  },
+  {
+    "type": "dialogue",
+    "speaker": "Bela",
+    "text": "maass cakep...",
+    "spriteMode": "custom"
+  },
+  {
+    "type": "choice",
+    "speaker": "Bela",
+    "text": "Kamu mau ini ngga?",
+    "autoDialogue": "narrator",
+    "choices": [
+      {
+        "text": "Apaan tuh?",
+        "jump": "Jawab Apaan tuh"
+      },
+      {
+        "text": "Ngga mw",
+        "jump": "Jawab Ngga mw"
+      },
+      {
+        "text": "....... (skip)",
+        "jump": "##SKIP_ALL_LABEL##"
+      }
+    ],
+    "spriteMode": "custom"
+  },
+  {
+    "type": "label",
+    "name": "Jawab Apaan tuh",
+    "bgmVolume": "1",
+    "bgmDelay": "0",
+    "bgmPan": "0",
+    "sfxVolume": "1",
+    "sfxDelay": "0",
+    "sfxPan": "0",
+    "transitionOut": "fade_white"
+  },
+  {
+    "type": "dialogue",
+    "speaker": "Bela",
+    "text": "Ini, coklat buat hari valentine",
+    "spriteMode": "custom"
+  },
+  {
+    "type": "choice",
+    "speaker": "Bela",
+    "text": "Ayok dicoba....",
+    "autoDialogue": "narrator",
+    "choices": [
+      {
+        "text": "AaaaEmmpp...",
+        "jump": ""
+      },
+      {
+        "text": "AeEmm..",
+        "jump": ""
+      }
+    ],
+    "spriteMode": "custom"
+  },
+  {
+    "type": "dialogue",
+    "speaker": "Bela",
+    "text": "(Senyumm....)",
+    "spriteMode": "custom"
+  },
+  {
+    "type": "choice",
+    "speaker": "Bela",
+    "text": "......",
+    "autoDialogue": "narrator",
+    "choices": [
+      {
+        "text": "Makasih ya",
+        "jump": "Jawab Apaan tuh.Jawab makasih y"
+      },
+      {
+        "text": "Ngeliatin aku mulu....",
+        "jump": "Jawab Apaan tuh.Jawab Ngeliatin?"
+      }
+    ],
+    "spriteMode": "custom"
+  },
+  {
+    "type": "label",
+    "name": "Jawab Apaan tuh.Jawab makasih y"
+  },
+  {
+    "type": "dialogue",
+    "speaker": "Bela",
+    "text": "Sama-sama ganteng... >//",
+    "spriteMode": "custom"
+  },
+  {
+    "type": "dialogue",
+    "speaker": "Bela",
+    "text": "Oh iya aku mau ke ruang osis dulu",
+    "spriteMode": "custom"
+  },
+  {
+    "type": "dialogue",
+    "speaker": "Bela",
+    "text": "Dadahh...",
+    "spriteMode": "custom"
+  },
+  {
+    "type": "jump",
+    "target": "##FINISH_PARENT##"
+  },
+  {
+    "type": "label",
+    "name": "Jawab Apaan tuh.Jawab Ngeliatin?"
+  },
+  {
+    "type": "dialogue",
+    "speaker": "Bela",
+    "text": "ngga apa-apa kok",
+    "spriteMode": "custom"
+  },
+  {
+    "type": "dialogue",
+    "speaker": "Bela",
+    "text": "Aku ngeliatin kamu lucu aja, wkwkwk",
+    "spriteMode": "custom"
+  },
+  {
+    "type": "dialogue",
+    "speaker": "Bela",
+    "text": "Aku pergi dulu ya",
+    "spriteMode": "custom"
+  },
+  {
+    "type": "jump",
+    "target": "##FINISH_PARENT##"
+  },
+  {
+    "type": "jump",
+    "target": "fase:Ruang osis Bela seneng"
+  },
+  {
+    "type": "label",
+    "name": "Jawab Ngga mw",
+    "bgmVolume": "1",
+    "bgmDelay": "0",
+    "bgmPan": "0",
+    "sfxVolume": "1",
+    "sfxDelay": "0",
+    "sfxPan": "0"
+  },
+  {
+    "type": "dialogue",
+    "speaker": "Bela",
+    "text": "Ihhh nyebelin (Jika milih \"apaan tuh\" berarti salah alur)",
+    "spriteMode": "custom"
+  },
+  {
+    "type": "dialogue",
+    "speaker": "Bela",
+    "text": "Yaudah lah coklatnya ku taruh di meja osis aja",
+    "spriteMode": "custom"
+  },
+  {
+    "type": "jump",
+    "target": "fase:Ruang osis Bela kecewa"
+  },
+  {
+    "type": "dialogue",
+    "speaker": "Bela",
+    "text": "Ini entri yang ada diluar label manapun",
+    "spriteMode": "custom"
+  },
+  {
+    "type": "jump",
+    "target": "fase:Ruang osis Bela seneng"
+  },
+  {
+    "type": "phase",
+    "name": "Ruang osis Bela kecewa",
+    "bgmVolume": 1,
+    "bgmDelay": 0,
+    "bgmPan": 0,
+    "isEnding": true
+  },
+  {
+    "type": "dialogue",
+    "speaker": "Bela",
+    "text": "Hmmm...., bisa ngga sih.",
+    "spriteMode": "custom"
+  },
+  {
+    "type": "dialogue",
+    "speaker": "Bela",
+    "text": "Jadi cowok yang bener ngerespon cewek",
+    "spriteMode": "custom"
+  },
+  {
+    "type": "phase",
+    "name": "Ruang osis Bela seneng",
+    "bgmVolume": 1,
+    "bgmDelay": 0,
+    "bgmPan": 0,
+    "isEnding": true
+  },
+  {
+    "type": "dialogue",
+    "speaker": "Bela",
+    "text": "(ku tungguin dia ke sini, wkwkwk)",
+    "spriteMode": "custom"
+  }
+]

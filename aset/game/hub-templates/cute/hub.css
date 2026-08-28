@@ -1,0 +1,113 @@
+/* ===================================================================
+   Template: Cute — Pastel & Bulat
+   Pastel manis, sudut bulat, garis tebal lucu, bayangan empuk. Bebas diubah.
+   =================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Quicksand:wght@500;600;700&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --q-bg1: #fff0f6;
+  --q-bg2: #ffe3ef;
+  --q-pink: #ff8fb1;
+  --q-pink-d: #ff5e94;
+  --q-mint: #9be7c4;
+  --q-cream: #fffdf9;
+  --q-ink: #6b3b52;
+  --q-muted: #a87e90;
+  --q-line: #ffc2d6;
+  --display: var(--vn-novel-font, "Fredoka", "Segoe UI", system-ui, sans-serif);
+  --body: var(--vn-novel-font, "Quicksand", "Segoe UI", system-ui, sans-serif);
+}
+
+body {
+  font-family: var(--body); font-weight: 600;
+  color: var(--q-ink);
+  min-height: 100vh; overflow: hidden;
+  background:
+    radial-gradient(circle at 18% 16%, #fff 0 8px, transparent 9px) 0 0 / 64px 64px,
+    linear-gradient(160deg, var(--q-bg1) 0%, var(--q-bg2) 100%);
+}
+
+#hub-root { position: relative; width: 100vw; height: 100vh; }
+
+/* --- Sistem layar: satu scene aktif (WAJIB) --- */
+.hub-scene {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: 6vmin;
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transform: translateY(10px);
+  transition: opacity .4s ease, visibility .4s ease, transform .4s cubic-bezier(.34,1.56,.64,1);
+}
+.hub-scene.active { opacity: 1; visibility: visible; pointer-events: auto; transform: translateY(0); }
+
+/* --- Tombol (empuk, garis tebal, bayangan "pop") --- */
+.tpl-btn {
+  font-family: var(--display); font-weight: 600;
+  min-width: 236px; padding: 13px 26px; margin: 6px 0;
+  border: 3px solid var(--q-ink); background: var(--q-cream); color: var(--q-ink);
+  border-radius: 22px; font-size: 1.04rem; cursor: pointer;
+  box-shadow: 0 5px 0 0 var(--q-line);
+  transition: transform .12s, box-shadow .12s, background .18s;
+}
+.tpl-btn:hover { transform: translateY(-2px); box-shadow: 0 7px 0 0 var(--q-line); }
+.tpl-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 0 var(--q-line); }
+.tpl-btn-primary { background: var(--q-pink); color: #fff; box-shadow: 0 5px 0 0 var(--q-pink-d); }
+.tpl-btn-primary:hover { box-shadow: 0 7px 0 0 var(--q-pink-d); }
+.tpl-btn-ghost { background: #fff; }
+
+/* --- Splash --- */
+.tpl-splash { flex-direction: column; cursor: pointer; }
+.tpl-splash-inner { text-align: center; }
+.tpl-splash-title {
+  font-family: var(--display); font-weight: 700; font-size: clamp(2.8rem, 9vw, 6rem);
+  color: var(--q-pink-d); -webkit-text-stroke: 3px #fff; paint-order: stroke fill;
+  text-shadow: 0 8px 0 var(--q-line);
+}
+.tpl-splash-sub { color: var(--q-ink); font-size: 1.1rem; margin-top: 14px; }
+.tpl-splash-skip { position: absolute; bottom: 28px; right: 32px; color: var(--q-muted); font-size: .9rem; }
+.tpl-splash-title::after { content: " ♡"; }
+
+/* --- Kartu (warning / info) --- */
+.tpl-warning-box, .tpl-info-card {
+  max-width: 600px; padding: 40px 36px; text-align: center;
+  background: var(--q-cream); border: 3px solid var(--q-ink); border-radius: 30px;
+  box-shadow: 0 10px 0 0 var(--q-line), 0 26px 50px -28px rgba(180, 90, 130, .5);
+}
+.tpl-warning-head { font-family: var(--display); font-weight: 700; font-size: 2.2rem; margin-bottom: 12px; }
+.tpl-warning-head::before { content: "⚠️ "; }
+.tpl-warning-text { color: var(--q-muted); line-height: 1.7; margin-bottom: 24px; }
+
+/* --- Main Menu --- */
+.tpl-menu-inner { text-align: center; max-width: 540px; }
+.tpl-menu-title {
+  font-family: var(--display); font-weight: 700; font-size: clamp(2.4rem, 8vw, 4.8rem);
+  color: var(--q-pink-d); -webkit-text-stroke: 3px #fff; paint-order: stroke fill;
+  text-shadow: 0 7px 0 var(--q-line);
+}
+.tpl-menu-tagline { color: var(--q-ink); margin: 14px 0 28px; font-size: 1.06rem; }
+.tpl-menu-actions { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+
+/* --- Info --- */
+.tpl-info-card { text-align: left; }
+.tpl-info-title { font-family: var(--display); font-weight: 700; font-size: 2.2rem; margin-bottom: 14px; text-align: center; }
+.tpl-info-desc { color: var(--q-ink); line-height: 1.7; margin-bottom: 20px; }
+.tpl-info-meta { display: grid; grid-template-columns: auto 1fr; gap: 8px 18px; margin-bottom: 24px; background: var(--q-bg1); border-radius: 18px; padding: 16px 18px; }
+.tpl-info-meta dt { color: var(--q-pink-d); font-weight: 700; }
+.tpl-info-meta dd { font-weight: 600; }
+.tpl-info .tpl-btn { display: block; margin: 0 auto; }
+
+/* --- Credits --- */
+.tpl-credits-inner { text-align: center; max-width: 560px; }
+.tpl-credits-title { font-family: var(--display); font-weight: 700; font-size: 2.5rem; color: var(--q-pink-d); -webkit-text-stroke: 2px #fff; paint-order: stroke fill; }
+.tpl-credits-title::after { content: " ✿"; }
+.tpl-credits-lines { color: var(--q-ink); line-height: 2; margin: 18px 0 26px; }
+.tpl-credits-lines span { color: var(--q-pink-d); font-weight: 700; }
+.tpl-credits-footer { margin-top: 14px; font-style: italic; color: var(--q-muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  .hub-scene { transition: opacity .2s ease, visibility .2s ease; transform: none; }
+  .tpl-btn { transition: none; }
+}

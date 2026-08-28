@@ -1,0 +1,15 @@
+<!-- ===== Scene: {{SCENE_NAME}} (main_menu) =====
+     Menu utama (layar terminal). Tombol ditangani engine via data-action. -->
+    <section class="hub-scene tpl-menu" data-scene-id="{{SCENE_ID}}" data-scene-type="main_menu" data-scene-name="{{SCENE_NAME}}">
+      <div class="tpl-menu-inner" data-node="stage">
+        <h1 class="tpl-menu-title" data-node="title" data-bind="title">Visual Novel</h1>
+        <p class="tpl-menu-tagline" data-node="tagline" data-bind="storyDesc"></p>
+        <div class="tpl-menu-actions" data-node="actions">
+          <button type="button" class="tpl-btn tpl-btn-primary" data-node="start-btn" data-action="start">Mulai Cerita</button>
+          <button type="button" class="tpl-btn" data-node="chapter-btn" data-action="chapter-select">Pilih Chapter</button>
+          <button type="button" class="tpl-btn" data-node="info-btn" data-action="goto" data-target="{{TARGET:info}}">Tentang Novel</button>
+          <button type="button" class="tpl-btn" data-node="credits-btn" data-action="goto" data-target="{{TARGET:credits}}">Credits</button>
+          <button type="button" class="tpl-btn tpl-btn-ghost" data-node="exit-btn" data-action="exit">Keluar</button>
+        </div>
+      </div>
+    </section>
