@@ -18,6 +18,40 @@ const editableSections = [
 
 ];
 
+const GAME_EDITOR_CONTENT_KEY = 'gameEditableContent';
+const CHARACTER_DATA_KEY = 'gameCharacterEditorData';
+const ROTATING_TEXTS_KEY = 'gameRotatingTexts';
+const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
+let defaultCharacterDataPromise = null;
+let gameEditorBootstrapPromise = null;
+let pendingMediaDeletes = [];
+
+function getGameEditorStore() {
+    return window.gameEditorStore || null;
+}
+
+function hasPersistedEditorValue(key) {
+    const store = getGameEditorStore();
+    return Boolean(store && store.has(key));
+}
+
+function getPersistedEditorState() {
+    const store = getGameEditorStore();
+    return store ? store.getState() : { schemaVersion: 1 };
+}
+
+function syncLegacyEditorStorage(content) {
+    // Menyimpan salinan kompatibilitas adalah best-effort saja. Sumber utama
+    // tetap userData sehingga kuota localStorage tidak dapat menggagalkan Save.
+    try {
+        localStorage.setItem(GAME_EDITOR_CONTENT_KEY, JSON.stringify(content));
+        localStorage.setItem(CHARACTER_DATA_KEY, JSON.stringify(gameCharacters));
+        localStorage.setItem(ROTATING_TEXTS_KEY, JSON.stringify(rotatingTexts));
+    } catch (error) {
+        console.warn('[GameEditor] Cadangan localStorage tidak dapat diperbarui:', error);
+    }
+}
+
 // Deteksi perubahan pada input di dalam editor
 if (gameEditorScreen) {
     gameEditorScreen.addEventListener('input', (e) => {
@@ -38,7 +72,10 @@ if (gameEditorScreen) {
 // Utility kecil untuk menyusun ulang teks judul utama (membuat <span> per karakter)
 function setTitleHeadingText(targetHeading, textValue) {
     if (!targetHeading) return;
-    const safeText = textValue || '';
+    // Judul di index.html ditulis multi-baris, jadi textContent-nya membawa newline
+    // dan indentasi. Tiap karakter jadi <span> display:inline-block, jadi spasi yang
+    // ikut terbawa menambah span kosong dan memperpanjang animasi masuk judul.
+    const safeText = (textValue || '').trim();
     targetHeading.innerHTML = '';
     safeText.split('').forEach(char => {
         const span = document.createElement('span');
@@ -344,7 +381,7 @@ function loadAllDataToEditorInputs() {
             const el = screens.find(s => s.id === 'title-screen');
             if (el) {
                 const h1 = el.querySelector('h1');
-                document.getElementById('edit-title-main').value = h1 ? h1.textContent || '' : '';
+                document.getElementById('edit-title-main').value = (h1?.textContent || '').trim();
                 document.getElementById('edit-title-subtitle').value = el.querySelector('h3')?.textContent || '';
                 document.getElementById('edit-title-press-start').value = el.querySelector('p')?.textContent || '';
             }
@@ -361,7 +398,8 @@ function loadAllDataToEditorInputs() {
         document.getElementById('edit-profile-description').value = document.getElementById('profile-description')?.textContent || '';
 
         // Muat gambar profil ke pratinjau kecil di area input
-        const actualProfilePicSrc = document.getElementById('profile-picture')?.src;
+        const actualProfilePic = document.getElementById('profile-picture');
+        const actualProfilePicSrc = actualProfilePic?.getAttribute('src') || actualProfilePic?.src;
         const editorImagePreview = document.getElementById('edit-profile-image-preview');
         if (editorImagePreview) {
             editorImagePreview.src = actualProfilePicSrc || './aset/ikon.jpg'; // Fallback ke default jika tidak ada
@@ -380,7 +418,6 @@ function loadAllDataToEditorInputs() {
 //------------------- logika character menu editor -------------------------//
 // Data struktur untuk menyimpan karakter game
 let gameCharacters = []; // Array global untuk menyimpan data karakter
-const CHARACTER_DATA_KEY = 'gameCharacterEditorData'; // Kunci untuk localStorage
 
 // Fungsi untuk menghasilkan ID unik sederhana
 function generateUniqueId() {
@@ -613,50 +650,19 @@ function renderCharacterEditForm(characterData) {
     // Tambahkan event listener untuk tombol remove
     const removeButton = listContainer.querySelector(`.button-remove-character[data-id="${characterId}"]`);
     if (removeButton) {
-        removeButton.addEventListener('click', async function () {
+        removeButton.addEventListener('click', function () {
             const charIdToRemove = this.dataset.id;
             const itemToRemove = document.querySelector(`.character-edit-item[data-character-id="${charIdToRemove}"]`);
             if (itemToRemove) {
-                // Cari data karakter yang akan dihapus untuk mendapatkan path media
                 const charToRemove = gameCharacters.find(char => char.id === charIdToRemove);
-                
-                // Hapus file media jika ada dan merupakan file kustom di aset/character
-                if (charToRemove && charToRemove.mediaSrc && charToRemove.mediaSrc.startsWith('./aset/character/')) {
-                    console.log(`[Hapus Karakter] Menghapus file media: ${charToRemove.mediaSrc}`);
-                    try {
-                        const result = await ipcRenderer.invoke('character-editor:delete-media', {
-                            filePath: charToRemove.mediaSrc
-                        });
-                        if (result.success) {
-                            if (result.deleted) {
-                                console.log(`[Hapus Karakter] File media berhasil dihapus: ${charToRemove.mediaSrc}`);
-                            } else {
-                                console.log(`[Hapus Karakter] Penghapusan dilewati (file tidak ada atau bukan file kustom)`);
-                            }
-                        } else {
-                            console.error(`[Hapus Karakter] Gagal menghapus file media:`, result.error);
-                        }
-                    } catch (err) {
-                        console.error(`[Hapus Karakter] Error saat menghapus file media:`, err);
-                    }
-                } else {
-                    console.log(`[Hapus Karakter] Tidak ada file kustom untuk dihapus (mediaSrc: ${charToRemove?.mediaSrc || 'tidak ada'})`);
+                // Jangan menghapus berkas sebelum tombol Save ditekan. Jika pengguna
+                // membatalkan keluar dari editor, media lama tetap aman.
+                if (charToRemove?.mediaSrc?.startsWith('file:')) {
+                    pendingMediaDeletes.push(charToRemove.mediaSrc);
                 }
-                
                 itemToRemove.remove();
-                // Juga hapus dari array gameCharacters
                 gameCharacters = gameCharacters.filter(char => char.id !== charIdToRemove);
-                console.log(`[Hapus Karakter] Karakter ${charIdToRemove} dihapus dari daftar.`);
-                
-                // Simpan perubahan ke localStorage dan JSON
-                localStorage.setItem(CHARACTER_DATA_KEY, JSON.stringify(gameCharacters));
-                try {
-                    await ipcRenderer.invoke('character-editor:save-data', gameCharacters);
-                    console.log('[Hapus Karakter] Data karakter tersimpan setelah penghapusan.');
-                } catch (e) {
-                    console.error('[Hapus Karakter] Gagal menyimpan data setelah penghapusan:', e);
-                }
-                
+                isEditorDirty = true;
                 if (listContainer.children.length === 1 && listContainer.querySelector('.character-list-empty-placeholder')) { // Jika hanya placeholder yg tersisa
                     listContainer.querySelector('.character-list-empty-placeholder').style.display = 'block';
                 }
@@ -677,17 +683,11 @@ function loadCharacterDataForEditor() {
     listContainer.innerHTML = `<p class="character-list-empty-placeholder" style="display: none; text-align: center; color: #777; margin: 20px 0;">Belum ada karakter. Klik "Tambah Karakter Baru" untuk memulai.</p>`;
 
 
-    // Coba muat dari localStorage dulu
-    const savedCharsString = localStorage.getItem(CHARACTER_DATA_KEY);
-    if (savedCharsString) {
-        try {
-            gameCharacters = JSON.parse(savedCharsString);
-            console.log("Loaded characters from localStorage:", gameCharacters);
-        } catch (e) {
-            console.error("Error parsing characters from localStorage, will extract from DOM:", e);
-            gameCharacters = extractCharactersFromDOM(); // Fallback ke ekstraksi DOM jika parse gagal
-        }
-    } else if (gameCharacters.length === 0) { // Jika tidak ada di LS dan array kosong, ekstrak dari DOM
+    const savedState = getPersistedEditorState();
+    if (hasPersistedEditorValue('characters')) {
+        // Array kosong adalah pilihan pengguna yang sah, jadi jangan jatuh ke default.
+        gameCharacters = Array.isArray(savedState.characters) ? savedState.characters : [];
+    } else if (gameCharacters.length === 0) {
         gameCharacters = extractCharactersFromDOM();
     }
 
@@ -764,14 +764,11 @@ function bindMoreButtons(root = document) {
     });
 }
 
-// Fungsi untuk menyimpan data karakter (dengan penyimpanan file ke aset/character)
+// Kumpulkan karakter dari form dan tulis berkas media baru ke userData. State
+// JSON-nya sendiri ditulis bersama seluruh editor oleh tombol Save Changes.
 window.saveCharacterMenuData = async function () {
-    console.log("Saving character data...");
     const updatedCharacters = [];
     const editItems = document.querySelectorAll('#characterEditorListContainer .character-edit-item');
-    
-    // Collect all media save promises
-    const mediaSavePromises = [];
 
     for (const item of editItems) {
         const id = item.dataset.characterId;
@@ -779,99 +776,52 @@ window.saveCharacterMenuData = async function () {
         const descInput = item.querySelector('.char-desc-input');
         const extDescInput = item.querySelector('.char-ext-desc-input');
         const mediaThumb = item.querySelector('.media-thumbnail-preview');
-
-        // Temukan karakter asli untuk mempertahankan mediaSrc jika tidak diubah
         const originalCharacter = gameCharacters.find(char => char.id === id) || {};
-        let currentMediaSrc = originalCharacter.mediaSrc || '';
-        let currentMediaType = originalCharacter.mediaType || 'image';
-        let currentMediaName = currentMediaSrc.split('/').pop();
-        let needsSaveToFile = false;
-        let newMediaDataUrl = null;
-        let newMediaFileName = null;
 
-        if (mediaThumb && mediaThumb.dataset.newMediaDataUrl) {
-            // Ada file baru yang dipilih - perlu disimpan ke folder aset/character
-            newMediaDataUrl = mediaThumb.dataset.newMediaDataUrl;
-            newMediaFileName = mediaThumb.dataset.newMediaName || `char_${id}_${Date.now()}`;
-            currentMediaType = mediaThumb.dataset.newMediaType || 'image';
-            needsSaveToFile = true;
-        } else if (mediaThumb) {
-            // Tidak ada file baru, coba deteksi dari tag yang ada
-            currentMediaType = mediaThumb.tagName.toLowerCase() === 'video' ? 'video' : 'image';
-            currentMediaSrc = mediaThumb.src;
-        }
+        let mediaSrc = originalCharacter.mediaSrc || '';
+        let mediaType = originalCharacter.mediaType || 'image';
 
-        const charData = {
-            id: id,
-            name: nameInput ? nameInput.value : 'Unknown Name',
-            description: descInput ? descInput.value : '',
-            extendedDescription: extDescInput ? extDescInput.value : '',
-            mediaSrc: currentMediaSrc,
-            mediaType: currentMediaType,
-            _needsSaveToFile: needsSaveToFile,
-            _newMediaDataUrl: newMediaDataUrl,
-            _newMediaFileName: newMediaFileName
-        };
-        updatedCharacters.push(charData);
-    }
-
-    // Process media files that need to be saved to disk
-    for (const charData of updatedCharacters) {
-        if (charData._needsSaveToFile && charData._newMediaDataUrl) {
-            try {
-                // Simpan file media ke folder aset/character via IPC
-                const result = await ipcRenderer.invoke('character-editor:save-media', {
-                    fileName: charData._newMediaFileName,
-                    dataUrl: charData._newMediaDataUrl,
-                    mediaType: charData.mediaType
-                });
-                
-                if (result.success) {
-                    charData.mediaSrc = result.path; // Update dengan path relatif
-                    console.log(`[CharacterEditor] Media saved for ${charData.name}:`, result.path);
-                } else {
-                    console.error(`[CharacterEditor] Failed to save media for ${charData.name}:`, result.error);
-                    // Fallback: simpan sebagai data URL jika gagal simpan ke file
-                    charData.mediaSrc = charData._newMediaDataUrl;
-                }
-            } catch (error) {
-                console.error(`[CharacterEditor] Error saving media for ${charData.name}:`, error);
-                // Fallback: simpan sebagai data URL jika error
-                charData.mediaSrc = charData._newMediaDataUrl;
+        if (mediaThumb?.dataset.newMediaDataUrl) {
+            const oldMediaSrc = mediaSrc;
+            mediaType = mediaThumb.dataset.newMediaType || 'image';
+            const mediaResult = await ipcRenderer.invoke('game-editor:save-media', {
+                fileName: mediaThumb.dataset.newMediaName || `character-${id}`,
+                dataUrl: mediaThumb.dataset.newMediaDataUrl
+            });
+            if (!mediaResult?.success) {
+                throw new Error(mediaResult?.error || `Media untuk ${nameInput?.value || 'karakter'} gagal disimpan.`);
             }
+            mediaSrc = mediaResult.path;
+            if (oldMediaSrc?.startsWith('file:') && oldMediaSrc !== mediaSrc) {
+                pendingMediaDeletes.push(oldMediaSrc);
+            }
+            mediaThumb.setAttribute('src', mediaSrc);
+            delete mediaThumb.dataset.newMediaDataUrl;
+            delete mediaThumb.dataset.newMediaName;
+            delete mediaThumb.dataset.newMediaType;
+        } else if (mediaThumb) {
+            mediaType = mediaThumb.tagName.toLowerCase() === 'video' ? 'video' : 'image';
+            // getAttribute mempertahankan path relatif aset bawaan. .src akan
+            // mengubahnya menjadi file:///.../resources/app dan mudah putus
+            // saat aplikasi dipindahkan atau diperbarui.
+            mediaSrc = mediaThumb.getAttribute('src') || mediaSrc;
         }
-        
-        // Hapus properti temporary
-        delete charData._needsSaveToFile;
-        delete charData._newMediaDataUrl;
-        delete charData._newMediaFileName;
+
+        updatedCharacters.push({
+            id,
+            name: nameInput?.value ?? '',
+            description: descInput?.value ?? '',
+            extendedDescription: extDescInput?.value ?? '',
+            mediaSrc,
+            mediaType
+        });
     }
 
-    gameCharacters = updatedCharacters; // Update array global
-    try {
-        // Simpan ke localStorage
-        localStorage.setItem(CHARACTER_DATA_KEY, JSON.stringify(gameCharacters));
-        console.log("Character data saved to localStorage:", gameCharacters);
-        
-        // Juga simpan ke file JSON untuk persistensi yang lebih baik
-        try {
-            await ipcRenderer.invoke('character-editor:save-data', gameCharacters);
-            console.log("Character data also saved to JSON file");
-        } catch (e) {
-            console.warn("Could not save to JSON file, localStorage only:", e);
-        }
-        
-        showNotification('Character data saved successfully!', 'notification-success');
-
-        // Setelah menyimpan, perbarui DOM menu karakter utama dan pratinjau editor
-        updateOriginalCharacterMenuDOM();
-        setupCharacterMenuPreview();      // Perbarui pratinjau di editor
-
-    } catch (e) {
-        console.error("Error saving character data to localStorage:", e);
-        showNotification('Error saving character data!', 'notification-error');
-    }
-}
+    gameCharacters = updatedCharacters;
+    updateOriginalCharacterMenuDOM();
+    setupCharacterMenuPreview();
+    return gameCharacters;
+};
 
 
 // untuk memperbarui DOM #character-menu berdasarkan array gameCharacters
@@ -1006,6 +956,7 @@ if (addNewCharButton) {
         // Ini penting jika pengguna menyimpan tanpa mengubah apa pun
         gameCharacters.push(newCharData);
         renderCharacterEditForm(newCharData); // Tampilkan formulir kosong
+        isEditorDirty = true;
         console.log("Added new blank character form.");
         updateSpecificPreview('character-menu', true);
     });
@@ -1097,7 +1048,6 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 //------------------- ( Rotating Texts Editor Logic ) -------------------------//
-const ROTATING_TEXTS_KEY = 'gameRotatingTexts'; // Key untuk localStorage
 
 // Render semua rotating text items ke editor
 function renderRotatingTextsEditor() {
@@ -1166,51 +1116,102 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Load rotating texts dari localStorage atau character_data.json
+async function loadDefaultCharacterData() {
+    if (!defaultCharacterDataPromise) {
+        defaultCharacterDataPromise = fetch('./aset/konten/character_data.json')
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return response.json();
+            })
+            .catch(error => {
+                console.error('[GameEditor] Gagal memuat data karakter bawaan:', error);
+                return {};
+            });
+    }
+    return defaultCharacterDataPromise;
+}
+
+function convertDefaultCharacters(characters) {
+    if (!Array.isArray(characters)) return [];
+    return characters.map((character, index) => ({
+        id: `default-character-${index}`,
+        name: character?.name ?? `Character ${index + 1}`,
+        description: character?.descValues?.description ?? character?.descValues?.summary ?? '',
+        extendedDescription: character?.descValues?.extended ?? '',
+        mediaSrc: character?.source ?? './aset/placeholder.png',
+        mediaType: character?.type === 'video' ? 'video' : 'image'
+    }));
+}
+
+function hasPersistedProfileContent() {
+    const state = getPersistedEditorState();
+    return hasPersistedEditorValue('content') && state.content && hasOwn(state.content, 'profile-section');
+}
+
+function applyDefaultProfile(profile) {
+    if (!profile || hasPersistedProfileContent()) return;
+    const name = document.getElementById('profile-name');
+    const level = document.getElementById('profile-level');
+    const description = document.getElementById('profile-description');
+    if (name && typeof profile.name === 'string') name.textContent = profile.name;
+    if (level && typeof profile.level === 'string') level.textContent = profile.level;
+    if (description && typeof profile.description === 'string') description.textContent = profile.description;
+}
+
+// State tersimpan, termasuk [], selalu menang atas data bawaan.
 async function loadRotatingTexts() {
-    // Coba load dari localStorage dulu
-    const savedTexts = localStorage.getItem(ROTATING_TEXTS_KEY);
-    if (savedTexts) {
-        try {
-            const parsed = JSON.parse(savedTexts);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-                rotatingTexts = parsed;
-                console.log('[RotatingTexts] Loaded from localStorage:', rotatingTexts);
-                return;
-            }
-        } catch (e) {
-            console.error('[RotatingTexts] Error parsing localStorage:', e);
-        }
+    await getGameEditorStore()?.ready;
+    const state = getPersistedEditorState();
+    if (hasPersistedEditorValue('rotatingTexts')) {
+        rotatingTexts = Array.isArray(state.rotatingTexts) ? state.rotatingTexts : [];
+        return;
     }
 
-    // Fallback: load dari character_data.json
-    try {
-        const response = await fetch('./aset/konten/character_data.json');
-        if (response.ok) {
-            const data = await response.json();
-            if (data.rotatingTexts && Array.isArray(data.rotatingTexts) && data.rotatingTexts.length > 0) {
-                rotatingTexts = data.rotatingTexts;
-                console.log('[RotatingTexts] Loaded from character_data.json:', rotatingTexts);
-            }
-        }
-    } catch (e) {
-        console.error('[RotatingTexts] Error loading from JSON:', e);
+    const defaults = await loadDefaultCharacterData();
+    rotatingTexts = Array.isArray(defaults.rotatingTexts) ? defaults.rotatingTexts.map(text => String(text)) : rotatingTexts;
+}
+
+function normalizeRotatingTextsForSave() {
+    // Nilai kosong di dalam daftar dibuang seperti perilaku UI sebelumnya, tetapi
+    // array kosong hasilnya tetap disimpan sebagai array kosong yang valid.
+    rotatingTexts = rotatingTexts.filter(text => String(text).trim() !== '');
+    return rotatingTexts;
+}
+
+async function hydrateGameEditorState() {
+    await getGameEditorStore()?.ready;
+    const state = getPersistedEditorState();
+    const needsDefaultCharacters = !hasPersistedEditorValue('characters');
+    const needsDefaultRotatingTexts = !hasPersistedEditorValue('rotatingTexts');
+    const needsDefaultProfile = !hasPersistedProfileContent();
+    const defaults = (needsDefaultCharacters || needsDefaultRotatingTexts || needsDefaultProfile)
+        ? await loadDefaultCharacterData()
+        : null;
+
+    if (hasPersistedEditorValue('characters')) {
+        gameCharacters = Array.isArray(state.characters) ? state.characters : [];
+    } else if (defaults) {
+        gameCharacters = convertDefaultCharacters(defaults.characters);
     }
-}
 
-// Save rotating texts ke localStorage
-function saveRotatingTextsToLocalStorage() {
-    // Filter out empty strings
-    const textsToSave = rotatingTexts.filter(text => text.trim() !== '');
-    localStorage.setItem(ROTATING_TEXTS_KEY, JSON.stringify(textsToSave));
-    rotatingTexts = textsToSave;
-    console.log('[RotatingTexts] Saved to localStorage:', textsToSave);
-}
-
-// Load rotating texts saat halaman dimuat
-document.addEventListener('DOMContentLoaded', async () => {
+    if (needsDefaultProfile && defaults) applyDefaultProfile(defaults.profile);
     await loadRotatingTexts();
-});
+    updateOriginalCharacterMenuDOM();
+    loadAllEditableContentFromLocalStorage();
+}
+
+async function initializeGameEditorState() {
+    if (!gameEditorBootstrapPromise) {
+        gameEditorBootstrapPromise = hydrateGameEditorState();
+    }
+    return gameEditorBootstrapPromise;
+}
+
+async function restoreSavedGameEditorState() {
+    pendingMediaDeletes = [];
+    await hydrateGameEditorState();
+    setupCharacterMenuPreview();
+}
 //------------------- ( End Rotating Texts Editor Logic ) -------------------------//
 
 function setupCharacterMenuPreview() {
@@ -1308,8 +1309,32 @@ function setupCharacterMenuPreview() {
     console.log("setupCharacterMenuPreview (versi replika konten) selesai.");
 }
 
+async function saveProfileImageFromEditor() {
+    const preview = document.getElementById('edit-profile-image-preview');
+    if (!preview?.dataset.newMediaDataUrl) return;
+
+    const oldMediaSrc = preview.getAttribute('src');
+
+    const mediaResult = await ipcRenderer.invoke('game-editor:save-media', {
+        fileName: preview.dataset.newMediaName || 'profile-picture',
+        dataUrl: preview.dataset.newMediaDataUrl
+    });
+    if (!mediaResult?.success) {
+        throw new Error(mediaResult?.error || 'Gambar profil gagal disimpan.');
+    }
+
+    preview.src = mediaResult.path;
+    if (oldMediaSrc?.startsWith('file:') && oldMediaSrc !== mediaResult.path) {
+        pendingMediaDeletes.push(oldMediaSrc);
+    }
+    delete preview.dataset.newMediaDataUrl;
+    delete preview.dataset.newMediaName;
+}
+
 // --- FUNGSI UNTUK MENYIMPAN SEMUA PERUBAHAN DARI SEMUA INPUT FIELD ---
-function saveAllEditorChanges() {
+async function saveAllEditorChanges() {
+    await saveProfileImageFromEditor();
+
     editableSections.forEach(section => {
         const elementId = section.elementId;
         if (elementId === 'warning-screen') {
@@ -1351,38 +1376,66 @@ function saveAllEditorChanges() {
 
             // Simpan gambar profil
             const actualProfilePicElement = document.getElementById('profile-picture'); // Elemen game asli
-            const editorImagePreviewSrc = document.getElementById('edit-profile-image-preview').src; // Ambil src dari pratinjau input
+            const editorImagePreview = document.getElementById('edit-profile-image-preview');
+            const editorImagePreviewSrc = editorImagePreview?.getAttribute('src') || editorImagePreview?.src;
             if (actualProfilePicElement && editorImagePreviewSrc) {
-                actualProfilePicElement.src = editorImagePreviewSrc;
+                actualProfilePicElement.setAttribute('src', editorImagePreviewSrc);
             }
         }
         updateSpecificPreview(elementId, false); // Update preview berdasarkan data game asli yang baru saja diubah
     });
 
-    // Simpan rotating texts
-    if (typeof saveRotatingTextsToLocalStorage === 'function') {
-        saveRotatingTextsToLocalStorage();
-    }
+    normalizeRotatingTextsForSave();
+    await window.saveCharacterMenuData();
 
-    saveAllEditableContentToLocalStorage();
-    showNotification('All changes saved successfully!', 'notification-success');
+    const content = collectAllEditableContent();
+    const store = getGameEditorStore();
+    if (!store) throw new Error('Penyimpanan Game Editor belum siap.');
+    store.update({
+        content,
+        characters: gameCharacters,
+        rotatingTexts
+    });
+    await store.persist();
+
+    editableContent = content;
+    syncLegacyEditorStorage(content);
+
+    // Hapus media lama hanya setelah state baru sudah aman tersimpan.
+    const mediaInUse = new Set(gameCharacters.map(character => character.mediaSrc));
+    const profileMediaSrc = document.getElementById('profile-picture')?.getAttribute('src');
+    if (profileMediaSrc) mediaInUse.add(profileMediaSrc);
+    const mediaToDelete = [...new Set(pendingMediaDeletes)].filter(mediaSrc => !mediaInUse.has(mediaSrc));
+    pendingMediaDeletes = [];
+    await Promise.all(mediaToDelete.map(async mediaSrc => {
+        const result = await ipcRenderer.invoke('game-editor:delete-media', { mediaSrc });
+        if (!result?.success) console.warn('[GameEditor] Media lama tidak dapat dihapus:', result?.error);
+    }));
+
     updateAllPreviews(false); // Update pratinjau kiri setelah menyimpan
 }
 
 // Event listener untuk tombol "Save Changes"
 if (saveEditorChangesBtn) {
-    saveEditorChangesBtn.addEventListener('click', () => {
-        saveAllEditorChanges();
-        if (typeof window.saveCharacterMenuData === 'function') {
-            window.saveCharacterMenuData();
+    saveEditorChangesBtn.addEventListener('click', async () => {
+        saveEditorChangesBtn.disabled = true;
+        try {
+            await saveAllEditorChanges();
+            isEditorDirty = false;
+            showNotification('All changes saved successfully!', 'notification-success');
+        } catch (error) {
+            console.error('[GameEditor] Gagal menyimpan perubahan:', error);
+            showNotification(`Error saving changes: ${error.message}`, 'notification-error');
+        } finally {
+            saveEditorChangesBtn.disabled = false;
         }
-        isEditorDirty = false; // Reset flag setelah menyimpan
     });
 }
 
 // Tombol untuk membuka Game Editor dari Main Menu
 if (gameEditorButton) {
-    gameEditorButton.addEventListener('click', () => {
+    gameEditorButton.addEventListener('click', async () => {
+        await initializeGameEditorState();
         const mainMenu = document.getElementById('main-menu');
         if (mainMenu) mainMenu.style.display = 'none';
 
@@ -1400,7 +1453,7 @@ if (gameEditorButton) {
         gameEditorScreen.style.display = 'flex';
         gameEditorScreen.style.animation = 'fadeIn 0.5s forwards';
 
-        loadAllEditableContentFromLocalStorage(); // Muat dari LS dulu
+        loadAllEditableContentFromLocalStorage();
         loadAllDataToEditorInputs(); // Kemudian isi semua input & update preview
         if (characterMenu) {
             characterMenu.style.display = 'block'; // Atau 'flex' tergantung main-container
@@ -1428,13 +1481,23 @@ if (gameEditorButton) {
 
 // Tombol untuk kembali ke Main Menu dari Game Editor
 if (backToMainMenuEditorBtn) {
-    backToMainMenuEditorBtn.addEventListener('click', () => {
+    backToMainMenuEditorBtn.addEventListener('click', async () => {
+        let discardedChanges = false;
         if (isEditorDirty) {
             const confirmLeave = confirm("Anda memiliki perubahan yang belum disimpan. Apakah Anda yakin ingin kembali ke Menu Utama tanpa menyimpan?");
             if (!confirmLeave) {
                 return; // Batalkan aksi kembali
             }
-            isEditorDirty = false; // Reset flag jika pengguna memilih untuk melanjutkan
+            isEditorDirty = false;
+            discardedChanges = true;
+        }
+
+        if (discardedChanges) {
+            try {
+                await restoreSavedGameEditorState();
+            } catch (error) {
+                console.error('[GameEditor] Gagal memulihkan perubahan yang dibatalkan:', error);
+            }
         }
 
         console.log("Back from Editor: #character-menu display BEFORE hide:", document.getElementById('character-menu').style.display);
@@ -1476,69 +1539,79 @@ if (backToMainMenuEditorBtn) {
 let editableContent = {};
 
 function loadAllEditableContentFromLocalStorage() {
-    const savedContentString = localStorage.getItem('gameEditableContent');
-    if (savedContentString) {
+    const state = getPersistedEditorState();
+    let content = hasPersistedEditorValue('content') ? state.content : null;
+
+    // Darurat/backward compatibility bila store belum dapat diload. Jalur normal
+    // selalu memakai userData, bukan localStorage.
+    if (!content && !getGameEditorStore()) {
         try {
-            editableContent = JSON.parse(savedContentString) || {}; // Inisialisasi jika null
-
-            editableSections.forEach(section => {
-                const data = editableContent[section.elementId];
-                if (!data) return;
-
-                const elementId = section.elementId;
-                if (elementId === 'warning-screen') {
-                    const el = screens.find(s => s.id === 'warning-screen');
-                    if (el) {
-                        el.querySelectorAll('p')[0].textContent = data.line1 || "⚠️ Health and Safety Warning ⚠️";
-                        el.querySelectorAll('p')[1].textContent = data.line2 || "Take breaks regularly and play responsibly.";
-                    }
-                } else if (elementId === 'developer-screen') {
-                    const el = screens.find(s => s.id === 'developer-screen');
-                    if (el) {
-                        el.querySelector('h2').textContent = data.title || "Gamer & Anime Pub";
-                        el.querySelector('h4').textContent = data.subtitle || "The successor of Real World Nime";
-                    }
-                } else if (elementId === 'concept-screen') {
-                    const el = screens.find(s => s.id === 'concept-screen');
-                    if (el) {
-                        el.querySelector('h2').textContent = data.title || "Disclaimer!!";
-                        const p = el.querySelector('p');
-                        if (p) {
-                            p.textContent = data.text || "Proyek ini dikerjakan secara part time plus kalau lagi mood aja, harap maklumi jika updatenya lama.";
-                        }
-                    }
-                } else if (elementId === 'title-screen') {
-                    const el = screens.find(s => s.id === 'title-screen');
-                    if (el) {
-                        const h1El = el.querySelector('h1');
-                        setTitleHeadingText(h1El, data.mainTitle || "Main Title");
-                        el.querySelector('h3').textContent = data.subtitle || "Subtitle";
-                        el.querySelector('p').textContent = data.pressStart || "Press Start";
-                    }
-                } else if (elementId === 'profile-section') {
-                    const profileNameEl = document.getElementById('profile-name');
-                    if (profileNameEl) profileNameEl.textContent = data.name || "--";
-                    const profileLevelEl = document.getElementById('profile-level');
-                    if (profileLevelEl) profileLevelEl.textContent = data.level || "Level: --";
-                    const profileDescriptionEl = document.getElementById('profile-description');
-                    if (profileDescriptionEl) profileDescriptionEl.textContent = data.description || "Description...";
-                    const actualProfilePic = document.getElementById('profile-picture'); // Elemen game asli
-                    if (actualProfilePic) {
-                        actualProfilePic.src = data.profileImageSrc || './aset/ikon.jpg'; // Fallback ke default
-                    }
-                }
-            });
-        } catch (e) {
-            console.error("Error parsing saved content from localStorage:", e);
-            editableContent = {}; // Reset jika error
+            const legacyContent = localStorage.getItem(GAME_EDITOR_CONTENT_KEY);
+            content = legacyContent ? JSON.parse(legacyContent) : null;
+        } catch (error) {
+            console.error('[GameEditor] Gagal membaca cadangan localStorage:', error);
         }
     }
+    if (!content || typeof content !== 'object' || Array.isArray(content)) return;
+
+    editableContent = content;
+    editableSections.forEach(section => {
+        const data = content[section.elementId];
+        if (!data || typeof data !== 'object' || Array.isArray(data)) return;
+
+        const elementId = section.elementId;
+        if (elementId === 'warning-screen') {
+            const el = screens.find(s => s.id === 'warning-screen');
+            if (el) {
+                const paragraphs = el.querySelectorAll('p');
+                if (paragraphs[0] && hasOwn(data, 'line1')) paragraphs[0].textContent = data.line1 ?? '';
+                if (paragraphs[1] && hasOwn(data, 'line2')) paragraphs[1].textContent = data.line2 ?? '';
+            }
+        } else if (elementId === 'developer-screen') {
+            const el = screens.find(s => s.id === 'developer-screen');
+            if (el) {
+                const title = el.querySelector('h2');
+                const subtitle = el.querySelector('h4');
+                if (title && hasOwn(data, 'title')) title.textContent = data.title ?? '';
+                if (subtitle && hasOwn(data, 'subtitle')) subtitle.textContent = data.subtitle ?? '';
+            }
+        } else if (elementId === 'concept-screen') {
+            const el = screens.find(s => s.id === 'concept-screen');
+            if (el) {
+                const title = el.querySelector('h2');
+                const text = el.querySelector('p');
+                if (title && hasOwn(data, 'title')) title.textContent = data.title ?? '';
+                if (text && hasOwn(data, 'text')) text.textContent = data.text ?? '';
+            }
+        } else if (elementId === 'title-screen') {
+            const el = screens.find(s => s.id === 'title-screen');
+            if (el) {
+                if (hasOwn(data, 'mainTitle')) setTitleHeadingText(el.querySelector('h1'), data.mainTitle ?? '');
+                const subtitle = el.querySelector('h3');
+                const pressStart = el.querySelector('p');
+                if (subtitle && hasOwn(data, 'subtitle')) subtitle.textContent = data.subtitle ?? '';
+                if (pressStart && hasOwn(data, 'pressStart')) pressStart.textContent = data.pressStart ?? '';
+            }
+        } else if (elementId === 'profile-section') {
+            const profileName = document.getElementById('profile-name');
+            const profileLevel = document.getElementById('profile-level');
+            const profileDescription = document.getElementById('profile-description');
+            const profileImage = document.getElementById('profile-picture');
+            if (profileName && hasOwn(data, 'name')) profileName.textContent = data.name ?? '';
+            if (profileLevel && hasOwn(data, 'level')) profileLevel.textContent = data.level ?? '';
+            if (profileDescription && hasOwn(data, 'description')) profileDescription.textContent = data.description ?? '';
+            if (profileImage && hasOwn(data, 'profileImageSrc') && data.profileImageSrc) {
+                profileImage.src = data.profileImageSrc;
+            }
+        }
+    });
+
     if (document.getElementById('game-editor-screen').style.display === 'flex') {
         loadAllDataToEditorInputs();
     }
 }
 
-function saveAllEditableContentToLocalStorage() {
+function collectAllEditableContent() {
     const currentContentToSave = {};
     editableSections.forEach(section => {
         const elementId = section.elementId;
@@ -1558,7 +1631,7 @@ function saveAllEditableContentToLocalStorage() {
         } else if (elementId === 'title-screen') {
             const el = screens.find(s => s.id === 'title-screen');
             if (el) {
-                data.mainTitle = el.querySelector('h1')?.textContent;
+                data.mainTitle = el.querySelector('h1')?.textContent?.trim();
                 data.subtitle = el.querySelector('h3')?.textContent;
                 data.pressStart = el.querySelector('p')?.textContent;
             }
@@ -1566,14 +1639,12 @@ function saveAllEditableContentToLocalStorage() {
             data.name = document.getElementById('profile-name')?.textContent; // Ambil dari elemen game asli
             data.level = document.getElementById('profile-level')?.textContent;
             data.description = document.getElementById('profile-description')?.textContent;
-            data.profileImageSrc = document.getElementById('profile-picture')?.src; // Ambil src dari elemen gambar game asli
+            data.profileImageSrc = document.getElementById('profile-picture')?.getAttribute('src');
         }
         currentContentToSave[elementId] = data;
     });
 
-    localStorage.setItem('gameEditableContent', JSON.stringify(currentContentToSave));
-    console.log('All editable content saved to localStorage.');
-    editableContent = currentContentToSave;
+    return currentContentToSave;
 }
 
 // --- Update Pratinjau secara Real-time saat Mengetik ---
@@ -1595,39 +1666,10 @@ function addRealTimePreviewUpdaterForAllInputs() {
 
 document.addEventListener('DOMContentLoaded', () => {
     addRealTimePreviewUpdaterForAllInputs();
-
-    const savedCharsString = localStorage.getItem(CHARACTER_DATA_KEY);
-    let charactersLoaded = false;
-
-    if (savedCharsString) {
-        try {
-            const parsedChars = JSON.parse(savedCharsString);
-            if (Array.isArray(parsedChars) && parsedChars.length > 0) {
-                gameCharacters = parsedChars;
-                console.log("Initial characters loaded from localStorage on DOMContentLoaded:", gameCharacters);
-                updateOriginalCharacterMenuDOM();
-                charactersLoaded = true;
-            } else {
-                console.log("localStorage character data is empty or invalid.");
-            }
-        } catch (e) {
-            console.error("Error parsing characters from localStorage on DOMContentLoaded:", e);
-        }
-    }
-
-    if (!charactersLoaded) {
-        // Jika tidak ada di LS yang valid, ekstrak dari DOM #character-menu yang mungkin hardcoded
-        const extractedChars = extractCharactersFromDOM();
-        if (extractedChars.length > 0) {
-            gameCharacters = extractedChars;
-            console.log("Initial characters extracted from hardcoded DOM on DOMContentLoaded:", gameCharacters);
-            // Simpan ke localStorage untuk penggunaan selanjutnya jika belum ada atau tidak valid
-            localStorage.setItem(CHARACTER_DATA_KEY, JSON.stringify(gameCharacters));
-        } else {
-            console.log("No characters found in hardcoded DOM either.");
-            updateOriginalCharacterMenuDOM(); // Akan menampilkan pesan "No characters defined."
-        }
-    }
+    initializeGameEditorState().catch(error => {
+        console.error('[GameEditor] Gagal menginisialisasi state:', error);
+        showNotification('Game Editor data could not be loaded.', 'notification-error');
+    });
 
     const profileImagePreviewInEditor = document.getElementById('edit-profile-image-preview');
     const profileImageInput = document.getElementById('edit-profile-image-input');
@@ -1647,6 +1689,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     const newImageSrc = e.target.result; // Ini adalah Base64 Data URL
 
                     profileImagePreviewInEditor.src = newImageSrc;
+                    profileImagePreviewInEditor.dataset.newMediaDataUrl = newImageSrc;
+                    profileImagePreviewInEditor.dataset.newMediaName = file.name;
                     updateSpecificPreview('profile-section', true);
                 };
                 reader.readAsDataURL(file);

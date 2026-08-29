@@ -454,6 +454,7 @@ const {
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL, fileURLToPath } = require('url');
 
 // =====================================================================
 // [LOGIN-FIX] Dukungan popup login YouTube Music / Google di dalam <webview>
@@ -1314,99 +1315,209 @@ ipcMain.handle("load-settings", () => {
     };
 });
 
-// =================== Character Menu Editor - Save Media to aset/character ================== //
-const characterDirectory = path.join(__dirname, 'aset', 'character');
+// =================== Game Editor - Persistensi Data Pengguna ================== //
+// Data Game Editor adalah data milik pengguna, bukan aset aplikasi. Menaruhnya di
+// __dirname/aset/character membuat data mudah hilang saat folder instalasi diganti
+// dan dapat gagal ditulis bila aplikasi dipasang pada lokasi yang terlindungi.
+const GAME_EDITOR_STATE_SCHEMA_VERSION = 1;
+const GAME_EDITOR_DIRECTORY_NAME = 'game-editor';
+const GAME_EDITOR_STATE_FILE_NAME = 'state.json';
+const GAME_EDITOR_MEDIA_DIRECTORY_NAME = 'media';
+const legacyCharacterDirectory = path.join(__dirname, 'aset', 'character');
 
-// Ensure the character directory exists
-if (!fs.existsSync(characterDirectory)) {
-    fs.mkdirSync(characterDirectory, { recursive: true });
+function getGameEditorDirectory() {
+    return path.join(app.getPath('userData'), GAME_EDITOR_DIRECTORY_NAME);
 }
 
-// Handler to save character media file (image/video) from base64 data
-ipcMain.handle('character-editor:save-media', async (event, { fileName, dataUrl, mediaType }) => {
+function getGameEditorStateFilePath() {
+    return path.join(getGameEditorDirectory(), GAME_EDITOR_STATE_FILE_NAME);
+}
+
+function getGameEditorMediaDirectory() {
+    return path.join(getGameEditorDirectory(), GAME_EDITOR_MEDIA_DIRECTORY_NAME);
+}
+
+function isPlainObject(value) {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function normalizeGameEditorState(value) {
+    if (!isPlainObject(value)) {
+        throw new Error('Format state Game Editor tidak valid.');
+    }
+
+    const state = { schemaVersion: GAME_EDITOR_STATE_SCHEMA_VERSION };
+
+    if (Object.prototype.hasOwnProperty.call(value, 'content')) {
+        if (!isPlainObject(value.content)) throw new Error('Konten Game Editor tidak valid.');
+        state.content = value.content;
+    }
+    if (Object.prototype.hasOwnProperty.call(value, 'characters')) {
+        if (!Array.isArray(value.characters)) throw new Error('Data karakter tidak valid.');
+        state.characters = value.characters;
+    }
+    if (Object.prototype.hasOwnProperty.call(value, 'rotatingTexts')) {
+        if (!Array.isArray(value.rotatingTexts)) throw new Error('Rotating text tidak valid.');
+        state.rotatingTexts = value.rotatingTexts.map(text => String(text));
+    }
+    if (Object.prototype.hasOwnProperty.call(value, 'profileCustomCss')) {
+        if (typeof value.profileCustomCss !== 'string') throw new Error('CSS profil tidak valid.');
+        state.profileCustomCss = value.profileCustomCss;
+    }
+
+    return state;
+}
+
+function readGameEditorStateFromDisk() {
+    const statePath = getGameEditorStateFilePath();
+    if (!fs.existsSync(statePath)) return null;
+    const parsed = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+    return normalizeGameEditorState(parsed);
+}
+
+function writeGameEditorStateToDisk(state) {
+    const normalizedState = normalizeGameEditorState(state);
+    fs.mkdirSync(getGameEditorDirectory(), { recursive: true });
+    writeJsonFileSafely(getGameEditorStateFilePath(), normalizedState);
+    return normalizedState;
+}
+
+function readLegacyCharacterData() {
     try {
-        // Extract base64 data from data URL
-        const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-        if (!matches) {
-            throw new Error('Invalid data URL format');
-        }
-
-        const base64Data = matches[2];
-        const buffer = Buffer.from(base64Data, 'base64');
-
-        // Sanitize filename to avoid path traversal
-        const safeFileName = path.basename(fileName).replace(/[^a-zA-Z0-9_\-\.]/g, '_');
-        const filePath = path.join(characterDirectory, safeFileName);
-
-        // Write file to disk
-        fs.writeFileSync(filePath, buffer);
-
-        // Return relative path for use in the app
-        const relativePath = './aset/character/' + safeFileName;
-        console.log('[CharacterEditor] Media saved:', relativePath);
-
-        return { success: true, path: relativePath };
+        const legacyPath = path.join(legacyCharacterDirectory, 'custom_character_data.json');
+        if (!fs.existsSync(legacyPath)) return null;
+        const parsed = JSON.parse(fs.readFileSync(legacyPath, 'utf8'));
+        return Array.isArray(parsed) ? parsed : null;
     } catch (error) {
-        console.error('[CharacterEditor] Error saving media:', error);
+        console.warn('[GameEditor] Gagal membaca data karakter lama:', error.message);
+        return null;
+    }
+}
+
+function isPathInside(parentDirectory, candidatePath) {
+    const relative = path.relative(parentDirectory, candidatePath);
+    return relative !== '' && !relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative);
+}
+
+function saveGameEditorMedia({ fileName, dataUrl }) {
+    if (typeof dataUrl !== 'string') throw new Error('Data media tidak valid.');
+    const matches = dataUrl.match(/^data:([^;]+);base64,([A-Za-z0-9+/=\r\n]+)$/);
+    if (!matches) throw new Error('Format data media tidak valid.');
+
+    const safeOriginalName = path.basename(String(fileName || 'media')).replace(/[^a-zA-Z0-9_\-.]/g, '_');
+    const extension = path.extname(safeOriginalName).slice(0, 12);
+    const uniqueName = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${extension}`;
+    const mediaDirectory = getGameEditorMediaDirectory();
+    const mediaPath = path.join(mediaDirectory, uniqueName);
+
+    fs.mkdirSync(mediaDirectory, { recursive: true });
+    fs.writeFileSync(mediaPath, Buffer.from(matches[2], 'base64'));
+    return pathToFileURL(mediaPath).href;
+}
+
+function deleteGameEditorMedia(mediaSrc) {
+    if (typeof mediaSrc !== 'string' || !mediaSrc.startsWith('file:')) {
+        return { success: true, skipped: true };
+    }
+
+    const mediaPath = fileURLToPath(mediaSrc);
+    const mediaDirectory = getGameEditorMediaDirectory();
+    if (!isPathInside(mediaDirectory, mediaPath)) {
+        return { success: true, skipped: true };
+    }
+    if (!fs.existsSync(mediaPath)) return { success: true, skipped: true };
+
+    fs.unlinkSync(mediaPath);
+    return { success: true, deleted: true };
+}
+
+ipcMain.handle('game-editor:load-state', async () => {
+    try {
+        const state = readGameEditorStateFromDisk();
+        if (state) return { success: true, exists: true, state };
+
+        // Hanya data lama yang dibaca di proses utama. localStorage lama dimigrasikan
+        // oleh renderer karena Electron main process memang tidak dapat membacanya.
+        return {
+            success: true,
+            exists: false,
+            legacyCharacters: readLegacyCharacterData()
+        };
+    } catch (error) {
+        console.error('[GameEditor] Gagal memuat state:', error);
         return { success: false, error: error.message };
     }
 });
 
-// Handler to load custom character data from JSON file (for persistence)
-ipcMain.handle('character-editor:load-data', async () => {
+ipcMain.handle('game-editor:save-state', async (event, state) => {
     try {
-        const jsonPath = path.join(characterDirectory, 'custom_character_data.json');
-        if (fs.existsSync(jsonPath)) {
-            const data = fs.readFileSync(jsonPath, 'utf-8');
-            return { success: true, data: JSON.parse(data) };
-        }
-        return { success: false, error: 'File not found' };
-    } catch (error) {
-        console.error('[CharacterEditor] Error loading data:', error);
-        return { success: false, error: error.message };
-    }
-});
-
-// Handler untuk menghapus file media karakter
-ipcMain.handle('character-editor:delete-media', async (event, { filePath }) => {
-    try {
-        // Pastikan path adalah file di folder aset/character
-        if (!filePath || !filePath.startsWith('./aset/character/')) {
-            console.log('[CharacterEditor] Melewati penghapusan - bukan file kustom:', filePath);
-            return { success: true, skipped: true };
-        }
-
-        const fileName = path.basename(filePath);
-        const fullPath = path.join(characterDirectory, fileName);
-
-        // Cek apakah file ada sebelum menghapus
-        if (fs.existsSync(fullPath)) {
-            fs.unlinkSync(fullPath);
-            console.log('[CharacterEditor] File media dihapus:', fullPath);
-            return { success: true, deleted: true };
-        } else {
-            console.log('[CharacterEditor] File tidak ditemukan, melewati:', fullPath);
-            return { success: true, skipped: true };
-        }
-    } catch (error) {
-        console.error('[CharacterEditor] Gagal menghapus file media:', error);
-        return { success: false, error: error.message };
-    }
-});
-
-// Handler to save custom character data to JSON file
-ipcMain.handle('character-editor:save-data', async (event, characterData) => {
-    try {
-        const jsonPath = path.join(characterDirectory, 'custom_character_data.json');
-        fs.writeFileSync(jsonPath, JSON.stringify(characterData, null, 2), 'utf-8');
-        console.log('[CharacterEditor] Character data saved to:', jsonPath);
+        writeGameEditorStateToDisk(state);
         return { success: true };
     } catch (error) {
-        console.error('[CharacterEditor] Error saving data:', error);
+        console.error('[GameEditor] Gagal menyimpan state:', error);
         return { success: false, error: error.message };
     }
 });
-// =================== End Character Menu Editor ================== //
+
+ipcMain.handle('game-editor:save-media', async (event, payload) => {
+    try {
+        return { success: true, path: saveGameEditorMedia(payload || {}) };
+    } catch (error) {
+        console.error('[GameEditor] Gagal menyimpan media:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('game-editor:delete-media', async (event, { mediaSrc } = {}) => {
+    try {
+        return deleteGameEditorMedia(mediaSrc);
+    } catch (error) {
+        console.error('[GameEditor] Gagal menghapus media:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// Kanal lama dipertahankan agar rilis yang kembali ke versi sebelumnya masih
+// dapat membaca/simpan data pengguna, tetapi semua data baru tetap masuk userData.
+ipcMain.handle('character-editor:save-media', async (event, payload) => {
+    try {
+        return { success: true, path: saveGameEditorMedia(payload || {}) };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('character-editor:load-data', async () => {
+    try {
+        const state = readGameEditorStateFromDisk();
+        if (state && Array.isArray(state.characters)) return { success: true, data: state.characters };
+        const legacyCharacters = readLegacyCharacterData();
+        return legacyCharacters ? { success: true, data: legacyCharacters } : { success: false, error: 'File not found' };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('character-editor:delete-media', async (event, { filePath } = {}) => {
+    try {
+        return deleteGameEditorMedia(filePath);
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('character-editor:save-data', async (event, characterData) => {
+    try {
+        if (!Array.isArray(characterData)) throw new Error('Data karakter tidak valid.');
+        const state = readGameEditorStateFromDisk() || { schemaVersion: GAME_EDITOR_STATE_SCHEMA_VERSION };
+        state.characters = characterData;
+        writeGameEditorStateToDisk(state);
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+// =================== End Game Editor ================== //
 
 // =================== Akhir Menyimpan dan Memuat Pengaturan Pengguna ================== //
 

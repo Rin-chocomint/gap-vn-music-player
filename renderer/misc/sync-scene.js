@@ -1,6 +1,6 @@
 ﻿// ================================ ( Sinkronisasi Scene dari Main Process ) ================================ //
 //------------------- ( konfigurasi scene + muat asset awal ) -------------------------//
-ipcRenderer.on('configure-scene', (event, config) => {
+ipcRenderer.on('configure-scene', async (event, config) => {
     const {
         skipScene,
         songs: dynamicSongs,
@@ -63,8 +63,18 @@ ipcRenderer.on('configure-scene', (event, config) => {
         document.getElementById('main-menu')
     ].filter(screenEl => screenEl !== null);
 
-    // Panggil loadAllEditableContent DI SINI, setelah `screens` diinisialisasi/diperbarui
-    loadAllEditableContentFromLocalStorage();
+    // State editor harus selesai dimuat sebelum diterapkan. Dengan demikian data
+    // userData selalu menang atas default/fetch asynchronous saat aplikasi boot.
+    try {
+        if (typeof initializeGameEditorState === 'function') {
+            await initializeGameEditorState();
+        } else if (window.gameEditorStore?.ready) {
+            await window.gameEditorStore.ready;
+        }
+        loadAllEditableContentFromLocalStorage();
+    } catch (error) {
+        console.error('[SyncScene] Gagal memulihkan Game Editor state:', error);
+    }
 
     if (enableAdSkipperCheckbox) {
         enableAdSkipperCheckbox.addEventListener('change', (e) => {

@@ -1,254 +1,155 @@
-console.log('[Index] Script execution reached Profile CSS Editor section');
 // ================================ ( Editor CSS Profil ) ================================ //
-function initProfileCSSEditor() {
-    console.log('[Profile CSS Editor] Initializing...');
+// CSS profil ikut memakai GameEditorStore supaya tidak bergantung pada
+// localStorage renderer yang bisa berbeda antar-instalasi.
+(function initProfileCSSEditor() {
+    const LEGACY_STORAGE_KEY = 'profile-section-custom-css';
 
-    const toggleBtn = document.getElementById('toggle-profile-css-editor');
-    const editorPanel = document.getElementById('profile-css-editor-panel');
-    const cssCodeTextarea = document.getElementById('profile-css-code');
-    const applyBtn = document.getElementById('apply-profile-css');
-    const resetBtn = document.getElementById('reset-profile-css');
+    function getStore() {
+        return window.gameEditorStore || null;
+    }
 
-    console.log('[Profile CSS Editor] Elements found:', {
-        toggleBtn: !!toggleBtn,
-        editorPanel: !!editorPanel,
-        cssCodeTextarea: !!cssCodeTextarea,
-        applyBtn: !!applyBtn,
-        resetBtn: !!resetBtn
-    });
+    function setAppliedCss(customCss) {
+        const oldStyle = document.getElementById('profile-section-custom-style');
+        if (oldStyle) oldStyle.remove();
 
-    const STORAGE_KEY = 'profile-section-custom-css';
-    let customStyleElement = null;
+        if (!customCss) return;
+        const style = document.createElement('style');
+        style.id = 'profile-section-custom-style';
+        style.textContent = customCss;
+        document.head.appendChild(style);
+    }
 
-    // Fungsi untuk mengambil CSS saat ini dari profile-section
     function extractCurrentCSS() {
         const profileSection = document.getElementById('profile-section');
-        if (!profileSection) {
-            console.warn('[Profile CSS Editor] profile-section element not found');
-            return '';
-        }
+        if (!profileSection) return '';
 
         const computedStyle = window.getComputedStyle(profileSection);
-
-        // Ambil properti CSS yang penting-penting saja
         const cssProperties = [
-            'background',
-            'background-color',
-            'background-image',
-            'border',
-            'border-radius',
-            'padding',
-            'margin',
-            'width',
-            'height',
-            'display',
-            'flex-direction',
-            'align-items',
-            'justify-content',
-            'gap',
-            'box-shadow',
-            'opacity',
-            'transform',
-            'transition'
+            'background', 'background-color', 'background-image', 'border',
+            'border-radius', 'padding', 'margin', 'width', 'height', 'display',
+            'flex-direction', 'align-items', 'justify-content', 'gap',
+            'box-shadow', 'opacity', 'transform', 'transition'
         ];
 
         let cssText = '#profile-section {\n';
-        cssProperties.forEach(prop => {
-            const value = computedStyle.getPropertyValue(prop);
+        cssProperties.forEach(property => {
+            const value = computedStyle.getPropertyValue(property);
             if (value && value !== 'none' && value !== 'normal' && value !== 'rgba(0, 0, 0, 0)') {
-                cssText += `    ${prop}: ${value};\n`;
+                cssText += `    ${property}: ${value};\n`;
             }
         });
-        cssText += '}';
-
-        return cssText;
+        return `${cssText}}`;
     }
 
-    // Atur visibilitas panel (buka/tutup)
-    if (toggleBtn && editorPanel) {
-        toggleBtn.addEventListener('click', function (e) {
-            e.preventDefault();
-            e.stopPropagation();
+    async function getSavedCss() {
+        const store = getStore();
+        if (store) {
+            await store.ready;
+            if (store.has('profileCustomCss')) return store.getState().profileCustomCss;
+        }
 
-            const isHidden = editorPanel.style.display === 'none';
-
-            if (isHidden) {
-                editorPanel.style.display = 'block';
-                toggleBtn.classList.add('active');
-
-                // Automatis isi pake CSS yang ada kalau textarea-nya masih kosong
-                if (cssCodeTextarea && !cssCodeTextarea.value.trim()) {
-                    // Cek dulu apakah ada CSS yang tersimpan
-                    const savedCSS = localStorage.getItem(STORAGE_KEY);
-                    if (savedCSS) {
-                        cssCodeTextarea.value = savedCSS;
-                        console.log('[Profile CSS Editor] Loaded saved CSS');
-                    } else {
-                        // Kalau gak ada, kita ambil aja CSS computed yang sekarang lagi dipake
-                        const currentCSS = extractCurrentCSS();
-                        cssCodeTextarea.value = currentCSS;
-                        console.log('[Profile CSS Editor] Extracted current CSS from profile-section');
-                    }
-                }
-            } else {
-                editorPanel.style.display = 'none';
-                toggleBtn.classList.remove('active');
-            }
-        });
-    }
-
-    // Terapkan CSS kustom hasil editan
-    if (applyBtn && cssCodeTextarea) {
-        applyBtn.addEventListener('click', function () {
-            const customCSS = cssCodeTextarea.value.trim();
-
-            // Hapus style kustom yang lama kalau emang ada
-            if (customStyleElement) {
-                customStyleElement.remove();
-            }
-
-            // Buat elemen style baru
-            if (customCSS) {
-                customStyleElement = document.createElement('style');
-                customStyleElement.id = 'profile-section-custom-style';
-                customStyleElement.textContent = customCSS;
-                document.head.appendChild(customStyleElement);
-
-                // Simpan setting-nya ke localStorage biar gak ilang
-                try {
-                    localStorage.setItem(STORAGE_KEY, customCSS);
-                    console.log('[Profile CSS Editor] CSS diterapkan dan disimpan');
-
-                    // Kasih umpan balik visual
-                    const originalText = applyBtn.textContent;
-                    applyBtn.textContent = '✓ Applied!';
-                    applyBtn.style.background = 'linear-gradient(135deg, #059669, #047857)';
-                    setTimeout(() => {
-                        applyBtn.textContent = originalText;
-                        applyBtn.style.background = '';
-                    }, 2000);
-                } catch (error) {
-                    console.error('[Profile CSS Editor] Error saving CSS:', error);
-                    alert('Error saving CSS: ' + error.message);
-                }
-            }
-        });
-    }
-
-    // Tombol untuk memuat CSS yang sedang aktif
-    const loadCurrentBtn = document.getElementById('load-current-css');
-    if (loadCurrentBtn && cssCodeTextarea) {
-        loadCurrentBtn.addEventListener('click', function () {
-            const currentCSS = extractCurrentCSS();
-            cssCodeTextarea.value = currentCSS;
-            console.log('[Profile CSS Editor] Loaded current CSS from profile-section');
-
-            // Tampilkan umpan balik
-            const originalText = loadCurrentBtn.textContent;
-            loadCurrentBtn.textContent = '✓ Loaded!';
-            setTimeout(() => {
-                loadCurrentBtn.textContent = originalText;
-            }, 2000);
-        });
-    }
-
-    // Reset kembali ke pengaturan awal
-    if (resetBtn && cssCodeTextarea) {
-        resetBtn.addEventListener('click', function () {
-            if (confirm('Are you sure you want to reset the profile section CSS to default?')) {
-                // Kosongkan textarea
-                cssCodeTextarea.value = '';
-
-                // Hapus elemen style kustom
-                if (customStyleElement) {
-                    customStyleElement.remove();
-                    customStyleElement = null;
-                }
-
-                // Hapus data dari localStorage
-                try {
-                    localStorage.removeItem(STORAGE_KEY);
-                    console.log('[Profile CSS Editor] CSS reset to default');
-
-                    // Tampilkan umpan balik
-                    const originalText = resetBtn.textContent;
-                    resetBtn.textContent = ' di-Reset!';
-                    setTimeout(() => {
-                        resetBtn.textContent = originalText;
-                    }, 2000);
-                } catch (error) {
-                    console.error('[Profile CSS Editor] Error removing CSS:', error);
-                }
-            }
-        });
-    }
-
-    // Muat CSS yang tersimpan saat halaman dibuka
-    function loadSavedCSS() {
         try {
-            const savedCSS = localStorage.getItem(STORAGE_KEY);
-            if (savedCSS && cssCodeTextarea) {
-                cssCodeTextarea.value = savedCSS;
-
-                // Terapkan CSS yang sudah disimpan
-                customStyleElement = document.createElement('style');
-                customStyleElement.id = 'profile-section-custom-style';
-                customStyleElement.textContent = savedCSS;
-                document.head.appendChild(customStyleElement);
-
-                console.log('[Profile CSS Editor] Loaded and applied saved CSS');
-            }
+            return localStorage.getItem(LEGACY_STORAGE_KEY) ?? '';
         } catch (error) {
-            console.error('[Profile CSS Editor] Error loading saved CSS:', error);
+            console.warn('[Profile CSS Editor] Gagal membaca CSS lama:', error);
+            return '';
         }
     }
 
-    // Jalankan fungsi muat CSS saat DOM sudah siap
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', loadSavedCSS);
-    } else {
-        loadSavedCSS();
+    async function saveCss(customCss) {
+        const store = getStore();
+        if (!store) throw new Error('Penyimpanan Game Editor belum siap.');
+
+        store.update({ profileCustomCss: customCss });
+        await store.persist();
+
+        // Cadangan kompatibilitas untuk rollback ke versi lama, bukan sumber utama.
+        try {
+            if (customCss) localStorage.setItem(LEGACY_STORAGE_KEY, customCss);
+            else localStorage.removeItem(LEGACY_STORAGE_KEY);
+        } catch (error) {
+            console.warn('[Profile CSS Editor] Cadangan localStorage gagal diperbarui:', error);
+        }
     }
-}
 
-console.log('[Profile CSS Editor] Script loaded, preparing to initialize...');
+    function flashButton(button, text, color) {
+        const originalText = button.textContent;
+        const originalBackground = button.style.background;
+        button.textContent = text;
+        if (color) button.style.background = color;
+        setTimeout(() => {
+            button.textContent = originalText;
+            button.style.background = originalBackground;
+        }, 1800);
+    }
 
-// Kasih jeda dikit baru inisialisasi biar yakin DOM-nya udah beneran siap
-// Dipanggil lagi juga pas game editor dibuka biar aman
-console.log('[Profile CSS Editor] Setting up delayed initialization (500ms)');
-setTimeout(function () {
-    console.log('[Profile CSS Editor] Delayed init triggered');
-    initProfileCSSEditor();
-}, 500);
+    function bindEditor() {
+        const toggleButton = document.getElementById('toggle-profile-css-editor');
+        const editorPanel = document.getElementById('profile-css-editor-panel');
+        const cssTextarea = document.getElementById('profile-css-code');
+        const applyButton = document.getElementById('apply-profile-css');
+        const resetButton = document.getElementById('reset-profile-css');
+        const loadCurrentButton = document.getElementById('load-current-css');
 
-// Inisialisasi ulang pas tombol game editor diklik
-console.log('[Profile CSS Editor] Looking for game-editor button...');
-const gameEditorBtn = document.getElementById('game-editor');
-console.log('[Profile CSS Editor] Game editor button found:', !!gameEditorBtn);
+        if (!toggleButton || !editorPanel || !cssTextarea || !applyButton || !resetButton || !loadCurrentButton) {
+            console.warn('[Profile CSS Editor] Elemen editor CSS tidak lengkap.');
+            return;
+        }
 
-if (gameEditorBtn) {
-    console.log('[Profile CSS Editor] Attaching click listener to game-editor button');
-    gameEditorBtn.addEventListener('click', function () {
-        console.log('[Profile CSS Editor] Game editor button clicked! Re-initializing in 300ms...');
-        setTimeout(function () {
-            console.log('[Profile CSS Editor] Re-init triggered from game editor click');
-            initProfileCSSEditor();
-        }, 300);
-    });
-} else {
-    console.warn('[Profile CSS Editor] Game editor button not found!');
-}
+        getSavedCss().then(savedCss => {
+            cssTextarea.value = savedCss;
+            setAppliedCss(savedCss);
+        }).catch(error => console.error('[Profile CSS Editor] Gagal memuat CSS:', error));
 
-// Coba inisialisasi pas dokumen bener-bener udah kelar dimuat
-console.log('[Profile CSS Editor] Document readyState:', document.readyState);
-if (document.readyState === 'loading') {
-    console.log('[Profile CSS Editor] Document still loading, waiting for DOMContentLoaded...');
-    document.addEventListener('DOMContentLoaded', function () {
-        console.log('[Profile CSS Editor] DOMContentLoaded fired, initializing...');
-        initProfileCSSEditor();
-    });
-} else {
-    console.log('[Profile CSS Editor] Document already loaded');
-}
+        toggleButton.addEventListener('click', event => {
+            event.preventDefault();
+            const isHidden = editorPanel.style.display === 'none' || !editorPanel.style.display;
+            editorPanel.style.display = isHidden ? 'block' : 'none';
+            toggleButton.classList.toggle('active', isHidden);
+            if (isHidden && !cssTextarea.value.trim()) cssTextarea.value = extractCurrentCSS();
+        });
 
+        applyButton.addEventListener('click', async () => {
+            const customCss = cssTextarea.value.trim();
+            applyButton.disabled = true;
+            try {
+                await saveCss(customCss);
+                setAppliedCss(customCss);
+                flashButton(applyButton, '✓ Applied!', 'linear-gradient(135deg, #059669, #047857)');
+            } catch (error) {
+                console.error('[Profile CSS Editor] Gagal menyimpan CSS:', error);
+                alert(`Error saving CSS: ${error.message}`);
+            } finally {
+                applyButton.disabled = false;
+            }
+        });
+
+        loadCurrentButton.addEventListener('click', () => {
+            cssTextarea.value = extractCurrentCSS();
+            flashButton(loadCurrentButton, '✓ Loaded!');
+        });
+
+        resetButton.addEventListener('click', async () => {
+            if (!confirm('Are you sure you want to reset the profile section CSS to default?')) return;
+            resetButton.disabled = true;
+            try {
+                await saveCss('');
+                cssTextarea.value = '';
+                setAppliedCss('');
+                flashButton(resetButton, '✓ Reset!');
+            } catch (error) {
+                console.error('[Profile CSS Editor] Gagal mereset CSS:', error);
+                alert(`Error resetting CSS: ${error.message}`);
+            } finally {
+                resetButton.disabled = false;
+            }
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', bindEditor, { once: true });
+    } else {
+        bindEditor();
+    }
+})();
 // ================================ ( Akhir Editor CSS Profil ) ================================ //
