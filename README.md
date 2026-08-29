@@ -53,7 +53,7 @@ Ingin membuat Visual Novel sendiri atau memodifikasi engine ini?
 1.  **Clone** repositori ini.
 2.  **Setup:** Jalankan `npm install` untuk mengunduh dependensi.
 3.  **Jalankan:** `npm start`.
-4.  **Bangun paket** (Windows x64): `npm run build` — keluarannya di `dist/Gap-win32-x64/`.
+4.  **Bangun paket** (Windows x64): `npm run build` keluarannya di `dist/Gap-win32-x64/`.
 
 Peta singkat kodenya:
 
@@ -63,15 +63,15 @@ Peta singkat kodenya:
 | `vn-player/` | runtime novel: engine, tema, palet, template, extension |
 | `aset/game/` | editor novel (`vnManager`), modulnya, template hub |
 | `renderer/` | antarmuka aplikasi utama |
-| `aset/game/visual_novels/` | novel — bawaan maupun buatanmu |
+| `aset/game/visual_novels/` | novel bawaan maupun buatanmu |
 
 > **Catatan:** Folder `aset` di repositori ini hanya membawa satu novel contoh dan berkas sampel. Silakan ganti dengan aset kreatif Anda sendiri saat membuat proyek baru.
 
 ## Cara pembaruan bekerja
 Repo ini adalah sumber kebenaran updater. Aplikasi tidak dibungkus ASAR, jadi berkas di `resources/app/` memetakan satu-satu ke path di repo.
 
-- **Tier-1 — tambalan per berkas.** Updater membaca `versions.json` pada tag rilis terbaru, membandingkan hash SHA-256 tiap berkas terkelola, lalu hanya mengunduh yang berubah. Semua berkas diunduh dan diverifikasi lebih dulu; kalau satu saja gagal, seluruh pembaruan dibatalkan tanpa menulis apa pun.
-- **Tier-2 — arsip penuh.** Untuk perubahan yang tak bisa ditambal per berkas (versi Electron, dependensi, aset biner besar), aplikasi mengarahkan pengguna ke halaman rilis.
+- **Tier-1 tambalan per berkas.** Updater membaca `versions.json` pada tag rilis terbaru, membandingkan hash SHA-256 tiap berkas terkelola, lalu hanya mengunduh yang berubah. Semua berkas diunduh dan diverifikasi lebih dulu; kalau satu saja gagal, seluruh pembaruan dibatalkan tanpa menulis apa pun.
+- **Tier-2 arsip penuh.** Untuk perubahan yang tak bisa ditambal per berkas (versi Electron, dependensi, aset biner besar), aplikasi mengarahkan pengguna ke halaman rilis.
 
 `updater.excludePaths` di `versions.json` menentukan apa yang **tidak** dikelola updater. Di dalamnya termasuk seluruh karya pengguna — novel, musik, wallpaper, karakter, dan save game — sehingga pembaruan tidak pernah menimpa atau menghapus buatan mereka.
 
