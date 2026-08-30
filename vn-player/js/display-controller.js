@@ -75,18 +75,54 @@ const VNDisplay = (() => {
         changeBackground(imageSrc, withFade, mode);
     }
 
-    /** Putar background video (sembunyikan gambar) */
-    function playBackgroundVideo(videoSrc, shouldMute = true) {
+    /**
+     * Putar background video (sembunyikan gambar).
+     *
+     * Sumbernya hanya dimuat ULANG kalau memang berganti berkas. Dulu `.src`
+     * ditulis tiap kali fungsi ini dipanggil, dan menulis `.src` — walau isinya
+     * string yang sama persis — memerintahkan Chromium menjalankan media load
+     * algorithm dari nol. Padahal story-carry menempelkan `video` yang sedang
+     * aktif ke SETIAP payload entri berikutnya (vn-engine/story-carry.js, latar
+     * lengket), jadi tiap klik lanjut memanggil fungsi ini dengan src itu-itu
+     * juga: wallpaper video melompat balik ke detik 0 di setiap baris dialog.
+     * Sekarang video jalan terus melintasi entri, seperti BGM.
+     *
+     * Nama aset MENTAH disimpan di dataset — cara yang sama dipakai
+     * changeBackground untuk gambar — supaya pembandingnya tidak bergantung
+     * pada normalisasi URL absolut yang dilakukan properti `.src`.
+     *
+     * `restart: true` adalah jalan keluar eksplisit untuk kasus yang memang
+     * ingin mengulang, mis. scene cutscene yang diputar lagi dari awal padahal
+     * berkasnya sama dengan yang sedang jadi wallpaper.
+     */
+    function playBackgroundVideo(videoSrc, shouldMute = true, restart = false) {
         if (!videoSrc) return;
         dom.background.style.opacity = 0;
         dom.backgroundNext.classList.remove('visible');
-        dom.backgroundVideo.src = resolveAssetPath(videoSrc);
+
+        if (dom.backgroundVideo.dataset.src !== videoSrc) {
+            dom.backgroundVideo.dataset.src = videoSrc;
+            dom.backgroundVideo.src = resolveAssetPath(videoSrc);
+        } else if (restart && dom.backgroundVideo.readyState > 0) {
+            // Berkas yang sama cukup digulung balik; memuat ulang berarti buffer
+            // yang sudah panas dibuang percuma dan layar sempat berkedip hitam.
+            dom.backgroundVideo.currentTime = 0;
+        }
+
         dom.backgroundVideo.muted = shouldMute;
         dom.backgroundVideo.style.opacity = 1;
-        dom.backgroundVideo.play().catch(e => {
-            console.error("Gagal memutar video:", e);
-            VNState.showToast('Gagal memutar video: ' + (videoSrc.split('/').pop() || videoSrc), 'error');
-        });
+
+        // Yang sudah bermain dibiarkan: play() pada elemen yang sedang jalan
+        // memang tak menggulung waktu, tapi menyisakan promise yang gampang
+        // ditolak saat entri berganti cepat dan mengotori konsol. Yang paused
+        // (mis. baru saja tertutup background gambar) dilanjutkan dari posisi
+        // terakhirnya, bukan dari awal.
+        if (dom.backgroundVideo.paused) {
+            dom.backgroundVideo.play().catch(e => {
+                console.error("Gagal memutar video:", e);
+                VNState.showToast('Gagal memutar video: ' + (videoSrc.split('/').pop() || videoSrc), 'error');
+            });
+        }
     }
 
     // Video load error fallback
@@ -94,6 +130,9 @@ const VNDisplay = (() => {
         VNState.showToast('Video tidak dapat dimuat.', 'error');
         dom.backgroundVideo.style.opacity = 0;
         dom.background.style.opacity = 1;
+        // Dataset dikosongkan supaya percobaan berikutnya ke berkas yang sama
+        // benar-benar memuat ulang, bukan disangka "sudah terpasang, lanjut saja".
+        delete dom.backgroundVideo.dataset.src;
     });
 
     /** Tampilkan text screen overlay */
@@ -477,7 +516,7 @@ const VNDisplay = (() => {
         if (data.type === 'scene') {
             switch (data.sceneType) {
                 case 'video':
-                    playBackgroundVideo(data.video, data.videoMuted ?? true);
+                    playBackgroundVideo(data.video, data.videoMuted ?? true, data.videoRestart === true);
                     break;
                 case 'text_screen':
                     showTextScreen(data.text, data.duration);

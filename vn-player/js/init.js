@@ -73,6 +73,13 @@
         if (context.enginePath) ENGINE_DIR = context.enginePath;   // E1: shim-aware
         document.title = `${context.storyTitle} | ${context.chapter}`;
 
+        // Wallpaper video kini JALAN TERUS antar entri (lihat playBackgroundVideo
+        // di display-controller.js), dan yang menahannya adalah dataset.src pada
+        // elemen video. Batas chapter adalah potongan keras: dataset dikosongkan
+        // supaya chapter baru memulai videonya dari detik 0, bukan menyambung
+        // sisa putaran chapter sebelumnya kalau kebetulan berkasnya sama.
+        if (dom.backgroundVideo) delete dom.backgroundVideo.dataset.src;
+
         // Hub Config & Chapter Config Integration (Fase 3)
         try {
             const result = await ipcRenderer.invoke('get-hub-config', context.storyTitle);

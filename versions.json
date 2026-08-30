@@ -1,7 +1,7 @@
 {
     "app": {
-        "version": "0.0.0.10-nightly.17",
-        "build": 17,
+        "version": "0.0.0.10-nightly.18",
+        "build": 18,
         "stage": "alpha",
         "requiresFullUpdate": false,
         "minCompatibleVersion": "0.0.0.9"
@@ -41,7 +41,7 @@
         "vnPlayer": {
             "version": "0.1.5",
             "file": "vn-player/templates/vn_player_template.html",
-            "hash": "4f345cd268fbf828f7e8aa55acc98820a5d3e6e5ccdf6733121e563bc3a153ae"
+            "hash": "290a3f23c98674537d88048b4b34a41d001d898479e503b5b533b4bfaa028260"
         },
         "vnHub": {
             "version": "0.1.2",
@@ -63,7 +63,7 @@
     },
     "files": {
         "Petunjuk cara pakai aplikasi (Baca Akuu).txt": "345147ab0fbcfd2516d8069470e7b6021387024ebc22b0c84b86804fb558d24c",
-        "README.md": "63a53aa8a15d4d1a88598a11df9fc3fe713b0ea18d99dda0707a2fff687b6d8a",
+        "README.md": "92e7166c7625f00a9ef1a456d8c0ec75d0aaa0d01028d7bc9052291b2c8482fe",
         "ad-skkiper.html": "3d9930fc57788762ca8248bc7abddd2f827328c34a473e1afeeca7a25df59086",
         "aset/fonts/fonts.json": "15bf4d83687df346908b347df8cfb1988b4622a09f37ecc616bb9ee945688657",
         "aset/game/hub-templates/README.md": "686196be9f395b8c47cb24ecc5ef7773d8c19fdd97b57196a4e801465a9b967f",
@@ -268,13 +268,13 @@
         "vn-player/extensions-example/settings-hook.js": "667d55f4fbc0fa4ab6ccb67a1205b9ef88f4007c1d0bca12af1207a57285fcc1",
         "vn-player/js/audio-manager.js": "0ad619c3063abe76fe2013562901fba03041e0ca3898ab4a24b3831ccb65d3ac",
         "vn-player/js/debug-hud.js": "eae1335539dad89207ab2fc603fa2b5f1477529e7806f0778d9f760f950ab951",
-        "vn-player/js/display-controller.js": "08ebf02d1f75a04836fac0d28460b3877d448208aa6c319993c30d635710eac3",
+        "vn-player/js/display-controller.js": "88c5e89ab61485ce0f7ff1326aa448b6f0faad069d91cac63e4ac037d54465d7",
         "vn-player/js/effects.js": "02b4871e5779b611e6d04c33d4631fa8ba79ed1e5059449871a68d1dd601a2f5",
         "vn-player/js/engine-bus.js": "04a90e232eed1cc35bbacba9a5d1b83cd0239d882e932e212dab5665bb1d23fc",
         "vn-player/js/extension-loader.js": "a66c4dca405f590375b38656d7a342ff146680671461d1cd4fe6a2d81544c5eb",
         "vn-player/js/hub-bridge-commands.js": "f72453037f430a6f8cdd788dee65db991fb7df4a355181344271f26e260e5d51",
         "vn-player/js/i18n.js": "9207e862fa55dbfdee5b0e919d4872393da40a77c97a58f7da8a1297ae612019",
-        "vn-player/js/init.js": "3e70b244147e5d749afa01f26bf327df7809966b93c8774b9698866802ad30fd",
+        "vn-player/js/init.js": "f8f5c19cb0cab3c6d4ccadacf38269469c04353fde76b06f153dcf871fc65ecd",
         "vn-player/js/input-controller.js": "a2da4a90eb2a6cb786125772df774763323cfb690a2c31fc0072e266a0f52607",
         "vn-player/js/registry.js": "3223e9b416108d144c9274c3306a3e858e31042a3468cc99fef382f8263690f5",
         "vn-player/js/screen-commands.js": "725e9415d5e7fe968fec53898eb4f53cd54e86080bf39007ce605c111ef048e4",
@@ -319,7 +319,7 @@
         "vn-player/templates/library/subtitle/template.json": "548ae2bc42196d33851bfa2a05c6611bea3c322c458eb9b170256f0990a45935",
         "vn-player/templates/library/subtitle/theme.css": "e0adae216b8d3f612f847b0f8c281be6d65e75f3e2c1dc933c0f1f545f884716",
         "vn-player/templates/vn_player_shim.html": "beca9a400e49e78cc151aff68b98f60b9469f681761c8ec643ad1a3f52bf04cc",
-        "vn-player/templates/vn_player_template.html": "4f345cd268fbf828f7e8aa55acc98820a5d3e6e5ccdf6733121e563bc3a153ae",
+        "vn-player/templates/vn_player_template.html": "290a3f23c98674537d88048b4b34a41d001d898479e503b5b533b4bfaa028260",
         "vn-player/themes/dark-horror/theme.css": "c2da5df787d2fcb4e145dd328cc9860e9a3fb660ed1cead1c712de44764edb53",
         "vn-player/themes/default/theme.css": "93dc2f4bb15200d80bef4f5e52dad1fe7e3048af48a80d8806e31fc80657671f",
         "vn-player/themes/light-romance/theme.css": "19dd78c0422b51112100c927b2b7f4be31408ab74a4b14560fb62364903a5eb7",

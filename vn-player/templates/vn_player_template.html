@@ -1862,7 +1862,7 @@
 
             if (p.type === 'scene') {
                 mode = 'scene';
-                if (p.sceneType === 'video') showVideo(p.video, p.videoMuted == null ? true : p.videoMuted);
+                if (p.sceneType === 'video') showVideo(p.video, p.videoMuted == null ? true : p.videoMuted, p.videoRestart === true);
                 else if (p.sceneType === 'text_screen') showTextScreen(p.text, p.duration);
                 if (p.transitionOut && p.persistBackground !== true) pendingExit = { effect: p.transitionOut };
                 if (isAuto && p.duration && p.sceneType !== 'text_screen') scheduleAuto(parseInt(p.duration, 10));
@@ -1931,12 +1931,27 @@
             }
         }
 
-        function showVideo(src, muted) {
+        // Wallpaper video JALAN TERUS melintasi entri, seperti BGM. Sumbernya
+        // hanya dimuat ulang kalau berkasnya memang berganti: menulis `.src`
+        // dengan nilai yang sama pun memerintahkan browser memuat dari nol,
+        // dan karena bgStack menempelkan video yang aktif ke tiap entri
+        // berikutnya, dulu tiap klik lanjut menggulung video balik ke detik 0.
+        // Nama aset mentah disimpan di dataset supaya perbandingannya tidak
+        // bergantung pada URL absolut hasil normalisasi properti `.src`.
+        // `restart` = jalan keluar eksplisit lewat `videoRestart: true` di entri.
+        function showVideo(src, muted, restart) {
             if (!src) return;
-            el.bgVideo.src = VNPlayer.resolveAsset(src);
+            if (el.bgVideo.dataset.src !== src) {
+                el.bgVideo.dataset.src = src;
+                el.bgVideo.src = VNPlayer.resolveAsset(src);
+            } else if (restart && el.bgVideo.readyState > 0) {
+                el.bgVideo.currentTime = 0;
+            }
             el.bgVideo.muted = !!muted;
             el.bgVideo.style.opacity = '1';
-            el.bgVideo.play().catch(function () {});
+            // Yang sudah bermain dibiarkan; yang paused dilanjutkan dari posisi
+            // terakhir, bukan dari awal.
+            if (el.bgVideo.paused) el.bgVideo.play().catch(function () {});
         }
 
         // Transisi fade hitam/putih: tutup layar (500ms) → mid() saat tertutup →
