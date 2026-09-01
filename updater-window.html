@@ -590,8 +590,10 @@
 
         el('btn-restart').addEventListener('click', () => ipcRenderer.send('updater:relaunch'));
 
-        // Default tampilkan detail file
-        showPanel('files');
+        // Default tampilkan changelog. Yang pertama ingin diketahui sebelum
+        // memutuskan memperbarui adalah APA yang berubah, bukan berkas mana saja
+        // yang tersentuh; daftar berkas tetap sejauh satu klik lewat "Detail File".
+        showPanel('changelog');
     </script>
 </body>
 

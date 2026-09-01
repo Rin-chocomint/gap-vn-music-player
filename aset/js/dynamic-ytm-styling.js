@@ -122,8 +122,12 @@ function getBaseCss() {
     /* Prevent hidden browse/home layer from contributing scrollbars in player mode.
        YT Music keeps #content (browse) in DOM and often only toggles visibility.
        If it's scrollable, it can still show a scrollbar behind the player page.
+
+       Kekecualian 'ts-player-exiting': saat preset Game Lobby memutar animasi
+       keluar halaman browse, #content harus tetap ter-render sebentar — animasi
+       CSS tidak pernah mulai dari display:none.
     */
-    html.ts-player-page-open ytmusic-app #content[slot="content"] {
+    html.ts-player-page-open:not(.ts-player-exiting) ytmusic-app #content[slot="content"] {
         display: none !important;
     }
 
@@ -277,13 +281,23 @@ function renderGameInfoPanel() {
             if (document.documentElement.classList.contains('ts-game-lobby-uimod')) applyDuration();
         }, 1500);
 
-        // Mainkan ulang animasi slide-in tiap ganti lagu.
-        panel.classList.remove('ts-game-panel-in');
-        void panel.offsetWidth;
-        panel.classList.add('ts-game-panel-in');
+        // Mainkan ulang animasi masuk tiap ganti lagu.
+        replayGamePanelIn();
     } catch (e) {
         console.warn('[DynamicTheme] Gagal merender panel info game:', e);
     }
+}
+
+// Putar ulang animasi masuk panel info.
+// Dipakai saat ganti lagu DAN saat berpindah ke/dari player page: di sana panel
+// berpindah posisi (kiri-atas <-> terpusat di bawah artwork), jadi tanpa replay
+// ini posisinya cuma melompat begitu saja.
+function replayGamePanelIn() {
+    const panel = document.getElementById('ts-game-info-panel');
+    if (!panel) return;
+    panel.classList.remove('ts-game-panel-in');
+    void panel.offsetWidth;   // paksa reflow => animasi benar-benar diputar ulang
+    panel.classList.add('ts-game-panel-in');
 }
 
 // ============================================================================
@@ -315,6 +329,8 @@ function pickPopulatedGuide() {
     return null;
 }
 
+let tsGuideIdSeq = 0;
+
 function buildNavbarGuide() {
     if (!document.documentElement.classList.contains('ts-game-lobby-uimod')) return false;
 
@@ -336,7 +352,33 @@ function buildNavbarGuide() {
         leftContent.insertAdjacentElement('afterend', strip);
     }
 
-    // Bangun ulang dari nol supaya selalu sinkron dgn keadaan guide terkini.
+    // Tanda tangan isi strip: id unik tiap node guide ASLI, berurutan. Selama
+    // Polymer tidak men-stamp ulang guide-nya (kasus paling umum saat sekadar
+    // pindah halaman), tanda tangannya sama => strip TIDAK dibongkar-pasang.
+    //
+    // KENAPA PENTING: dulu strip selalu dibangun ulang dari nol tiap navigasi
+    // (dan tiap ganti lagu), jadi deretan ikon navbar berkedip hilang-muncul
+    // persis saat halaman sedang beranimasi — salah satu sumber rasa stutter.
+    // Kalau tanda tangannya sama, cukup segarkan penanda entri aktifnya.
+    const isActive = (o) => o.hasAttribute('active') || o.getAttribute('aria-current') === 'true';
+    const sig = [];
+    items.forEach((o) => {
+        if (!o.__tsGuideId) o.__tsGuideId = ++tsGuideIdSeq;
+        sig.push(o.__tsGuideId);
+    });
+    const sigStr = sig.join(',');
+
+    if (strip.dataset.tsSig === sigStr && strip.children.length === items.length) {
+        items.forEach((orig, i) => {
+            const btn = strip.children[i];
+            if (btn) btn.classList.toggle('ts-game-nav-active', isActive(orig));
+        });
+        document.documentElement.classList.add('ts-game-guide-relocated');
+        return true;
+    }
+
+    // Isi guide benar-benar berubah => baru bangun ulang dari nol.
+    strip.dataset.tsSig = sigStr;
     strip.textContent = '';
 
     items.forEach((orig) => {
@@ -350,9 +392,7 @@ function buildNavbarGuide() {
         btn.type = 'button';
         btn.className = 'ts-game-nav-btn';
         if (title) { btn.title = title; btn.setAttribute('aria-label', title); }
-        if (orig.hasAttribute('active') || orig.getAttribute('aria-current') === 'true') {
-            btn.classList.add('ts-game-nav-active');
-        }
+        if (isActive(orig)) btn.classList.add('ts-game-nav-active');
 
         // Ikon = clone SVG dari entri asli HANYA untuk yang punya ikon khas:
         //   - .guide-icon          -> ikon nav (Beranda/Eksplorasi/Koleksi/Upgrade)
@@ -402,15 +442,31 @@ function relocateGuideButtonsToNavbar(retries = 12) {
             guideMirrorNavHandler = () => {
                 if (!document.documentElement.classList.contains('ts-game-lobby-uimod')) return;
                 // Beri jeda agar YTM sempat me-render guide & header halaman baru.
-                setTimeout(() => { buildNavbarGuide(); replayTrapezoidIfReused(); refreshGameCarouselCards(); updateGameCarouselCentered(); }, 250);
-                setTimeout(() => { buildNavbarGuide(); replayTrapezoidIfReused(); refreshGameCarouselCards(); updateGameCarouselCentered(); }, 900);
+                // Header trapesium hanya boleh DIPERIKSA SEKALI per navigasi:
+                // dulu kedua pass memanggilnya, dan pass ke-2 (900ms) melihat
+                // header yang sama lalu memutar ULANG animasinya di tengah jalan
+                // => banner channel terlihat "masuk, kedip, masuk lagi".
+                let trapezoidDone = false;
+                const pass = () => {
+                    buildNavbarGuide();
+                    if (!trapezoidDone) trapezoidDone = replayTrapezoidIfReused();
+                    refreshGameCarouselCards();
+                    updateGameCarouselCentered();
+                };
+                setTimeout(pass, 250);
+                setTimeout(pass, 900);
             };
             document.addEventListener('yt-navigate-finish', guideMirrorNavHandler);
         }
 
         // Pantau guide untuk perubahan (re-stamp) di luar event navigasi.
         if (!guideMirrorObserver) {
-            const miniHost = document.querySelector('#mini-guide') || document.querySelector('ytmusic-app');
+            // HANYA pantau rel mini-guide. Fallback lama ke <ytmusic-app> berarti
+            // memantau childList + attributes SELURUH aplikasi: callback-nya banjir
+            // tiap Polymer men-stamp halaman baru, membebani main-thread persis
+            // saat animasi transisi berjalan. Kalau rel-nya belum ada, biarkan —
+            // relocateGuideButtonsToNavbar() dipanggil lagi tiap ganti lagu.
+            const miniHost = document.querySelector('#mini-guide');
             if (miniHost) {
                 let pending = null;
                 guideMirrorObserver = new MutationObserver(() => {
@@ -460,13 +516,16 @@ function restoreGuideButtons() {
 // ----------------------------------------------------------------------------
 let lastTrapezoidHeader = null;
 
+// Mengembalikan true kalau header channel-nya SUDAH ada (berarti urusan
+// trapesium untuk navigasi ini selesai), false kalau belum ter-render — pemanggil
+// boleh mencoba lagi di pass berikutnya.
 function replayTrapezoidIfReused() {
-    if (!document.documentElement.classList.contains('ts-game-lobby-uimod')) return;
+    if (!document.documentElement.classList.contains('ts-game-lobby-uimod')) return false;
     const header = document.querySelector(
         'ytmusic-browse-response ytmusic-immersive-header-renderer,' +
         'ytmusic-browse-response ytmusic-visual-header-renderer'
     );
-    if (!header) { lastTrapezoidHeader = null; return; }
+    if (!header) { lastTrapezoidHeader = null; return false; }
 
     if (header === lastTrapezoidHeader) {
         // Dipakai-ulang => putar ulang animasi CSS-nya.
@@ -477,6 +536,7 @@ function replayTrapezoidIfReused() {
         } catch (_) { }
     }
     lastTrapezoidHeader = header;
+    return true;
 }
 
 // ============================================================================
@@ -496,6 +556,9 @@ let gameCarouselScroller = null;
 let gameCarouselLastRefresh = 0;
 let gameCarouselScrollHandler = null;
 let gameCarouselClickHandler = null;
+let gameCarouselRaf = 0;
+let gameCarouselPendingCard = null;   // kartu yang baru saja "diluncurkan ke tengah"
+let gameCarouselPendingAt = 0;
 
 function isHomeBrowse(br) {
     if (!br) return false;
@@ -528,6 +591,11 @@ function refreshGameCarouselCards() {
 // Busur (scaleX) sudah ditangani sepenuhnya oleh CSS animation-timeline: view().
 function updateGameCarouselCentered() {
     if (!gameCarouselActive || !gameCarouselCards.length) return;
+    // Saat halaman sedang MUNDUR (kartu barusan dipilih, animasi keluar jalan),
+    // jangan pindahkan sorotan. Kartu yang baru diklik harus tetap menyala sampai
+    // halamannya benar-benar berganti — terutama kartu yang tak bisa ditengahkan,
+    // yang menurut hitungan pusat memang bukan "kartu tengah".
+    if (document.documentElement.classList.contains('ts-page-out')) return;
 
     const centerY = gameCarouselCenterY();
     const vh = window.innerHeight;
@@ -570,6 +638,60 @@ function gameCarouselCenterY() {
     return window.innerHeight * 0.46;
 }
 
+// Bisakah kartu ini benar-benar berakhir sebagai kartu-tengah?
+//
+// MASALAH: klik pada kartu yang belum di tengah selalu DICEGAT dan diganti jadi
+// "luncurkan ke tengah dulu". Padahal kartu paling atas / paling bawah — juga
+// semua kartu kalau daftarnya lebih pendek dari setengah layar — TIDAK PERNAH
+// bisa sampai ke tengah, karena scroll-nya mentok di batas atas/bawah. Akibatnya
+// lagu-lagu itu jadi mustahil diputar: diklik berkali-kali pun tak terjadi apa-apa.
+//
+// Di sini kita hitung dulu: kalau kartu ini diluncurkan ke tengah lalu scroll-nya
+// dijepit ke rentang yang sah, apakah dia yang PALING dekat ke pusat? Kalau iya,
+// peluncuran itu berguna. Kalau tidak, memaksa "ke tengah" cuma jalan buntu —
+// pemanggil boleh langsung memutarnya.
+function gameCardCanBeCentered(card) {
+    const scroller = (gameCarouselScroller && gameCarouselScroller.isConnected)
+        ? gameCarouselScroller
+        : (document.scrollingElement || document.documentElement);
+    if (!scroller) return true;
+
+    const max = scroller.scrollHeight - scroller.clientHeight;
+    if (max <= 0) return false;            // tak ada ruang scroll sama sekali
+
+    const r = card.getBoundingClientRect();
+    if (!r.height) return true;            // belum ter-layout; jangan menghalangi
+
+    const centerY = gameCarouselCenterY();
+    // scrollTop yang DIBUTUHKAN agar pusat kartu tepat di pusat acuan.
+    const needed = scroller.scrollTop + (r.top + r.height / 2) - centerY;
+    if (needed >= 0 && needed <= max) return true;   // masih dalam jangkauan
+
+    // Di luar jangkauan => scroll akan mentok. Cek siapa yang menang di posisi
+    // mentok itu; kalau bukan kartu ini, dia memang tak akan pernah jadi
+    // kartu-tengah berapa kali pun diklik.
+    const shift = Math.min(Math.max(needed, 0), max) - scroller.scrollTop;
+    const myDist = Math.abs((r.top + r.height / 2) - shift - centerY);
+    for (const other of gameCarouselCards) {
+        if (other === card || !other.isConnected) continue;
+        const or = other.getBoundingClientRect();
+        if (!or.height) continue;
+        if (Math.abs((or.top + or.height / 2) - shift - centerY) < myDist) return false;
+    }
+    return true;
+}
+
+// Pindahkan sorotan "kartu terpilih" ke kartu tertentu, apa pun kata perhitungan
+// pusat. Dipakai saat kartu yang tak bisa ditengahkan langsung diputar, supaya
+// umpan baliknya tetap jelas: yang menyala persis yang diklik.
+function markGameCardCentered(card) {
+    if (gameCarouselCenterCard && gameCarouselCenterCard !== card) {
+        gameCarouselCenterCard.classList.remove('ts-game-card-centered');
+    }
+    card.classList.add('ts-game-card-centered');
+    gameCarouselCenterCard = card;
+}
+
 function onGameCarouselClickCapture(e) {
     if (!gameCarouselActive) return;
     const card = e.target.closest && e.target.closest('ytmusic-two-row-item-renderer');
@@ -579,9 +701,28 @@ function onGameCarouselClickCapture(e) {
         if (gameCarouselCards.indexOf(card) === -1) return;
     }
 
-    if (card === getCenterHomeCard()) {
-        // Jika sudah ditandai sedang navigasi, biarkan event lolos agar YTM berpindah
-        if (card.__tsNavigating) return;
+    // Klik yang KITA teruskan sendiri (a.click() di bawah) MASUK LAGI ke handler
+    // ini, karena listener-nya dipasang di fase capture pada document. Kartu yang
+    // sedang dalam proses navigasi WAJIB dibiarkan lolos, apa pun hasil hitungan
+    // "kartu tengah" saat itu.
+    //
+    // Dulu penjaga ini ada DI DALAM cabang "putar". Akibatnya, kalau kartunya
+    // bukan kartu-tengah (mis. dipilih lewat klik kedua atau karena tak bisa
+    // ditengahkan), klik-terusan kita sendiri jatuh ke cabang "luncurkan ke
+    // tengah" dan ditelan preventDefault di sana => lagunya tidak jadi diputar.
+    if (card.__tsNavigating) return;
+
+    // Kartu boleh LANGSUNG diputar kalau salah satu terpenuhi:
+    //   1. memang sudah di tengah (perilaku song-select seperti biasa);
+    //   2. tak mungkin sampai ke tengah (paling atas/bawah, atau daftarnya lebih
+    //      pendek dari setengah layar) — dulu kartu begini mustahil dipilih;
+    //   3. ini klik kedua pada kartu yang sama dalam 1,2 detik — jaring pengaman
+    //      terakhir, supaya tak ada lagu yang benar-benar tak bisa diputar
+    //      seandainya ada kasus geometri yang luput dari perhitungan di atas.
+    const isRepeatClick = card === gameCarouselPendingCard &&
+        Date.now() - gameCarouselPendingAt < 1200;
+
+    if (card === getCenterHomeCard() || isRepeatClick || !gameCardCanBeCentered(card)) {
         const a = card.querySelector('a');
         if (!a) return;
 
@@ -590,25 +731,33 @@ function onGameCarouselClickCapture(e) {
         e.stopPropagation();
         if (e.stopImmediatePropagation) e.stopImmediatePropagation();
 
-        document.documentElement.classList.add('ts-game-animating-out');
+        gameCarouselPendingCard = null;
+        markGameCardCentered(card);
+
+        // Mundurkan halaman lewat mesin transisi bersama (bukan class ad-hoc),
+        // supaya klik kartu, klik tombol navbar, dan tombol back memakai jalur
+        // yang sama persis — termasuk watchdog-nya kalau navigasinya gagal.
+        tsPageOut();
         card.__tsNavigating = true;
 
-        // Beri jeda 400ms (sebagian besar animasi 0.6s sudah selesai) sebelum pindah beneran
+        // Klik diteruskan saat animasi keluar sudah lewat separuh: YTM mulai
+        // memuat halaman baru sementara animasinya masih berjalan, jadi tidak ada
+        // jeda mati yang terasa seperti nge-lag.
         setTimeout(() => {
             a.click();
-            // Cleanup state setelah pindah
-            setTimeout(() => {
-                card.__tsNavigating = false;
-                document.documentElement.classList.remove('ts-game-animating-out');
-            }, 1000);
-        }, 120);
+            setTimeout(() => { card.__tsNavigating = false; }, 800);
+        }, Math.round(TS_PAGE_OUT_MS * 0.55));
         return;
     }
 
-    // Belum di tengah => batalkan aksi YTM, luncurkan kartu ke tengah dulu.
+    // Belum di tengah TAPI masih bisa ditengahkan => batalkan aksi YTM,
+    // luncurkan kartu ke tengah dulu. Kartunya dicatat supaya klik berikutnya
+    // pasti diteruskan walau peluncurannya meleset.
     e.preventDefault();
     e.stopPropagation();
     if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+    gameCarouselPendingCard = card;
+    gameCarouselPendingAt = Date.now();
     try { card.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
     catch (_) { try { card.scrollIntoView(); } catch (__) { } }
     // Perbarui centered card setelah scroll settle
@@ -623,10 +772,20 @@ function initGameCarousel() {
 
     // Scroll handler ringan: hanya refresh daftar kartu & deteksi centered card.
     // Busur (scaleX) sepenuhnya dikerjakan CSS animation-timeline: view().
+    //
+    // Dikumpulkan ke SATU rAF: event scroll bisa datang berkali-kali per frame,
+    // dan tiap panggilan updateGameCarouselCentered() membaca getBoundingClientRect
+    // semua kartu (= forced layout). Selama animasi transisi halaman berjalan,
+    // pekerjaan ini dilewati sama sekali supaya main-thread tidak direbut.
     gameCarouselScrollHandler = () => {
-        const now = Date.now();
-        if (now - gameCarouselLastRefresh > 600) { gameCarouselLastRefresh = now; refreshGameCarouselCards(); }
-        updateGameCarouselCentered();
+        if (gameCarouselRaf) return;
+        gameCarouselRaf = requestAnimationFrame(() => {
+            gameCarouselRaf = 0;
+            if (!gameCarouselActive || tsPageInFlight) return;
+            const now = Date.now();
+            if (now - gameCarouselLastRefresh > 600) { gameCarouselLastRefresh = now; refreshGameCarouselCards(); }
+            updateGameCarouselCentered();
+        });
     };
     document.addEventListener('scroll', gameCarouselScrollHandler, true);
 
@@ -646,6 +805,8 @@ function teardownGameCarousel() {
     gameCarouselActive = false;
     if (gameCarouselScrollHandler) document.removeEventListener('scroll', gameCarouselScrollHandler, true);
     if (gameCarouselClickHandler) document.removeEventListener('click', gameCarouselClickHandler, true);
+    if (gameCarouselRaf) { cancelAnimationFrame(gameCarouselRaf); gameCarouselRaf = 0; }
+    gameCarouselPendingCard = null;
     gameCarouselCards.forEach((c) => {
         c.classList.remove('ts-game-card-centered');
     });
@@ -653,6 +814,261 @@ function teardownGameCarousel() {
     gameCarouselCenterCard = null;
     gameCarouselScroller = null;
     gameCarouselScrollHandler = gameCarouselClickHandler = null;
+}
+
+// ============================================================================
+// 2e. MESIN TRANSISI ANTAR-HALAMAN (UI MOD "GAME LOBBY")
+//
+// MASALAH LAMA
+//   Perpindahan halaman hanya punya SATU animasi: <ul id="items"> carousel home
+//   digeser keluar/masuk, dan itu pun cuma dipicu saat player page ditutup.
+//   Akibatnya:
+//     1. Jenis halaman lain (channel/artis, playlist/album, eksplorasi, koleksi,
+//        hasil pencarian) berganti TANPA animasi apa pun => terasa "potong
+//        mendadak" alias stuttering.
+//     2. Bahkan di home animasi "in"-nya SERING TIDAK JALAN, karena:
+//        - <ul#items> baru di-stamp Polymer SETELAH class 'ts-game-animating-in'
+//          keburu dilepas (600 ms), jadi tak ada elemen yang memainkannya;
+//        - saat player page terbuka #content di-display:none, sedangkan animasi
+//          maupun transisi tidak pernah mulai dari kondisi display:none;
+//        - onSongChange() memanggil applyDynamicTheme() yang MENIMPA ULANG isi
+//          <style> mode ini. Mengganti teks stylesheet berarti seluruh rule
+//          dicabut lalu dipasang lagi => SEMUA animasi CSS yang sedang berjalan
+//          ikut ter-reset. Dan lagu memang berganti tepat pada detik kita
+//          berpindah halaman lewat kartu. (Diatasi di applyDynamicTheme: teks
+//          stylesheet sekarang hanya ditulis kalau isinya benar-benar berubah.)
+//
+// PENDEKATAN BARU
+//   Yang dianimasikan adalah CANGKANG HALAMAN (ytmusic-browse-response /
+//   ytmusic-search-page), bukan node daftar di dalamnya. Cangkang selalu ada
+//   selama halaman tampil dan tidak dibongkar-pasang Polymer sesering isinya,
+//   jadi animasinya tak pernah "kelewat".
+//
+//   State-nya ditaruh di <html> supaya elemen yang baru LAHIR di tengah jendela
+//   animasi tetap ikut memainkannya sejak frame pertama:
+//     <html data-ts-page="home|channel|playlist|browse|search|player">
+//     .ts-page-out   -> halaman lama mundur
+//     .ts-page-in    -> halaman baru masuk (arah menyesuaikan data-ts-page)
+//     .ts-page-hold  -> ditahan transparan; dipakai selama player page terbuka
+//                       supaya saat player ditutup konten tidak sempat berkedip
+//                       muncul dulu baru dianimasikan.
+//
+//   Pemicu: 'yt-navigate-start' (out) dan 'yt-navigate-finish' (in), ditambah
+//   dua jaring pengaman: watchdog (konten TIDAK BOLEH tertinggal transparan
+//   kalau navigasi batal/gagal) dan observer #content (menangkap perpindahan
+//   yang tidak memancarkan event, mis. tombol back/forward).
+// ============================================================================
+
+// Durasi di sini WAJIB sama dengan --ts-page-out-dur / --ts-page-in-dur di CSS.
+const TS_PAGE_OUT_MS = 240;
+const TS_PAGE_IN_MS = 520;
+const TS_PAGE_STAGGER_TAIL_MS = 320;   // ekor delay stagger blok terakhir
+
+let tsPageEngineActive = false;
+let tsPageCurrentType = '';
+let tsPageOutWatchdog = null;
+let tsPageInTimer = null;
+let tsPageLastIn = 0;
+let tsPageInFlight = false;            // true selama out/in sedang berjalan
+let tsPageContentObserver = null;
+let tsPageObserverDebounce = null;
+let tsPageNavStartHandler = null;
+let tsPageNavFinishHandler = null;
+
+function isGameLobbyMode() {
+    return document.documentElement.classList.contains('ts-game-lobby-uimod');
+}
+
+// Jenis halaman BROWSE (tanpa memperhitungkan player page yang menimpanya).
+// Dipakai animasi "out": saat player page dibuka atributnya sudah menyala,
+// padahal yang sedang mundur adalah halaman browse di belakangnya.
+function detectGameBrowseType() {
+    const path = (location && location.pathname) || '';
+    if (path.indexOf('/search') === 0) return 'search';
+
+    const br = document.querySelector('ytmusic-app #content ytmusic-browse-response') ||
+        document.querySelector('ytmusic-browse-response');
+    if (!br) return 'browse';
+
+    // Pembeda yang sama dipakai HOME_SCOPE di CSS: halaman channel/artis
+    // dikenali dari header khasnya, bukan dari ada/tidaknya page-type.
+    if (br.querySelector('ytmusic-immersive-header-renderer') ||
+        br.querySelector('ytmusic-visual-header-renderer')) return 'channel';
+    if (br.querySelector('ytmusic-responsive-header-renderer')) return 'playlist';
+    if (isHomeBrowse(br)) return 'home';
+    return 'browse';
+}
+
+function detectGamePageType() {
+    if (document.querySelector('ytmusic-player-page[player-page-open]') ||
+        document.querySelector('ytmusic-app-layout[player-page-open]')) return 'player';
+    return detectGameBrowseType();
+}
+
+function tsApplyPageType(type) {
+    const root = document.documentElement;
+    if (root.getAttribute('data-ts-page') !== type) root.setAttribute('data-ts-page', type);
+    tsPageCurrentType = type;
+}
+
+// Mundurkan halaman yang sedang tampil. Idempoten: dipanggil dua kali (mis.
+// klik kartu + yt-navigate-start) tidak akan memutar ulang animasinya.
+function tsPageOut() {
+    if (!isGameLobbyMode()) return;
+    const root = document.documentElement;
+    if (root.classList.contains('ts-page-out')) return;
+
+    tsApplyPageType(detectGameBrowseType());   // arah keluar = jenis halaman LAMA
+    root.classList.remove('ts-page-in', 'ts-page-hold');
+    root.classList.add('ts-page-out');
+    tsPageInFlight = true;
+
+    clearTimeout(tsPageOutWatchdog);
+    // PENGAMAN: kalau navigasinya batal (klik entri yang sedang aktif, request
+    // gagal, dsb) konten tidak boleh tertinggal transparan selamanya.
+    tsPageOutWatchdog = setTimeout(() => tsPageIn(), 1100);
+}
+
+// Masukkan halaman yang aktif sekarang. Selalu aman dipanggil: fungsinya juga
+// yang membereskan sisa state 'out'/'hold'.
+function tsPageIn() {
+    if (!isGameLobbyMode()) return;
+    const root = document.documentElement;
+
+    clearTimeout(tsPageOutWatchdog);
+    tsPageOutWatchdog = null;
+
+    const type = detectGamePageType();
+    tsApplyPageType(type);
+    tsPageLastIn = Date.now();
+
+    if (type === 'player') {
+        // Player page punya animasi buka/tutupnya sendiri dari YTM. Cangkang
+        // browse di belakangnya cukup DITAHAN transparan, bukan dilepas: dengan
+        // begitu saat player ditutup nanti ia sudah siap masuk dan tidak sempat
+        // berkedip muncul penuh satu frame dulu.
+        clearTimeout(tsPageInTimer);
+        root.classList.remove('ts-page-out', 'ts-page-in');
+        root.classList.add('ts-page-hold');
+        tsPageInFlight = false;
+        return;
+    }
+
+    root.classList.remove('ts-page-out', 'ts-page-in', 'ts-page-hold');
+
+    // Reflow sekali supaya browser "melupakan" animasi sebelumnya => ts-page-in
+    // benar-benar diputar ulang walau class-nya baru saja dilepas di baris atas.
+    void root.offsetWidth;
+
+    root.classList.add('ts-page-in');
+    tsPageInFlight = true;
+
+    clearTimeout(tsPageInTimer);
+    tsPageInTimer = setTimeout(() => {
+        root.classList.remove('ts-page-in');
+        tsPageInFlight = false;
+    }, TS_PAGE_IN_MS + TS_PAGE_STAGGER_TAIL_MS);
+}
+
+// Tunggu dua frame supaya Polymer sempat menaruh & me-layout cangkang halaman
+// baru, baru mainkan animasi masuk. Elemen yang menyusul lahir setelah itu tetap
+// kebagian, karena class-nya masih menempel di <html> selama jendela animasi.
+function tsSchedulePageIn(delayMs) {
+    if (!isGameLobbyMode()) return;
+    const run = () => requestAnimationFrame(() => requestAnimationFrame(() => tsPageIn()));
+    if (delayMs > 0) setTimeout(run, delayMs); else run();
+}
+
+// Tahan konten transparan tanpa animasi. Dipakai saat player page terbuka:
+// begitu player ditutup konten sudah "siap masuk", tidak berkedip muncul penuh
+// satu frame lalu baru dianimasikan.
+function tsPageHold() {
+    if (!isGameLobbyMode()) return;
+    const root = document.documentElement;
+    clearTimeout(tsPageOutWatchdog);
+    tsPageOutWatchdog = null;
+    clearTimeout(tsPageInTimer);
+    root.classList.remove('ts-page-out', 'ts-page-in');
+    root.classList.add('ts-page-hold');
+    tsPageInFlight = false;
+}
+
+function initGamePageTransitions() {
+    if (tsPageEngineActive) return;
+    tsPageEngineActive = true;
+
+    tsApplyPageType(detectGamePageType());
+
+    tsPageNavStartHandler = () => { if (isGameLobbyMode()) tsPageOut(); };
+    tsPageNavFinishHandler = () => { if (isGameLobbyMode()) tsSchedulePageIn(); };
+    document.addEventListener('yt-navigate-start', tsPageNavStartHandler, true);
+    document.addEventListener('yt-navigate-finish', tsPageNavFinishHandler, true);
+
+    attachGamePageContentObserver();
+
+    // Sekali di awal: halaman yang sedang terbuka ikut diperkenalkan dengan
+    // animasi masuk, biar pengaktifan preset terasa disengaja.
+    tsSchedulePageIn();
+}
+
+// Jaring pengaman: sebagian perpindahan (back/forward, redirect internal) tidak
+// selalu memancarkan yt-navigate-finish. Cangkang halaman adalah anak LANGSUNG
+// #content, jadi observer childList TANPA subtree sudah cukup — sengaja tidak
+// memakai subtree supaya callback-nya tidak membanjir saat Polymer men-stamp
+// ribuan node, karena banjir callback itu sendiri sumber stutter.
+function attachGamePageContentObserver(retries = 10) {
+    if (tsPageContentObserver || !tsPageEngineActive) return;
+
+    const contentHost = document.querySelector('ytmusic-app #content[slot="content"]') ||
+        document.querySelector('ytmusic-app #content');
+    if (!contentHost) {
+        if (retries > 0) setTimeout(() => attachGamePageContentObserver(retries - 1), 800);
+        return;
+    }
+
+    tsPageContentObserver = new MutationObserver(() => {
+        if (!isGameLobbyMode()) return;
+        clearTimeout(tsPageObserverDebounce);
+        tsPageObserverDebounce = setTimeout(() => {
+            const root = document.documentElement;
+            if (root.classList.contains('ts-page-hold')) return;   // player page terbuka
+            if (root.classList.contains('ts-page-out')) { tsPageIn(); return; }
+            // Jangan memutar ulang animasi yang baru saja jalan (mutasi datang
+            // bergelombang saat konten lazy-load), dan jangan bereaksi kalau
+            // jenis halamannya memang tidak berpindah.
+            if (Date.now() - tsPageLastIn < 500) return;
+            if (detectGamePageType() === tsPageCurrentType) return;
+            tsPageIn();
+        }, 90);
+    });
+    tsPageContentObserver.observe(contentHost, { childList: true });
+}
+
+function teardownGamePageTransitions() {
+    const root = document.documentElement;
+    clearTimeout(tsPageOutWatchdog);
+    clearTimeout(tsPageInTimer);
+    clearTimeout(tsPageObserverDebounce);
+    tsPageOutWatchdog = tsPageInTimer = tsPageObserverDebounce = null;
+
+    if (tsPageNavStartHandler) {
+        document.removeEventListener('yt-navigate-start', tsPageNavStartHandler, true);
+        tsPageNavStartHandler = null;
+    }
+    if (tsPageNavFinishHandler) {
+        document.removeEventListener('yt-navigate-finish', tsPageNavFinishHandler, true);
+        tsPageNavFinishHandler = null;
+    }
+    if (tsPageContentObserver) {
+        try { tsPageContentObserver.disconnect(); } catch (_) { }
+        tsPageContentObserver = null;
+    }
+
+    root.classList.remove('ts-page-out', 'ts-page-in', 'ts-page-hold', 'ts-player-exiting');
+    root.removeAttribute('data-ts-page');
+    tsPageEngineActive = false;
+    tsPageInFlight = false;
+    tsPageCurrentType = '';
 }
 
 // ============================================================================
@@ -707,6 +1123,9 @@ function applyDynamicTheme(palette) {
         restoreGuideButtons();
         // Matikan efek busur carousel + bersihkan lebar/inline-nya.
         teardownGameCarousel();
+        // Lepas mesin transisi + semua class state-nya (jangan sampai konten
+        // tertinggal transparan di mode lain).
+        teardownGamePageTransitions();
         unset('--ts-game-artwork');
     }
 
@@ -1647,8 +2066,181 @@ function applyDynamicTheme(palette) {
                 document.head.appendChild(gameStyle);
             }
 
-            gameStyle.textContent = `
+            const gameCss = `
                 /* ===== GAME LOBBY (UI MOD) ===== */
+
+                /* ============================================================
+                   TRANSISI ANTAR-JENIS-HALAMAN
+                   (pengendalinya: "MESIN TRANSISI ANTAR-HALAMAN" di bagian 2e JS)
+
+                   Yang dianimasikan adalah WADAH DAFTAR halaman — <ytmusic-carousel>
+                   di home, '#contents' milik section-list di halaman lain — bukan
+                   tiap kartu satu per satu. Wadah ini bertahan selama halaman
+                   tampil, jadi animasinya tak pernah "kelewat" walau Polymer
+                   men-stamp ulang isinya kapan saja. Rinciannya di blok
+                   "LAPISAN MANA YANG BOLEH BERGERAK" di bawah.
+
+                   Arah gerak menyesuaikan data-ts-page supaya tiap jenis halaman
+                   masuk dari sisi yang masuk akal dengan tata letaknya sendiri:
+                     home     -> horizontal (daftar beatmap memang menepi ke kanan)
+                     channel  -> dari kiri  (balok trapesium menggantung di kiri)
+                     lainnya  -> naik lembut (playlist/album/eksplorasi/pencarian)
+
+                   CATATAN PENTING soal home: kartu home memakai scroll-driven
+                   animation (animation-timeline: view(block)) yang mengukur posisi
+                   VERTIKAL kartu terhadap viewport. Menggeser sumbu Y saat transisi
+                   akan membuat busur scaleX-nya berkedut tiap frame. Karena itu
+                   home HANYA digeser horizontal — aman, sekaligus mempertahankan
+                   gerak "daftar menepi ke kanan" yang sudah jadi ciri presetnya.
+                   ============================================================ */
+                :root {
+                    --ts-page-out-dur: 240ms;
+                    --ts-page-in-dur: 520ms;
+                    --ts-page-item-dur: 460ms;
+                    --ts-page-ease-out: cubic-bezier(0.4, 0, 1, 1);
+                    --ts-page-ease-in: cubic-bezier(0.22, 1, 0.36, 1);
+                }
+
+                @keyframes ts-page-out-x {
+                    from { opacity: 1; transform: translate3d(0, 0, 0); }
+                    to   { opacity: 0; transform: translate3d(7%, 0, 0); }
+                }
+                @keyframes ts-page-in-x {
+                    from { opacity: 0; transform: translate3d(7%, 0, 0); }
+                    to   { opacity: 1; transform: translate3d(0, 0, 0); }
+                }
+                @keyframes ts-page-out-left {
+                    from { opacity: 1; transform: translate3d(0, 0, 0); }
+                    to   { opacity: 0; transform: translate3d(-3.5%, 0, 0); }
+                }
+                @keyframes ts-page-in-left {
+                    from { opacity: 0; transform: translate3d(-3.5%, 0, 0); }
+                    to   { opacity: 1; transform: translate3d(0, 0, 0); }
+                }
+                @keyframes ts-page-out-y {
+                    from { opacity: 1; transform: translate3d(0, 0, 0); }
+                    to   { opacity: 0; transform: translate3d(0, -16px, 0); }
+                }
+                @keyframes ts-page-in-y {
+                    from { opacity: 0; transform: translate3d(0, 20px, 0); }
+                    to   { opacity: 1; transform: translate3d(0, 0, 0); }
+                }
+                /* Stagger blok isi: offsetnya kecil karena menumpang di atas
+                   gerak cangkangnya (kalau sama besar, jaraknya jadi dobel). */
+                @keyframes ts-page-item-x {
+                    from { opacity: 0; transform: translate3d(4%, 0, 0); }
+                    to   { opacity: 1; transform: translate3d(0, 0, 0); }
+                }
+                @keyframes ts-page-item-y {
+                    from { opacity: 0; transform: translate3d(0, 16px, 0); }
+                    to   { opacity: 1; transform: translate3d(0, 0, 0); }
+                }
+
+                /* Geser horizontal tidak boleh memunculkan scrollbar mendatar.
+                   Dipilih 'clip' (bukan 'hidden') karena tidak membuat kotak
+                   scroll baru dan tidak memaksa overflow-y jadi auto; margin
+                   klipnya menyisakan ruang untuk glow/bayangan hover kartu. */
+                html.ts-game-lobby-uimod ytmusic-app #content[slot="content"] {
+                    overflow-x: clip;
+                    overflow-clip-margin: 40px;
+                }
+
+                /* ============================================================
+                   LAPISAN MANA YANG BOLEH BERGERAK
+
+                   Bukan seluruh cangkang halaman. Aturannya per jenis halaman:
+
+                     home   -> HANYA <ytmusic-carousel> (tumpukan kartu beatmap).
+                               Judul shelf, tombol "Selengkapnya", baris chip,
+                               navbar, dan playerbar tetap diam.
+                     lainnya-> '#contents' milik <ytmusic-section-list-renderer>.
+
+                   Kenapa '#contents', bukan cangkangnya? Karena '#header' — baris
+                   chip sticky "Senang / Bersantai / Tidur / ..." beserta garis
+                   pelanginya — adalah SAUDARA dari '#contents', bukan anaknya.
+                   Dengan menaruh animasi di '#contents', baris chip itu otomatis
+                   TIDAK PERNAH ikut bergerak atau memudar.
+
+                   Jadi aturan mainnya gampang diingat, dan gampang ditambahi:
+                   apa pun yang berada DI LUAR '#contents' bersifat tetap —
+                   termasuk balok trapesium banner channel yang punya animasi
+                   masuknya sendiri.
+                   ============================================================ */
+
+                /* --- HOME: keluar/masuk --- */
+                html.ts-game-lobby-uimod[data-ts-page="home"].ts-page-out ytmusic-browse-response ytmusic-carousel {
+                    animation: ts-page-out-x var(--ts-page-out-dur) var(--ts-page-ease-out) both !important;
+                    pointer-events: none !important;
+                    will-change: transform, opacity;
+                }
+                html.ts-game-lobby-uimod[data-ts-page="home"].ts-page-in ytmusic-browse-response ytmusic-carousel {
+                    animation: ts-page-in-x var(--ts-page-in-dur) var(--ts-page-ease-in) both !important;
+                    will-change: transform, opacity;
+                }
+                /* Stagger antar-shelf: dihitung dari urutan shelf-nya, karena yang
+                   dianimasikan kini carousel di DALAM shelf, bukan shelf-nya. */
+                html.ts-game-lobby-uimod[data-ts-page="home"].ts-page-in ytmusic-section-list-renderer > #contents > *:nth-child(1) ytmusic-carousel { animation-delay: 0ms !important; }
+                html.ts-game-lobby-uimod[data-ts-page="home"].ts-page-in ytmusic-section-list-renderer > #contents > *:nth-child(2) ytmusic-carousel { animation-delay: 60ms !important; }
+                html.ts-game-lobby-uimod[data-ts-page="home"].ts-page-in ytmusic-section-list-renderer > #contents > *:nth-child(3) ytmusic-carousel { animation-delay: 120ms !important; }
+                html.ts-game-lobby-uimod[data-ts-page="home"].ts-page-in ytmusic-section-list-renderer > #contents > *:nth-child(4) ytmusic-carousel { animation-delay: 180ms !important; }
+                html.ts-game-lobby-uimod[data-ts-page="home"].ts-page-in ytmusic-section-list-renderer > #contents > *:nth-child(n+5) ytmusic-carousel { animation-delay: 240ms !important; }
+
+                /* --- HALAMAN LAIN: keluar/masuk --- */
+                html.ts-game-lobby-uimod:not([data-ts-page="home"]).ts-page-out ytmusic-browse-response ytmusic-section-list-renderer > #contents,
+                html.ts-game-lobby-uimod:not([data-ts-page="home"]).ts-page-out ytmusic-search-page ytmusic-section-list-renderer > #contents {
+                    animation: ts-page-out-y var(--ts-page-out-dur) var(--ts-page-ease-out) both !important;
+                    pointer-events: none !important;
+                    will-change: transform, opacity;
+                }
+                html.ts-game-lobby-uimod:not([data-ts-page="home"]).ts-page-in ytmusic-browse-response ytmusic-section-list-renderer > #contents,
+                html.ts-game-lobby-uimod:not([data-ts-page="home"]).ts-page-in ytmusic-search-page ytmusic-section-list-renderer > #contents {
+                    animation: ts-page-in-y var(--ts-page-in-dur) var(--ts-page-ease-in) both !important;
+                    will-change: transform, opacity;
+                }
+                /* Channel/artis: searah dengan balok trapesium yang menggantung di
+                   kiri. Spesifisitasnya SAMA dengan dua aturan di atas, jadi harus
+                   ditulis SESUDAHNYA supaya menang. */
+                html.ts-game-lobby-uimod[data-ts-page="channel"].ts-page-out ytmusic-browse-response ytmusic-section-list-renderer > #contents {
+                    animation-name: ts-page-out-left !important;
+                }
+                html.ts-game-lobby-uimod[data-ts-page="channel"].ts-page-in ytmusic-browse-response ytmusic-section-list-renderer > #contents {
+                    animation-name: ts-page-in-left !important;
+                }
+
+                /* Isi halaman masuk bertahap supaya terasa "dibangun", bukan
+                   nongol sekaligus. Dibatasi empat blok teratas; sisanya memakai
+                   delay yang sama agar halaman panjang tidak terasa lambat. */
+                html.ts-game-lobby-uimod:not([data-ts-page="home"]).ts-page-in ytmusic-browse-response ytmusic-section-list-renderer > #contents > *,
+                html.ts-game-lobby-uimod:not([data-ts-page="home"]).ts-page-in ytmusic-search-page ytmusic-section-list-renderer > #contents > * {
+                    animation: ts-page-item-y var(--ts-page-item-dur) var(--ts-page-ease-in) both;
+                }
+                html.ts-game-lobby-uimod:not([data-ts-page="home"]).ts-page-in ytmusic-section-list-renderer > #contents > *:nth-child(1) { animation-delay: 0ms; }
+                html.ts-game-lobby-uimod:not([data-ts-page="home"]).ts-page-in ytmusic-section-list-renderer > #contents > *:nth-child(2) { animation-delay: 60ms; }
+                html.ts-game-lobby-uimod:not([data-ts-page="home"]).ts-page-in ytmusic-section-list-renderer > #contents > *:nth-child(3) { animation-delay: 120ms; }
+                html.ts-game-lobby-uimod:not([data-ts-page="home"]).ts-page-in ytmusic-section-list-renderer > #contents > *:nth-child(4) { animation-delay: 180ms; }
+                html.ts-game-lobby-uimod:not([data-ts-page="home"]).ts-page-in ytmusic-section-list-renderer > #contents > *:nth-child(n+5) { animation-delay: 240ms; }
+
+                /* --- Ditahan (player page terbuka): transparan, tanpa animasi ---
+                   Sengaja dipasang di '#contents' untuk SEMUA jenis halaman: ia
+                   membungkus carousel juga, jadi satu aturan sudah cukup dan
+                   tidak ada konten yang sempat berkedip saat player ditutup. */
+                html.ts-game-lobby-uimod.ts-page-hold ytmusic-browse-response ytmusic-section-list-renderer > #contents,
+                html.ts-game-lobby-uimod.ts-page-hold ytmusic-search-page ytmusic-section-list-renderer > #contents {
+                    opacity: 0 !important;
+                    pointer-events: none !important;
+                }
+
+                /* Hormati preferensi sistem: matikan gerakannya, bukan tampilannya. */
+                @media (prefers-reduced-motion: reduce) {
+                    html.ts-game-lobby-uimod.ts-page-out ytmusic-carousel,
+                    html.ts-game-lobby-uimod.ts-page-in ytmusic-carousel,
+                    html.ts-game-lobby-uimod.ts-page-out ytmusic-section-list-renderer > #contents,
+                    html.ts-game-lobby-uimod.ts-page-in ytmusic-section-list-renderer > #contents,
+                    html.ts-game-lobby-uimod.ts-page-in ytmusic-section-list-renderer > #contents > * {
+                        animation-duration: 1ms !important;
+                        animation-delay: 0ms !important;
+                    }
+                }
 
                 @keyframes ts-game-panel-in {
                     from { opacity: 0; transform: translateX(-18px); }
@@ -1657,6 +2249,10 @@ function applyDynamicTheme(palette) {
                 @keyframes ts-game-logo-pulse {
                     0%, 100% { transform: scale(1); }
                     50%      { transform: scale(1.015); }
+                }
+                @keyframes ts-game-panel-in-center {
+                    from { opacity: 0; transform: translate3d(0, 18px, 0); }
+                    to   { opacity: 1; transform: translate3d(0, 0, 0); }
                 }
 
                 /* BUSUR CAROUSEL via CSS Scroll-Driven Animations (Chromium 115+)
@@ -1712,12 +2308,43 @@ function applyDynamicTheme(palette) {
                     pointer-events: none;
                 }
                 /* Saat player page terbuka => backdrop berubah jadi blur ekstrem terang
-                   seperti layar loading beatmap (screenshot 2). */
-                html.ts-player-page-open #ts-game-bg {
-                    filter: blur(48px) brightness(0.8) saturate(1.25);
+                   seperti layar loading beatmap (screenshot 2).
+
+                   CARA BARU: blur-nya STATIS, yang dianimasikan hanya opacity.
+                   Menganimasikan radius blur memaksa GPU merender ulang blur
+                   se-layar penuh TIAP FRAME — itu persis rasa tersendat saat
+                   masuk/keluar player page. Cross-fade dua lapisan (tajam <->
+                   blur) murni kerja kompositor, jadi mulus. Hasil akhirnya sama:
+                   lapisan blur sudah memuat scrim mode player sekaligus, dan
+                   scrim song-select (body::after) memudar berbarengan. */
+                #ts-game-bg::before {
+                    content: '';
+                    position: absolute;
+                    /* Lebih lebar dari induknya supaya tepi yang "termakan" blur
+                       48px jatuh di luar layar, bukan jadi pinggiran pudar. */
+                    inset: -10%;
+                    background:
+                        linear-gradient(180deg, rgba(0,0,0,0.25), rgba(0,0,0,0.45)),
+                        var(--ts-game-artwork, linear-gradient(135deg, var(--ts-game-primary), var(--ts-game-secondary)))
+                        no-repeat center center / cover;
+                    /* saturate 1.09 karena filter induk (saturate 1.15) ikut
+                       menimpa lapisan ini juga => gabungannya ~1.25, sama seperti
+                       nilai lama. */
+                    filter: blur(48px) brightness(0.8) saturate(1.09);
+                    opacity: 0;
+                    transition: opacity 0.45s ease;
+                    pointer-events: none;
+                }
+                html.ts-player-page-open #ts-game-bg::before {
+                    opacity: 1;
+                }
+                /* Scrim song-select memudar, bukan berganti mendadak: gradien
+                   bertumpuk memang tidak bisa ditransisikan, opacity bisa. */
+                body::after {
+                    transition: opacity 0.45s ease;
                 }
                 html.ts-player-page-open body::after {
-                    background: linear-gradient(180deg, rgba(0,0,0,0.25), rgba(0,0,0,0.45));
+                    opacity: 0;
                 }
 
                 /* Semua kontainer utama transparan agar backdrop tembus */
@@ -1893,22 +2520,13 @@ function applyDynamicTheme(palette) {
                     overflow: visible !important;
                     transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s ease !important;
                 }
-                /* Animasi out: geser carousel ke kanan saat masuk ke player page atau sedang di-klik */
-                html.ts-player-page-open ${HOME_SCOPE} ytmusic-carousel ul#items,
-                html.ts-game-animating-out ${HOME_SCOPE} ytmusic-carousel ul#items {
-                    transform: translateX(120%) !important;
-                    opacity: 0 !important;
-                }
-                
-                @keyframes ts-game-carousel-in {
-                    from { transform: translateX(120%); opacity: 0; }
-                    to   { transform: translateX(0); opacity: 1; }
-                }
-                
-                /* Animasi in: masuk kembali dari kanan saat player ditutup */
-                html.ts-game-animating-in ${HOME_SCOPE} ytmusic-carousel ul#items {
-                    animation: ts-game-carousel-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
-                }
+                /* CATATAN: animasi keluar/masuk daftar home DULU dipasang di sini
+                   (translateX(120%) + ts-game-carousel-in pada <ul#items>) dan
+                   sering tidak jalan — <ul#items> di-stamp ulang Polymer setelah
+                   class pemicunya keburu dilepas, dan saat player page terbuka
+                   #content ber-display:none sehingga animasinya tak pernah mulai.
+                   Sekarang ditangani mesin transisi di bagian atas berkas ini,
+                   pada CANGKANG halaman yang selalu ada selama halaman tampil. */
                 ${HOME_SCOPE} ytmusic-grid-renderer #items {
                     display: flex !important;
                     flex-direction: column !important;
@@ -2215,6 +2833,73 @@ function applyDynamicTheme(palette) {
                     box-shadow: inset 3px 0 0 #ffd966;
                 }
 
+                /* ============================================================
+                   KEHADIRAN ISI ANTREAN (panel "BERIKUTNYA" di player page)
+
+                   Antrean di-render belakangan. Begitu player page terbuka,
+                   <ytmusic-player-queue id="queue"> masih kosong; beberapa saat
+                   kemudian Polymer men-stamp <ytmusic-queue-header-renderer>,
+                   #steering-chips, lalu deretan <ytmusic-player-queue-item> di
+                   dalam #contents. Tanpa penanganan, isinya "nongol" sekaligus di
+                   panel frosted yang tadinya kosong.
+
+                   Animasinya sengaja TIDAK digantungkan pada jendela waktu apa pun.
+                   Rule-nya berada di bawah 'html.ts-player-page-open', jadi
+                   animasi mulai sendiri pada dua momen yang tepat:
+                     - elemen LAHIR ketika player page sedang terbuka  -> ikut main;
+                     - elemen sudah ada lalu player page BARU DIBUKA   -> ikut main,
+                       karena rule-nya baru berlaku saat itu.
+                   Tidak ada setTimeout yang bisa keburu habis, dan isi yang datang
+                   menyusul (autoplay menambah lagu, atau balik dari tab LIRIK)
+                   tetap kebagian.
+
+                   Dua pilihan yang disengaja:
+                   - fill-mode 'backwards', BUKAN 'both'. Sesudah selesai, elemen
+                     kembali ke gaya normalnya. Dengan 'both', penyisipan item baru
+                     di tengah daftar menggeser urutan => animation-delay berubah =>
+                     item yang sudah settle bisa berkedip transparan lagi.
+                   - ':nth-of-type', BUKAN ':nth-child'. #contents juga memuat
+                     <dom-if>/<template> milik Polymer yang ikut terhitung sebagai
+                     anak; menghitung per nama-tag membuat urutannya tetap benar.
+                   ============================================================ */
+                @keyframes ts-queue-in {
+                    from { opacity: 0; transform: translate3d(16px, 0, 0); }
+                    to   { opacity: 1; transform: translate3d(0, 0, 0); }
+                }
+
+                /* Kepala panel: "Diputar dari <nama mix>" + tombol Simpan. */
+                html.ts-player-page-open ytmusic-tab-renderer ytmusic-queue-header-renderer {
+                    animation: ts-queue-in 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+                }
+                /* Baris chip penyaring antrean ("Semua / musik J-pop / Ceria / ..."). */
+                html.ts-player-page-open ytmusic-player-queue > #steering-chips {
+                    animation: ts-queue-in 420ms cubic-bezier(0.22, 1, 0.36, 1) 70ms backwards;
+                }
+                /* Baris lagu: menyusul bertahap dari kanan, mengikuti arah panel. */
+                html.ts-player-page-open ytmusic-player-queue > #contents > ytmusic-player-queue-item {
+                    animation: ts-queue-in 380ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+                }
+                /* Tangga delay dibatasi delapan baris teratas — itu yang benar-benar
+                   terlihat; sisanya menyusul serempak supaya antrean panjang tidak
+                   terasa lambat merangkak. */
+                html.ts-player-page-open ytmusic-player-queue > #contents > ytmusic-player-queue-item:nth-of-type(1) { animation-delay: 140ms; }
+                html.ts-player-page-open ytmusic-player-queue > #contents > ytmusic-player-queue-item:nth-of-type(2) { animation-delay: 172ms; }
+                html.ts-player-page-open ytmusic-player-queue > #contents > ytmusic-player-queue-item:nth-of-type(3) { animation-delay: 204ms; }
+                html.ts-player-page-open ytmusic-player-queue > #contents > ytmusic-player-queue-item:nth-of-type(4) { animation-delay: 236ms; }
+                html.ts-player-page-open ytmusic-player-queue > #contents > ytmusic-player-queue-item:nth-of-type(5) { animation-delay: 268ms; }
+                html.ts-player-page-open ytmusic-player-queue > #contents > ytmusic-player-queue-item:nth-of-type(6) { animation-delay: 300ms; }
+                html.ts-player-page-open ytmusic-player-queue > #contents > ytmusic-player-queue-item:nth-of-type(7) { animation-delay: 332ms; }
+                html.ts-player-page-open ytmusic-player-queue > #contents > ytmusic-player-queue-item:nth-of-type(n+8) { animation-delay: 364ms; }
+
+                @media (prefers-reduced-motion: reduce) {
+                    html.ts-player-page-open ytmusic-tab-renderer ytmusic-queue-header-renderer,
+                    html.ts-player-page-open ytmusic-player-queue > #steering-chips,
+                    html.ts-player-page-open ytmusic-player-queue > #contents > ytmusic-player-queue-item {
+                        animation-duration: 1ms !important;
+                        animation-delay: 0ms !important;
+                    }
+                }
+
                 /* --- LAYER 6: Panel info lagu (DOM #ts-game-info-panel) --- */
                 /* Mode home: panel KIRI-ATAS di area lapang sisi kiri, persis posisi
                    panel info beatmap di song select (teks di atas scrim gradien,
@@ -2236,6 +2921,11 @@ function applyDynamicTheme(palette) {
                 }
                 #ts-game-info-panel.ts-game-panel-in {
                     animation: ts-game-panel-in 0.45s ease;
+                }
+                /* Di mode player, panel duduk terpusat di bawah artwork — masuknya
+                   naik dari bawah, bukan menggeser dari kiri seperti di home. */
+                html.ts-player-page-open #ts-game-info-panel.ts-game-panel-in {
+                    animation: ts-game-panel-in-center 0.5s cubic-bezier(0.22, 1, 0.36, 1);
                 }
                 #ts-game-info-panel .ts-game-badge {
                     display: inline-block;
@@ -2575,6 +3265,16 @@ function applyDynamicTheme(palette) {
                 }
             `;
 
+            // JANGAN tulis ulang kalau isinya sama persis. applyDynamicTheme()
+            // dipanggil SETIAP kali lagu berganti; mengganti teks <style> berarti
+            // seluruh rule dicabut lalu dipasang lagi, dan itu me-RESET semua
+            // animasi CSS yang sedang berjalan — termasuk animasi transisi halaman
+            // yang baru saja dimulai saat kita mengklik kartu (lagu memang berganti
+            // tepat di momen itu). Inilah penyebab utama animasi "in" home terasa
+            // suka hilang. Warna tetap ikut berubah karena palet dikirim lewat CSS
+            // variable di :root, bukan lewat teks stylesheet ini.
+            if (gameStyle.textContent !== gameCss) gameStyle.textContent = gameCss;
+
             // Variabel native YTM: player page transparan (backdrop blur kita yang tampil)
             set('--ytmusic-player-page-background', 'transparent');
             unset('--ytmusic-nav-bar');
@@ -2590,6 +3290,9 @@ function applyDynamicTheme(palette) {
 
             // Aktifkan efek busur + klik-ke-tengah di carousel home.
             initGameCarousel();
+
+            // Aktifkan mesin transisi antar-halaman (idempoten).
+            initGamePageTransitions();
 
         } else if (themeMode === 'harmony') {
             // === MODE HARMONY: Sistem gradien multi-layer yang kohesif ===
@@ -2855,6 +3558,8 @@ let dynamicThemeDisabled = false;
 
 let tsWasPlayerOpen = false;
 
+let tsPlayerAnimTimer = null;
+
 function syncPlayerPageOpenState() {
     const root = document.documentElement;
 
@@ -2865,15 +3570,47 @@ function syncPlayerPageOpenState() {
         document.querySelector('ytmusic-app-layout[player-page-open]')
     );
 
-    // Jika player baru saja ditutup, putar animasi masuk
-    if (!isOpen && tsWasPlayerOpen) {
-        root.classList.add('ts-game-animating-in');
-        // Hapus class setelah durasi animasi selesai
-        setTimeout(() => root.classList.remove('ts-game-animating-in'), 600);
+    // Observer pemanggilnya sengaja longgar (ikut memantau 'style'/'hidden'),
+    // jadi fungsi ini terpanggil sangat sering. Kalau state-nya TIDAK berubah,
+    // jangan sentuh apa pun: dulu justru di sinilah animasi masuk sempat dipicu
+    // berkali-kali lalu saling memotong sehingga sering tak sempat terlihat.
+    if (isOpen === tsWasPlayerOpen) {
+        root.classList.toggle('ts-player-page-open', isOpen);
+        return;
     }
     tsWasPlayerOpen = isOpen;
-
     root.classList.toggle('ts-player-page-open', isOpen);
+
+    if (!isGameLobbyMode()) return;
+
+    clearTimeout(tsPlayerAnimTimer);
+
+    if (isOpen) {
+        // MASUK player page. 'ts-player-exiting' menahan #content tetap ter-render
+        // selama animasi keluar (base style menyembunyikannya begitu player
+        // terbuka, padahal animasi tak pernah mulai dari display:none). Setelah
+        // animasinya selesai, konten ditahan transparan — jadi saat player ditutup
+        // nanti ia sudah siap masuk, tanpa berkedip muncul penuh dulu.
+        root.classList.add('ts-player-exiting');
+        tsPageOut();
+        tsPlayerAnimTimer = setTimeout(() => {
+            root.classList.remove('ts-player-exiting');
+            tsPageHold();
+            tsApplyPageType('player');
+        }, TS_PAGE_OUT_MS + 60);
+    } else {
+        // KELUAR player page: #content terlihat lagi (masih ditahan transparan),
+        // tinggal mainkan animasi masuk halaman yang aktif sekarang.
+        root.classList.remove('ts-player-exiting');
+        // Jeda kecil supaya urutannya terbaca: player page menyelesaikan gerak
+        // turunnya dulu, BARU daftar halaman kembali masuk — bukan dua gerakan
+        // yang saling menimpa di frame yang sama.
+        tsSchedulePageIn(140);
+    }
+
+    // Panel info berpindah posisi antara mode home & mode player; tanpa replay
+    // animasinya, dia cuma melompat.
+    replayGamePanelIn();
 }
 
 function initPlayerUiObserver() {
@@ -3022,6 +3759,7 @@ window.disableDynamicTheme = function () {
     // Kembalikan tombol guide yang sempat dipindah ke navbar.
     restoreGuideButtons();
     teardownGameCarousel();
+    teardownGamePageTransitions();
     for (const id of styleIds) {
         const el = document.getElementById(id);
         if (el) el.remove();

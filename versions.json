@@ -1,7 +1,7 @@
 {
     "app": {
-        "version": "0.0.0.10-nightly.18",
-        "build": 18,
+        "version": "0.0.0.10-nightly.19",
+        "build": 19,
         "stage": "alpha",
         "requiresFullUpdate": false,
         "minCompatibleVersion": "0.0.0.9"
@@ -167,7 +167,7 @@
         "aset/game/vnStyles/player/global.css": "689caa009361272e010c95112bca1f597d23a0867897b368dd58ac4e395a87d1",
         "aset/game/vnStyles/player/intro.css": "ef6905e8e3ecffb1ef15ec20c2c6c2a8c06190f43344f46fc8d9c8c27d3cfd3a",
         "aset/game/vnStyles/player/main-menu.css": "078f6d2f8046d7bee649188b8c7381f0e5ef7bf7c044a501002ac3dd68e40a02",
-        "aset/js/dynamic-ytm-styling.js": "543f3c195c762fba5c8e34d38e022a9ffa2c140a9fcf246859f8154b5f2736ac",
+        "aset/js/dynamic-ytm-styling.js": "afb69ba8e4e1054992f9b3e4a0fc52baad0ed5dbb3979c14b9c839cdf4c72583",
         "aset/js/vibrant.min.js": "cc2c98843df5d35f4722eb1f7b1f0a504ec6bb63f461aaa2a7a6fe91b9761aac",
         "aset/konten/character_data.json": "1b2477734127182e3dfe2c8f2b1d4e40002430396de2cc1f398d043877b96bf0",
         "gif-overlay-geometry.js": "4656f92d78525445147202717602d6ea9b82f41271f5148ba97e0e3a4dc9ee67",
@@ -220,7 +220,7 @@
         "snow.js": "50ce847284fec09dcd24aacea4a52249047cf5ebfcf9c3ccf62c807954fc3318",
         "splitRunner.js": "2d37dc0899dd35963e0a1b41b0967921e3676fdebd2cae45ce69633ac8496b73",
         "update-hashes.js": "6a8d019f59ef07c7054f3e211c255e43fb498237faf371fc892161a5923d3b39",
-        "updater-window.html": "561e2875ce30f79e33deb7dae4fd097ef7d0e329a32b981ee8cded17bc1de0f2",
+        "updater-window.html": "e76e4b6e3ede66e22da79e6501dab6999e4d69bcc9ca78229c838a74ed42d610",
         "vn-engine/achievement-manager.js": "151e40fec463a8fd986e4a52c4c3a024eb29d58c663aad2165505941506296a7",
         "vn-engine/asset-manager.js": "5a4fd4668f410ec24f097c4ea3755654e3a80b48de191f58d02d6e1f063517be",
         "vn-engine/atomic-writer.js": "d038bef9e5e421a69836cd82aed4d51b164e6aa427bc927b8dcf518def4074ab",
