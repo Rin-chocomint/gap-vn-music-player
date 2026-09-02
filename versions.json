@@ -1,7 +1,7 @@
 {
     "app": {
-        "version": "0.0.0.10-nightly.19",
-        "build": 19,
+        "version": "0.0.0.10-nightly.20",
+        "build": 21,
         "stage": "alpha",
         "requiresFullUpdate": false,
         "minCompatibleVersion": "0.0.0.9"
