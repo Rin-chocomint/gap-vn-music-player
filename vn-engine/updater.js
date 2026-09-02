@@ -218,12 +218,14 @@ async function fetchRemoteManifestAndMeta(cfg) {
     let releaseName = '';
     let usedRelease = false;
     let prerelease = false;
+    let daftarRilis = [];
 
     try {
         const list = await httpsGet(
             `${cfg.apiBase}/repos/${cfg.owner}/${cfg.repo}/releases?per_page=30`,
             { json: true }
         );
+        if (Array.isArray(list)) daftarRilis = list;
         const rel = pickRelease(list, cfg.channel);
         if (rel) {
             ref = rel.tag_name;
@@ -242,7 +244,114 @@ async function fetchRemoteManifestAndMeta(cfg) {
     const manifestUrl = `${cfg.rawBase}/${cfg.owner}/${cfg.repo}/${ref}/${cfg.manifestPath || 'versions.json'}`;
     const manifest = await httpsGet(manifestUrl, { json: true });
 
-    return { manifest, ref, changelog, releaseUrl, releaseName, usedRelease, prerelease };
+    return { manifest, ref, changelog, releaseUrl, releaseName, usedRelease, prerelease, daftarRilis };
+}
+
+// =============================================
+// RINGKASAN PERUBAHAN LINTAS RILIS
+//
+// Body sebuah GitHub Release hanya menceritakan rilis ITU. Pemasang yang
+// tertinggal beberapa versi tidak pernah melihat apa saja yang sudah lewat.
+// Mengumpulkan body rilis-rilis di antaranya juga tidak menutup lubangnya:
+// sebagian tag di repo ini tidak punya Release sama sekali, jadi potongan
+// riwayatnya hilang begitu saja.
+//
+// Yang selalu lengkap adalah daftar commit. Endpoint compare GitHub memberi
+// seluruh commit antara dua tag dalam satu permintaan, tanpa autentikasi.
+// Dikelompokkan per scope (bagian sebelum ':' pada pesan commit), hasilnya
+// terbaca seperti catatan rilis yang ditulis tangan.
+// =============================================
+
+// Batas commit yang dirender. Endpoint compare sendiri berhenti di 250.
+const MAKS_COMMIT_DITAMPILKAN = 120;
+
+// Cari tag yang mewakili versi yang SEDANG TERPASANG, sebagai titik awal
+// perbandingan. Tag di repo ini berbentuk "v<versi>", tapi tidak semua versi
+// punya Release. Karena itu ada jalur cadangan yang menyisir daftar rilis untuk
+// rilis terbaru yang versinya masih di bawah versi terpasang.
+function cariTagAwal(daftarRilis, currentVersion) {
+    if (!currentVersion || !Array.isArray(daftarRilis)) return null;
+
+    const langsung = 'v' + currentVersion;
+    for (const r of daftarRilis) {
+        if (r && !r.draft && r.tag_name === langsung) return r.tag_name;
+    }
+
+    let terbaik = null;
+    for (const r of daftarRilis) {
+        if (!r || r.draft || !r.tag_name) continue;
+        const v = tagToVersion(r.tag_name);
+        if (compareVersion(v, currentVersion) > 0) continue;   // lebih baru, bukan titik awal
+        if (!terbaik || compareVersion(v, tagToVersion(terbaik)) > 0) terbaik = r.tag_name;
+    }
+    return terbaik;
+}
+
+async function fetchPerubahanAntarTag(cfg, tagAwal, tagAkhir) {
+    const url = `${cfg.apiBase}/repos/${cfg.owner}/${cfg.repo}/compare/` +
+        `${encodeURIComponent(tagAwal)}...${encodeURIComponent(tagAkhir)}`;
+    const data = await httpsGet(url, { json: true });
+    if (!data || !Array.isArray(data.commits)) return null;
+    return {
+        pesan: data.commits
+            .map((c) => String((c.commit && c.commit.message) || '').split('\n')[0].trim())
+            .filter(Boolean),
+        total: Number(data.total_commits) || data.commits.length,
+        url: data.html_url || ''
+    };
+}
+
+// Susun jadi markdown dengan subset yang bisa dirender jendela pembaruan:
+// heading '###', butir '-', '**tebal**', dan tautan.
+function bangunRingkasanCommit(hasil, tagAwal) {
+    if (!hasil || !hasil.pesan.length) return '';
+
+    // Commit rilis cuma penanda versi, bukan perubahan yang dirasakan pengguna.
+    const dipakai = hasil.pesan.filter((p) => !/^Rilis\s/i.test(p));
+    if (!dipakai.length) return '';
+
+    const dipotong = dipakai.slice(0, MAKS_COMMIT_DITAMPILKAN);
+
+    // Yang benar-benar disembunyikan ada dua sumber: dipotong oleh batas kita
+    // sendiri, dan tidak dikembalikan endpoint compare (berhenti di 250).
+    // Commit rilis yang disaring di atas TIDAK dihitung, karena memang bukan
+    // perubahan yang disembunyikan dari pengguna.
+    const sisa = (dipakai.length - dipotong.length) +
+        Math.max(0, hasil.total - hasil.pesan.length);
+
+    // Scope = bagian sebelum ':' pertama, mengikuti format pesan commit repo ini.
+    const grup = new Map();
+    const UMUM = 'Lainnya';
+    for (const p of dipotong) {
+        const m = p.match(/^([A-Za-z0-9][A-Za-z0-9._/-]*)\s*:\s*(.+)$/);
+        const kunci = m ? m[1] : UMUM;
+        const isi = m ? m[2] : p;
+        if (!grup.has(kunci)) grup.set(kunci, []);
+        grup.get(kunci).push(isi);
+    }
+
+    // 'Lainnya' selalu di bawah; sisanya urut abjad supaya susunannya stabil.
+    const kunci = Array.from(grup.keys()).sort((a, b) => {
+        if (a === UMUM) return 1;
+        if (b === UMUM) return -1;
+        return a.localeCompare(b);
+    });
+
+    const baris = ['', '### Semua perubahan sejak ' + tagAwal];
+    for (const k of kunci) {
+        baris.push('');
+        baris.push('**' + k + '**');
+        for (const isi of grup.get(k)) baris.push('- ' + isi);
+    }
+    if (sisa > 0) {
+        baris.push('');
+        baris.push('- dan ' + sisa + ' perubahan lain');
+    }
+    if (hasil.url) {
+        baris.push('');
+        baris.push('[Lihat perbandingan lengkap di GitHub](' + hasil.url + ')');
+    }
+    return baris.join('\n');
 }
 
 // =============================================
@@ -257,7 +366,7 @@ async function checkForUpdates() {
     }
 
     try {
-        const { manifest: remote, ref, changelog, releaseUrl, releaseName, usedRelease, prerelease } =
+        const { manifest: remote, ref, changelog, releaseUrl, releaseName, usedRelease, prerelease, daftarRilis } =
             await fetchRemoteManifestAndMeta(cfg);
 
         const currentVersion = (local.app && local.app.version) || '0';
@@ -286,6 +395,23 @@ async function checkForUpdates() {
         const effectiveReleaseUrl = releaseUrl ||
             `https://github.com/${cfg.owner}/${cfg.repo}/releases/latest`;
 
+        // Daftar perubahan lintas rilis. Kegagalan di sini TIDAK boleh
+        // menggagalkan pengecekan pembaruan: paling buruk changelog-nya cuma
+        // berisi catatan rilis terbaru, persis seperti perilaku sebelumnya.
+        let changelogPenuh = changelog;
+        if (updateAvailable && usedRelease) {
+            try {
+                const tagAwal = cariTagAwal(daftarRilis, currentVersion);
+                if (tagAwal && tagAwal !== ref) {
+                    const hasil = await fetchPerubahanAntarTag(cfg, tagAwal, ref);
+                    const tambahan = bangunRingkasanCommit(hasil, tagAwal);
+                    if (tambahan) changelogPenuh = (changelog || '').trim() + '\n' + tambahan;
+                }
+            } catch (e) {
+                console.warn('[Updater] Ringkasan perubahan lintas rilis dilewati:', e.message);
+            }
+        }
+
         const info = {
             ok: true,
             updateAvailable,
@@ -297,7 +423,7 @@ async function checkForUpdates() {
             usedRelease,
             prerelease,
             channel: cfg.channel || 'release',
-            changelog,
+            changelog: changelogPenuh,
             releaseUrl: effectiveReleaseUrl,
             releaseName,
             requiresFullUpdate,
