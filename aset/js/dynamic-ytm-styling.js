@@ -22,6 +22,30 @@
  */
 
 // ============================================================================
+// 0. PENJAGA HOST
+// Skrip ini disuntikkan oleh aplikasi ke APA PUN yang sedang dimuat webview,
+// bukan hanya ke YouTube Music. Saat pengguna menekan "Masuk", webview pindah ke
+// accounts.google.com, dan tanpa penjaga ini gaya kita ikut terpasang di sana:
+// #ts-game-bg menutupi satu layar penuh, body dibuat transparan, dan panel
+// kecepatan (z-index 999999) mengambang di atas formulir. Halaman loginnya jadi
+// tidak bisa dipakai.
+//
+// Semua pintu masuk publik (bootstrap, enableDynamicTheme, applyDynamicTheme)
+// lewat sini dulu. Menjaganya di satu tempat lebih aman daripada mengandalkan
+// sisi host, karena injeksinya dipicu dari beberapa lifecycle webview sekaligus.
+// ============================================================================
+
+const TS_HOST_DIDUKUNG = ['music.youtube.com'];
+
+function isHostDidukung() {
+    try {
+        return TS_HOST_DIDUKUNG.indexOf(location.hostname) !== -1;
+    } catch (_) {
+        return false;
+    }
+}
+
+// ============================================================================
 // 1. SISTEM VARIABEL CSS (The "Base Styles")
 // Definisi variabel dasar agar kita punya nilai default sebelum lagu dimuat.
 // ============================================================================
@@ -1078,6 +1102,7 @@ function teardownGamePageTransitions() {
 function applyDynamicTheme(palette) {
     if (!palette) return;
     if (dynamicThemeDisabled) return;
+    if (!isHostDidukung()) return;
 
     const root = document.documentElement;
     const set = (k, v) => root.style.setProperty(k, v);
@@ -3840,6 +3865,14 @@ window.disableDynamicTheme = function () {
 
 // Optional: allow re-enabling without reload
 window.enableDynamicTheme = function (mode = 'default-optimized') {
+    // Pengaturan pengguna sengaja TIDAK diubah. Host tetap boleh memanggil ini
+    // kapan saja; begitu webview kembali ke YouTube Music, panggilan berikutnya
+    // akan lolos dan tema menyala lagi seperti semula.
+    if (!isHostDidukung()) {
+        console.log('[DynamicTheme] Host tidak didukung (' + location.hostname + '), tema dilewati.');
+        try { window.disableDynamicTheme(); } catch (_) { }
+        return;
+    }
     if (mode !== 'game-lobby-uimod' && mode?.endsWith('-lobby-uimod')) mode = 'game-lobby-uimod';
     const sanitizedMode = mode === 'unified'
         ? 'overlay'
@@ -3861,6 +3894,19 @@ window.enableDynamicTheme = function (mode = 'default-optimized') {
 };
 
 (function () {
+    // Halaman login Google dan halaman non-YTM lain tidak boleh disentuh sama
+    // sekali. Keluar sebelum menyuntik style, memasang observer, atau menempel
+    // panel kecepatan ke <body>.
+    if (!isHostDidukung()) {
+        console.log('[DynamicTheme] Bukan YouTube Music (' + location.hostname + '), skrip tidak diaktifkan.');
+        try {
+            window.__gapDynamicThemeLoaded = true;
+            window.__gapDynamicThemeVersion = '2.1';
+            window.__gapDynamicThemeHostSkipped = true;
+        } catch (_) { }
+        return;
+    }
+
     injectBaseStyles();
     initPlayerUiObserver();
     // --- GAME MODS: SPEED CONTROLLER (HT, DT) ---
