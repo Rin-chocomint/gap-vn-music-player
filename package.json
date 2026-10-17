@@ -6,7 +6,7 @@
     "start": "electron --unhandled-rejections=strict .",
     "test": "echo \"Error: no test specified\" && exit 1",
     "clean": "rimraf dist && rimraf %LocalAppData%\\Temp\\electron-packager",
-    "build": "electron-packager . Gap --platform=win32 --arch=x64 --out=dist --icon=aset/icon.ico",
+    "build": "electron-packager . Gap --platform=win32 --arch=x64 --out=dist --icon=aset/icon.ico --download.mirrorOptions.mirror=https://github.com/castlabs/electron-releases/releases/download/",
     "update-hashes": "node update-hashes.js"
   },
   "keywords": [],
@@ -19,7 +19,7 @@
   "description": "Gap VN & Music Player (Codename: VN 0) - Aplikasi pemutar musik dan visual novel open source...",
   "devDependencies": {
     "@playwright/test": "^1.55.0",
-    "electron": "^33.2.1",
+    "electron": "https://github.com/castlabs/electron-releases#v44.5.1+wvcus",
     "electron-packager": "^17.1.2",
     "rimraf": "^6.0.1"
   },
