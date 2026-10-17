@@ -19,7 +19,7 @@ let isRpcEnabled = false;          // Status fitur RPC (diaktifkan/dinonaktifkan
 let isRpcReady = false;            // Status koneksi RPC (true hanya saat ready dan terhubung)
 let isRpcConnecting = false;       // Flag untuk mencegah koneksi ganda saat proses koneksi
 let rpcRetryInterval = null;
-let currentAppMode = 'game';       // 'game' | 'native' | 'gif-overlay'
+let currentAppMode = 'game';       // 'game' | 'native' | 'native-spotify' | 'gif-overlay'
 
 // Fungsi utama yang dipanggil untuk memulai koneksi
 function initRPC() {
@@ -94,6 +94,9 @@ function connectRPC() {
         if (currentAppMode === 'native') {
             detailsText = 'GAP Music Player';
             stateText = 'Menikmati Musik';
+        } else if (currentAppMode === 'native-spotify') {
+            detailsText = 'GAP Music Player';
+            stateText = 'Mendengarkan Spotify';
         } else if (currentAppMode === 'gif-overlay') {
             detailsText = 'GAP Free GIF overlay!';
             stateText = 'Mengatur Overlay';
@@ -685,6 +688,14 @@ const updater = require('./vn-engine/updater');
 const { normalizeScript, validateNovelMeta } = require('./vn-engine/schema-validator');
 // Init dilakukan setelah versionsManifest dimuat (baris bawah)
 // Lihat: vnEngine.initVNEngine() call di bawah
+
+const spotifySession = require('./spotify-session');
+// Getter, bukan nilai: internetConnectionAllowed baru dideklarasikan jauh di
+// bawah dan berubah selama aplikasi jalan. Di luar mode game penyaring session
+// default membuka semua, jadi Spotify ikut.
+spotifySession.registerSpotifySupport({
+    isInternetAllowed: () => currentAppMode !== 'game' || internetConnectionAllowed
+});
 
 // ======================== Integrity Check & Novel Security Module ======================== //
 const crypto = require('crypto');
@@ -5131,6 +5142,8 @@ app.on('ready', () => {
             const mode = settings.mode || 'game';
             if (mode === 'native') {
                 setupNativeYTMusicWindow(settings);
+            } else if (mode === 'native-spotify') {
+                setupNativeSpotifyWindow();
             } else {
                 setupGameWindow(settings);
             }
@@ -5357,12 +5370,58 @@ ipcMain.on('open-main-window', (event, data) => {
 
     if (mode === 'native') {
         setupNativeYTMusicWindow(data);
+    } else if (mode === 'native-spotify') {
+        setupNativeSpotifyWindow();
     } else if (mode === 'gif-overlay') {
         setupGifOverlayStandaloneWindow(data);
     } else {
         setupGameWindow(data);
     }
 });
+
+// === Setup Native Spotify Window ===
+// Satu jendela berisi webview Spotify, tanpa scraper, ad skipper, atau overlay
+// milik mode native YT Music. Partition, UA, dan Widevine diurus
+// spotify-session.js; internetnya selalu terbuka karena penyaring mode game
+// cuma berlaku saat currentAppMode === 'game'.
+function setupNativeSpotifyWindow() {
+    console.log('[Main] Memulai mode Native Spotify');
+    currentAppMode = 'native-spotify';
+
+    mainWindow = new BrowserWindow({
+        width: 1280,
+        height: 800,
+        minWidth: 800,
+        minHeight: 600,
+        icon: path.join(__dirname, 'aset', 'ikon.jpg'),
+        autoHideMenuBar: true,
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false,
+            webviewTag: true,
+        },
+    });
+    mainWindow.setMenu(null);
+    mainWindow.loadFile('native-spotify.html');
+
+    // Tanpa ini, menutup jendela Spotify tidak mengakhiri aplikasi selama jendela
+    // pembaruan dari cek otomatis di bawah masih terbuka.
+    pasangPenjagaTutup(mainWindow, 'jendela Spotify');
+
+    mainWindow.webContents.once('did-finish-load', () => {
+        setTimeout(() => updater.autoCheckAndPrompt('native-spotify'), 1200);
+    });
+
+    mainWindow.on('closed', () => {
+        mainWindow = null;
+        flushUserSettingsToDisk();
+    });
+
+    if (userSettings.rpcEnabled === true) {
+        isRpcEnabled = true;
+        initRPC();
+    }
+}
 
 // === Setup GIF Overlay Standalone Window ===
 function setupGifOverlayStandaloneWindow(data) {

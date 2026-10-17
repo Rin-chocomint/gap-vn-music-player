@@ -9,6 +9,8 @@ const loader = document.getElementById('webview-loader');
 const onlineIcons = document.querySelectorAll('.online-icon');
 
 const webviewForScroll = document.getElementById('external-webview');
+const spotifyWebview = document.getElementById('spotify-webview');
+const webviewTitle = document.getElementById('webview-title');
 //------------------- ( end elemen utama webview + overlay ) -------------------------//
 
 //------------------- ( elemen UI player yang ikut dipakai mode online ) -------------------------//
@@ -333,7 +335,11 @@ webview.addEventListener('did-navigate', () => {
 //------------------- ( end penting: anti race condition buat Dynamic Theme ) -------------------------//
 
 //------------------- ( IPC dari preload webview ) -------------------------//
-webview.addEventListener('ipc-message', async (e) => {
+// Dipakai dua webview: YT Music (source 'ytmusic') dan Spotify (source
+// 'spotify'). Spotify cuma mengirim track-changed, playback-update, dan
+// play-state; kanal lain di bawah tetap khusus YT Music.
+async function handleOnlineWebviewMessage(e, source) {
+    if (ONLINE_STATE_CHANNELS.includes(e.channel) && !acceptOnlineState(source, e.channel, e.args[0])) return;
     // console.log("Pesan dari webview:", e.channel, e.args);
 
     if (e.channel === 'analyser-data') {
@@ -480,7 +486,7 @@ webview.addEventListener('ipc-message', async (e) => {
 
         // Simpan durasi untuk nanti (misal digunakan di seek)
         trackDuration = duration;
-        webview.executeJavaScript('window.playerAPI.requestMetadata()');
+        if (source === 'ytmusic') webview.executeJavaScript('window.playerAPI.requestMetadata()');
 
         // Refresh UI (tombol play/pause, animasi disk, dsb.)
         updateMusicUI();
@@ -594,7 +600,9 @@ webview.addEventListener('ipc-message', async (e) => {
         console.log('Webview play-state is true, pausing local audio.');
         audioElement.pause();
     }
-});
+}
+
+webview.addEventListener('ipc-message', (e) => handleOnlineWebviewMessage(e, 'ytmusic'));
 
 //------------------- ( end IPC dari preload webview ) -------------------------//
 
@@ -746,6 +754,9 @@ async function openExternalWebview(url) {
         return;
     }
 
+    showWebviewService('ytmusic');
+    if (!webviewIsPlaying) controlledMusicService = 'ytmusic';
+
     // Cek apakah webview sudah aktif dan memuat URL yang sama
     const isAlreadyLoaded = webviewActive && webview.src && webview.src.startsWith(url);
 
@@ -778,6 +789,141 @@ async function openExternalWebview(url) {
 
 //------------------- ( end buka webview + pastiin mode online ke-sync ) -------------------------//
 
+//------------------- ( Spotify: webview kedua di jendela yang sama ) -------------------------//
+let activeWebviewService = 'ytmusic';
+let spotifyWidevineReady = false;
+
+// Layanan yang menerima tombol play/next/prev/seek dari player aplikasi, mini
+// player, dan overlay. Bukan selalu yang sedang tampil: ia pindah ke layanan
+// yang benar-benar mulai berbunyi, atau ke layanan yang dibuka saat tidak ada
+// yang berbunyi.
+let controlledMusicService = 'ytmusic';
+
+// YT Music dan Spotify sama-sama mengirim status walau sedang dijeda. Tanpa
+// saringan ini, layanan yang diam menimpa judul dan progress layanan yang
+// sedang berbunyi setiap setengah detik.
+const ONLINE_STATE_CHANNELS = ['track-changed', 'playback-update', 'play-state'];
+
+function acceptOnlineState(source, channel, data) {
+    if (source === controlledMusicService) return true;
+    const playing = channel === 'playback-update' ? !!(data && data.isPlaying)
+        : channel === 'play-state' ? !!(data && data.playing)
+            : false;
+    if (!playing) return false;
+    takeOverMusicControl(source);
+    return true;
+}
+
+function takeOverMusicControl(source) {
+    if (controlledMusicService === source) return;
+    // webviewIsPlaying masih milik layanan lama (status layanan lain disaring),
+    // jadi jeda di sini mengenai layanan lama: satu sumber bunyi saja.
+    if (webviewIsPlaying) sendMusicCommand('playPause').catch(() => { /* webview lama belum siap */ });
+    controlledMusicService = source;
+    controlMode = 'webview';
+    // Judul yang sama tidak dikirim ulang dengan sendirinya; minta status penuh
+    // supaya UI langsung berganti ke layanan baru.
+    if (source === 'spotify') sendSpotifyCommand('resendState');
+    else webview.executeJavaScript('window.playerAPI.requestMetadata()').catch(() => { /* belum siap */ });
+}
+
+function sendSpotifyCommand(command, arg) {
+    try {
+        spotifyWebview.send('spotify-command', { command, arg });
+    } catch (err) {
+        // Webview Spotify belum dimuat.
+    }
+}
+
+// Pengganti `webview.executeJavaScript('window.playerAPI.xxx()')`. Untuk YT
+// Music string yang dijalankan persis sama dengan sebelumnya.
+function sendMusicCommand(command, arg) {
+    if (controlledMusicService === 'spotify' && spotifyWebview) {
+        sendSpotifyCommand(command, arg);
+        return Promise.resolve();
+    }
+    const call = arg === undefined
+        ? `window.playerAPI.${command}()`
+        : `window.playerAPI.${command}(${JSON.stringify(arg)})`;
+    return webview.executeJavaScript(call);
+}
+
+// Pengganti syarat lama `webviewActive && webviewIsPlaying`. webviewActive cuma
+// dinyalakan dom-ready YT Music, jadi Spotify perlu jalur sendiri.
+function isOnlinePlaybackActive() {
+    return webviewIsPlaying && (controlledMusicService === 'spotify' || webviewActive);
+}
+
+const WEBVIEW_TITLES = {
+    ytmusic: 'YT Music webview',
+    spotify: 'Spotify webview'
+};
+
+function showWebviewService(service) {
+    activeWebviewService = service;
+    webview.classList.toggle('webview-service-hidden', service !== 'ytmusic');
+    if (spotifyWebview) spotifyWebview.classList.toggle('webview-service-hidden', service !== 'spotify');
+    if (webviewTitle) webviewTitle.textContent = WEBVIEW_TITLES[service];
+}
+
+async function openSpotifyWebview(url) {
+    if (!spotifyWebview) return;
+    if (!window.internetConnectionAllowed) {
+        showNotification('Izinkan akses internet melalui menu Options -> Network terlebih dahulu.', 'notification-warning');
+        return;
+    }
+
+    overlay.classList.remove('hidden');
+    showWebviewService('spotify');
+    spotifyWebview.focus();
+    if (!webviewIsPlaying) {
+        controlledMusicService = 'spotify';
+        if (audioElement.paused) controlMode = 'webview';
+    }
+
+    if (!spotifyWidevineReady) {
+        showLoader();
+        const result = await ipcRenderer.invoke('spotify:prepare');
+        hideLoader();
+        spotifyWidevineReady = result.ok;
+        if (!result.ok) {
+            // Halaman tetap dimuat: jelajah dan login masih berguna walau belum bisa memutar.
+            showNotification(result.message, 'notification-error');
+        } else if (spotifyWebview.getAttribute('src')) {
+            // Spotify memeriksa DRM sekali, sesaat sesudah halaman dimuat. Halaman
+            // yang terlanjur dimuat sebelum CDM siap tetap menolak memutar sampai
+            // dimuat ulang.
+            spotifyWebview.reload();
+        }
+    }
+
+    if (!spotifyWebview.getAttribute('src')) {
+        spotifyWebview.src = url;
+    }
+}
+
+if (spotifyWebview) {
+    spotifyWebview.addEventListener('did-start-loading', () => {
+        if (activeWebviewService === 'spotify') showLoader();
+    });
+    spotifyWebview.addEventListener('did-stop-loading', () => hideLoader());
+    spotifyWebview.addEventListener('did-fail-load', (e) => {
+        // -3 itu navigasi yang dibatalkan (mis. dialihkan), bukan kegagalan.
+        if (!e.isMainFrame || e.errorCode === -3) return;
+        hideLoader();
+        showNotification('Gagal memuat Spotify.', 'notification-error');
+    });
+
+    spotifyWebview.addEventListener('ipc-message', (e) => handleOnlineWebviewMessage(e, 'spotify'));
+
+    // Lebih cepat daripada menunggu play-state berikutnya dari spotify-preload.js.
+    spotifyWebview.addEventListener('media-started-playing', () => {
+        if (!audioElement.paused) audioElement.pause();
+        takeOverMusicControl('spotify');
+    });
+}
+//------------------- ( end Spotify: webview kedua di jendela yang sama ) -------------------------//
+
 //------------------- ( tombol close webview ) -------------------------//
 closeBtn.addEventListener('click', () => {
     if (overlay.classList.contains('hidden')) {
@@ -802,11 +948,12 @@ if (webview && openWebviewDevToolsBtn) {
 
     // listener tombol "Toggle Webview DevTools"
     openWebviewDevToolsBtn.addEventListener('click', () => {
-        if (webview.isDevToolsOpened()) {
-            webview.closeDevTools();
+        const target = (activeWebviewService === 'spotify' && spotifyWebview) ? spotifyWebview : webview;
+        if (target.isDevToolsOpened()) {
+            target.closeDevTools();
             console.log('Webview DevTools closed.');
         } else {
-            webview.openDevTools();
+            target.openDevTools();
             console.log('Webview DevTools opened.');
         }
     });
@@ -1044,7 +1191,9 @@ function onWebviewResizeUp() {
 onlineIcons.forEach(icon => {
     icon.addEventListener('click', () => {
         const url = icon.getAttribute('data-url');
-        if (url) openExternalWebview(url);
+        if (!url) return;
+        if (icon.dataset.service === 'spotify') openSpotifyWebview(url);
+        else openExternalWebview(url);
     });
 });
 

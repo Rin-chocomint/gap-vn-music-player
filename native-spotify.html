@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <title>GAP Spotify</title>
+    <style>
+        @font-face {
+            font-family: 'Lexend';
+            font-style: normal;
+            font-weight: 400;
+            src: url('./aset/fonts/lexend-v26-latin-regular.woff2') format('woff2');
+        }
+
+        html,
+        body {
+            margin: 0;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+            font-family: 'Lexend', sans-serif;
+        }
+
+        webview {
+            width: 100%;
+            height: 100%;
+        }
+
+        #status {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            padding: 32px;
+            background: #000;
+            color: #ddd;
+            text-align: center;
+        }
+
+        #status[hidden],
+        #status button[hidden] {
+            display: none;
+        }
+
+        #status-text {
+            max-width: 520px;
+            margin: 0;
+            line-height: 1.6;
+        }
+
+        #status-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        #status button {
+            padding: 8px 18px;
+            border: none;
+            border-radius: 20px;
+            background: #1ed760;
+            color: #000;
+            font: inherit;
+            cursor: pointer;
+        }
+
+        #status button.secondary {
+            background: #333;
+            color: #ddd;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Tanpa preload: webview-preload.js berisi scraper dan penjaga login khusus
+         YT Music. Partition, UA, dan Widevine-nya disiapkan spotify-session.js. -->
+    <webview id="spotify-view" partition="persist:spotify" src="" allowpopups></webview>
+
+    <div id="status">
+        <p id="status-text">Menyiapkan modul pemutaran Spotify...</p>
+        <div id="status-actions">
+            <button id="retry-button" hidden>Coba lagi</button>
+            <button id="skip-button" class="secondary" hidden>Buka tanpa pemutaran</button>
+        </div>
+    </div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+
+        const SPOTIFY_URL = 'https://open.spotify.com';
+        const view = document.getElementById('spotify-view');
+        const statusBox = document.getElementById('status');
+        const statusText = document.getElementById('status-text');
+        const retryButton = document.getElementById('retry-button');
+        const skipButton = document.getElementById('skip-button');
+
+        let retryAction = null;
+
+        function showStatus(text, { retry = null, allowSkip = false } = {}) {
+            statusText.textContent = text;
+            retryAction = retry;
+            retryButton.hidden = !retry;
+            skipButton.hidden = !allowSkip;
+            statusBox.hidden = false;
+        }
+
+        function loadSpotify() {
+            statusBox.hidden = true;
+            // Spotify memeriksa DRM sekali, sesaat sesudah halaman dimuat. Halaman
+            // yang terlanjur dimuat sebelum CDM siap harus dimuat ulang.
+            if (view.getAttribute('src')) view.reload();
+            else view.src = SPOTIFY_URL;
+        }
+
+        async function prepareAndLoad() {
+            showStatus('Menyiapkan modul pemutaran Spotify...');
+            const result = await ipcRenderer.invoke('spotify:prepare');
+            if (result.ok) {
+                loadSpotify();
+                return;
+            }
+            showStatus(result.message, { retry: prepareAndLoad, allowSkip: true });
+        }
+
+        retryButton.addEventListener('click', () => { if (retryAction) retryAction(); });
+        skipButton.addEventListener('click', loadSpotify);
+
+        view.addEventListener('did-fail-load', (e) => {
+            // -3 itu navigasi yang dibatalkan (mis. dialihkan), bukan kegagalan.
+            if (!e.isMainFrame || e.errorCode === -3) return;
+            showStatus('Spotify gagal dimuat (' + e.errorDescription + '). Periksa koneksi internet, lalu coba lagi.', {
+                retry: loadSpotify
+            });
+        });
+
+        prepareAndLoad();
+    </script>
+</body>
+
+</html>

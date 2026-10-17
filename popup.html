@@ -17,7 +17,8 @@
                 </p>
                 <p class="popup-description">
                     Pilih opsi boot ke "Game" untuk menikmati estetika Aplikasi serta game Visual Novel, atau Jika hanya
-                    mau mendengarkan musik, boot ke "Native ytMusic webview" untuk Power Effisiensi.
+                    mau mendengarkan musik, boot ke "Native ytMusic webview" atau "Native Spotify webview" untuk Power
+                    Effisiensi.
                 </p>
             </div>
         </div>
@@ -30,6 +31,7 @@
                     <select id="boot-mode-select" onchange="toggleBootOptions()" style="margin-right: 10px;">
                         <option value="game">Game (VN & Music Player)</option>
                         <option value="native">Native ytMusic webview</option>
+                        <option value="native-spotify">Native Spotify webview</option>
                         <option value="gif-overlay">GIF/Media Overlay Studio</option>
                     </select>
 
@@ -268,7 +270,7 @@
         const gameOptions = document.getElementById('game-mode-options');
         const inputs = gameOptions.querySelectorAll('input, select');
 
-        if (mode === 'native' || mode === 'gif-overlay') {
+        if (mode === 'native' || mode === 'native-spotify' || mode === 'gif-overlay') {
             // Samarkan opsi game mode untuk native dan gif-overlay
             gameOptions.style.opacity = '0.3';
             gameOptions.style.pointerEvents = 'none';
@@ -307,6 +309,7 @@
         const mode = document.getElementById('boot-mode-select').value;
         const modeNames = {
             'native': 'Native ytMusic',
+            'native-spotify': 'Native Spotify',
             'game': 'Game (VN & Music Player)',
             'gif-overlay': 'GIF Overlay Only'
         };
@@ -395,6 +398,8 @@
                 mode: 'native'
                 // Default settings akan di-handle oleh main.js dan native-player.html
             });
+        } else if (mode === 'native-spotify') {
+            ipcRenderer.send('open-main-window', { mode: 'native-spotify' });
         } else if (mode === 'gif-overlay') {
             // Mode GIF Overlay - hanya menampilkan panel kontrol GIF
             ipcRenderer.send('open-main-window', {

@@ -1705,8 +1705,8 @@ function renderPlaylist() {
             controlMode = 'local';
 
             // Hentikan webview jika sedang berjalan
-            if (webviewActive && webviewIsPlaying) {
-                webview.executeJavaScript('window.playerAPI.playPause()');
+            if (isOnlinePlaybackActive()) {
+                sendMusicCommand('playPause');
             }
 
             currentSongIndex = index;
@@ -2071,7 +2071,7 @@ document.getElementById('shuffle-music').addEventListener('click', () => {
 // --- Listener elemen Musik Player saat ada webview (tidak ter-Expand) --- //
 document.getElementById('play-pause').addEventListener('click', () => {
     if (controlMode === 'webview') {
-        webview.executeJavaScript('window.playerAPI.playPause()');
+        sendMusicCommand('playPause');
     } else {
         const isPlayingAfterClick = audioElement.paused;
         ipcRenderer.send('update-rpc-activity', {
@@ -2092,7 +2092,7 @@ document.getElementById('play-pause').addEventListener('click', () => {
 
 document.getElementById('prev-music').addEventListener('click', () => {
     if (controlMode === 'webview') {
-        webview.executeJavaScript('window.playerAPI.prev()');
+        sendMusicCommand('prev');
     } else {
         currentSongIndex = (currentSongIndex - 1 + songs.length) % songs.length;
         loadSong(currentSongIndex);
@@ -2103,7 +2103,7 @@ document.getElementById('prev-music').addEventListener('click', () => {
 
 document.getElementById('next-music').addEventListener('click', () => {
     if (controlMode === 'webview') {
-        webview.executeJavaScript('window.playerAPI.next()');
+        sendMusicCommand('next');
     } else {
         if (isShuffleOn) {
             currentSongIndex = getNextShuffleSongIndex();
@@ -2143,7 +2143,7 @@ expandCollapseButton.addEventListener('click', () => {
 /* Expanded button di dalam player */
 document.getElementById("play-pause-expanded").addEventListener("click", () => {
     if (controlMode === 'webview') {
-        webview.executeJavaScript('window.playerAPI.playPause()');
+        sendMusicCommand('playPause');
     } else {
         const isPlayingAfterClick = audioElement.paused;
         ipcRenderer.send('update-rpc-activity', {
@@ -2164,7 +2164,7 @@ document.getElementById("play-pause-expanded").addEventListener("click", () => {
 
 document.getElementById('prev-music-expanded').addEventListener('click', () => {
     if (controlMode === 'webview') {
-        webview.executeJavaScript('window.playerAPI.prev()');
+        sendMusicCommand('prev');
     } else {
         currentSongIndex = (currentSongIndex - 1 + songs.length) % songs.length;
         loadSong(currentSongIndex);
@@ -2175,7 +2175,7 @@ document.getElementById('prev-music-expanded').addEventListener('click', () => {
 
 document.getElementById("next-music-expanded").addEventListener("click", () => {
     if (controlMode === 'webview') {
-        webview.executeJavaScript('window.playerAPI.next()');
+        sendMusicCommand('next');
     } else {
         if (isShuffleOn) currentSongIndex = Math.floor(Math.random() * songs.length);
         else currentSongIndex = (currentSongIndex + 1) % songs.length;
@@ -2256,7 +2256,7 @@ document.getElementById('progress-container').addEventListener('click', (e) => {
         const containerWidth = e.currentTarget.offsetWidth;
         const clickX = e.offsetX;
         const seekTime = (clickX / containerWidth) * webviewDuration; // Use webviewDuration
-        webview.executeJavaScript(`window.playerAPI.seek(${seekTime})`);
+        sendMusicCommand('seek', seekTime);
     } else {
         // Local seek logic
         if (!isNaN(audioElement.duration)) {
@@ -2272,7 +2272,7 @@ document.getElementById('progress-container-expanded').addEventListener('click',
         const containerWidth = e.currentTarget.offsetWidth;
         const clickX = e.offsetX;
         const seekTime = (clickX / containerWidth) * webviewDuration;
-        webview.executeJavaScript(`window.playerAPI.seek(${seekTime})`);
+        sendMusicCommand('seek', seekTime);
     } else {
         if (!isNaN(audioElement.duration)) {
             const containerWidth = e.currentTarget.offsetWidth;

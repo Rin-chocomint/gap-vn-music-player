@@ -153,13 +153,15 @@
     opacity: 1;
 }
 
-.online-icon img {
+.online-icon img,
+.online-icon svg {
     width: 32px;
     height: 32px;
     transition: transform 0.2s;
 }
 
-.online-icon:hover img {
+.online-icon:hover img,
+.online-icon:hover svg {
     transform: scale(1.1);
 }
 
@@ -259,6 +261,24 @@
 
 webview#external-webview.vertical-mode::-webkit-scrollbar {
     display: none;
+}
+
+/* Menumpuk tepat di atas webview YT Music, di bawah title bar 30px. */
+webview#spotify-webview {
+    position: absolute;
+    top: 30px;
+    left: 0;
+    width: 100%;
+    height: calc(100% - 30px);
+    border: none;
+}
+
+/* Jangan diganti display:none. Electron meminta display:flex bawaan <webview>
+   dibiarkan, dan ukuran yang tetap membuat layout YT Music yang dibaca scraper
+   tidak ikut berubah saat layanan lain sedang tampil. */
+webview.webview-service-hidden {
+    visibility: hidden;
+    pointer-events: none;
 }
 
 .loader {

@@ -161,13 +161,13 @@ ipcRenderer.on('forwarded-player-control-action', (event, action) => {
                 } else if (controlMode === 'webview') {
                     if (webviewDuration > 0) {
                         const seekTime = action.percentage * webviewDuration;
-                        webview.executeJavaScript(`window.playerAPI.seek(${seekTime})`);
+                        sendMusicCommand('seek', seekTime);
                     }
                 }
                 break;
             case 'play-from-playlist':
-                if (webviewActive && webviewIsPlaying) {
-                    webview.executeJavaScript('window.playerAPI.playPause()');
+                if (isOnlinePlaybackActive()) {
+                    sendMusicCommand('playPause');
                 }
                 controlMode = 'local';
                 currentSongIndex = action.index;

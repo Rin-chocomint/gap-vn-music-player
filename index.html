@@ -194,6 +194,16 @@
                         <div class="online-icon" data-url="https://music.youtube.com">
                             <img src="./aset/webview.png" alt="YouTube Music">
                         </div>
+                        <div class="online-icon" data-url="https://open.spotify.com" data-service="spotify" title="Spotify">
+                            <svg viewBox="0 0 24 24" role="img" aria-label="Spotify">
+                                <circle cx="12" cy="12" r="12" fill="#1ED760" />
+                                <g fill="none" stroke="#000" stroke-linecap="round">
+                                    <path d="M5.8 8.9c4-1.2 8.7-.8 12.3 1.2" stroke-width="1.8" />
+                                    <path d="M6.5 12.4c3.3-.9 7-.6 10 1.1" stroke-width="1.5" />
+                                    <path d="M7.2 15.6c2.6-.7 5.4-.5 7.7.8" stroke-width="1.2" />
+                                </g>
+                            </svg>
+                        </div>
                     </div>
 
                     <div id="volume-and-buttons">
@@ -1027,7 +1037,7 @@
     <div id="external-browser-container" class="hidden">
         <div id="webview-window">
             <div class="title-bar">
-                <span>YT Music webview</span>
+                <span id="webview-title">YT Music webview</span>
 
                 <div class="webview-preset-controls">
                     <button id="preset-normal" class="active" title="Mode Normal (Default)">Desktop Web</button>
@@ -1044,6 +1054,13 @@
                  membuat Google menolak login ("browser tidak aman"). -->
             <webview id="external-webview" preload="webview-preload.js" src="" allowpopups
                 style="width:100%; height:calc(100% - 30px); border:none;"></webview>
+            <!-- Preload sendiri (spotify-preload.js), bukan webview-preload.js yang
+                 berisi scraper dan penjaga login khusus YT Music. Partition-nya
+                 disiapkan spotify-session.js (UA bersih, Widevine). Ditumpuk di atas
+                 webview YT Music, bukan diganti, supaya musik di layanan yang tidak
+                 tampil tetap jalan. -->
+            <webview id="spotify-webview" class="webview-service-hidden" partition="persist:spotify"
+                preload="spotify-preload.js" src="" allowpopups></webview>
             <button id="openWebviewDevTools"
                 style="position: fixed; top: 10px; right: 10px; z-index: 100000; padding: 5px 10px; background-color: #333; color: white; border: 1px solid #555; border-radius: 5px; cursor: pointer;">
                 Webview DevTools
